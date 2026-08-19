@@ -350,13 +350,35 @@ const NA_SHARE=.8; // 일반공격이 총딜에서 차지하는 비중 가정
 const tgtName={infantry:"보병",lancer:"창병",marksman:"궁병","inf+mar":"보병+궁병","mar+lan":"궁병+창병"};
 function tgtStat(t,r){const v=tgtRatio(t,r);return v<5?["dead","사망",v]:v<20?["weak","약함",v]:["ok","정상",v];}
 
+// 비율은 [보병,창병,궁병]. 2자리 약칭 해석 규칙:
+//  60/40 = 보60·창40 (궁0)   70/30 = 보70·창30 (궁0)
+//  50/50 = 보50·궁50 (창0)   49/49 = 보49·궁49 (창2)   40/60 = 보40·궁60 (창0)
+//  단, "40/60 초방어를 깨는 50/50"만은 보50·창50 (창병으로 상대 궁60 저격)
 const COUNTERS=[
- {m:[50,20,30],c:["40/40/20","30/20/50"],ban:[[50,50,0],[49,49,0],[48,4,48],[60,40,0]],why:"창40으로 상대 궁30 저격 / 30·20·50은 궁병 속결"},
- {m:[60,40,0],c:["40/20/40 + 멀티랠리 3~4개"],ban:[[50,50,0],[49,49,0],[48,4,48]],why:"60/40은 만능 방어라 단일 랠리로 못 깬다. 동시 타격이 정석"},
- {m:[70,30,0],c:["멀티랠리로 물량 압박"],ban:[[50,50,0],[49,49,0],[48,4,48]],why:"특정 비율 카운터가 없다"},
- {m:[40,60,0],c:["50/50","60/40"],ban:[[50,20,30]],why:"50보가 전방 유지 + 50창이 60궁을 순삭"},
- {m:[60,30,10],c:["40/20/40 + 더블·트리플 랠리"],ban:[],why:"단일 랠리는 실패한다"},
- {m:[40,10,50],c:["40/40/20","50/40/10"],ban:[[48,4,48],[49,49,0]],why:"상대 창10이라 내 후열이 안전. 창40으로 상대 주력(궁50)을 지운다"}];
+ {m:[50,20,30],lbl:"50/20/30",src:"sheet",
+  c:["40/40/20","30/20/50"],
+  ban:[{v:[60,40,0],l:"60/40"}],
+  why:"40/40/20은 보40 흡수·창40이 상대 궁30 저격·궁20 전방. 30/20/50은 궁50 속전속결. 반대로 60/40은 궁병이 0이라 상대 보50을 녹이지 못하고, 창40이 잡을 상대 궁도 30뿐이라 화력이 남는다."},
+ {m:[60,40,0],lbl:"60/40",src:"sheet",
+  c:["40/20/40 + 멀티랠리 3~4개"],
+  ban:[{v:[50,0,50],l:"50/50"},{v:[49,2,49],l:"49/49"}],
+  why:"60/40은 만능 방어라 단일 랠리로는 못 깬다. 궁병을 절반 넣는 50/50·49/49는 상대 창40에 후열이 먼저 지워지고, 보60이 오래 버텨 역전당한다. 동시 타격이 정석이고 브래들리·카롤·불카누스가 영웅 카운터."},
+ {m:[70,30,0],lbl:"70/30",src:"sheet",
+  c:["멀티랠리로 물량 압박"],
+  ban:[{v:[50,0,50],l:"50/50"},{v:[49,2,49],l:"49/49"}],
+  why:"특정 비율 카운터가 없다. 60/40과 같은 이유로 궁병 절반 편성은 금지."},
+ {m:[40,0,60],lbl:"40/60 (초방어)",src:"sheet",
+  c:["50/50/0 (보50·창50)","60/40"],
+  ban:[{v:[50,20,30],l:"50/20/30"}],
+  why:"보50이 전방을 유지하고 창50이 상대 궁60을 순삭한다. 창병이 20밖에 없는 50/20/30은 상대 궁60을 못 지워서 밴드. 여기서는 60/40이 오히려 정답 카운터다."},
+ {m:[60,30,10],lbl:"60/30/10",src:"sheet",
+  c:["40/20/40 + 더블·트리플 랠리"],ban:[],
+  why:"단일 랠리는 실패한다. 최소 2~3랠리 필요."},
+ {m:[40,10,50],lbl:"40/10/50 (준공격)",src:"theory",
+  c:["40/40/20","50/40/10"],ban:[],
+  why:"상대 창병이 10뿐이라 내 후열이 안전하다. 창40으로 상대 주력(궁50)을 지운다. ※ 가이드 카운터표에 없는 확장 항목(이론)."}];
+const BAND_TOL=6;   // 내 병비가 금지 비율과 이 거리 안이면 밴드
+const ROW_TOL=10;   // 상대 비율이 이 거리 밖이면 밴드 판정을 내리지 않는다
 const dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2]);
 
 function calc(){
@@ -414,8 +436,9 @@ function calc(){
    const en=norm(...ev),ea=[en.inf,en.lan,en.mar];
    const best=COUNTERS.map(c=>({c,d:dist(ea,c.m)})).sort((a,b)=>a.d-b.d)[0];
    const mine=[r.inf,r.lan,r.mar];
-   const banned=best.c.ban.find(b=>dist(mine,b)<8);
-   ctr={en:ea,rule:best.c,banned,far:best.d>15};
+   const exact=best.d<=ROW_TOL;
+   const banned=exact?best.c.ban.map(b=>({b,d:dist(mine,b.v)})).filter(x=>x.d<BAND_TOL).sort((a,b)=>a.d-b.d).map(x=>x.b)[0]:null;
+   ctr={en:ea,rule:best.c,banned,exact,d:best.d};
  }
  render({mode,leaders,picks,r,buck,src,cls,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap});
 }
@@ -508,12 +531,14 @@ function render(d){
   const e=ctr.en,mine=[r.inf,r.lan,r.mar];
   o+='<h2>⑥ 상대 카운터 · 밴드 판정</h2><div class="panel">';
   o+='<div class="callout '+(ctr.banned?"co-warn":"co-ok")+'"><h3>'+(ctr.banned?"🚫 밴드 편성입니다":"✅ 밴드 아님")+"</h3>"+
-   "<p>상대 <b>"+e.map(v=>v.toFixed(0)).join("/")+"</b> · 내 편성 <b>"+mine.map(v=>v.toFixed(0)).join("/")+"</b></p>"+
-   (ctr.banned?"<p>현재 병비는 이 상대에게 <b>쓰면 지는 편성</b>입니다. 아래 카운터로 바꾸세요.</p>":"")+
-   "<p><b>추천 카운터:</b> "+ctr.rule.c.map(c=>'<span class="pill">'+c+"</span>").join("")+"</p>"+
+   "<p>상대 <b>"+e.map(v=>v.toFixed(0)).join("/")+"</b> · 내 편성 <b>"+mine.map(v=>v.toFixed(0)).join("/")+"</b>"+
+     (ctr.exact?' <span class="pill">가이드 항목: '+esc(ctr.rule.lbl)+"</span>":"")+"</p>"+
+   (ctr.banned?"<p>현재 병비는 이 상대에게 <b>쓰면 지는 편성("+esc(ctr.banned.l)+')</b>입니다. 아래 카운터로 바꾸세요.</p>':"")+
+   (!ctr.exact?'<p class="note">⚠️ 가이드 카운터표에 이 상대 비율('+e.map(v=>v.toFixed(0)).join("/")+")과 맞는 항목이 없습니다. 가장 가까운 <b>"+esc(ctr.rule.lbl)+"</b> 항목을 <b>참고용</b>으로만 보여주며, 밴드 판정은 하지 않습니다.</p>":"")+
+   "<p><b>추천 카운터:</b> "+ctr.rule.c.map(c=>'<span class="pill">'+esc(c)+"</span>").join("")+"</p>"+
    '<p class="cap">'+esc(ctr.rule.why)+"</p>"+
-   (ctr.rule.ban.length?'<p class="cap">🚫 금지: '+ctr.rule.ban.map(b=>b.join("/")).join(" · ")+"</p>":"")+
-   (ctr.far?'<p class="note">⚠️ 가이드 표에 정확히 일치하는 상대 비율이 없어 가장 가까운 항목('+ctr.rule.m.join("/")+")을 적용했습니다.</p>":"")+"</div></div>";}
+   (ctr.rule.ban.length?'<p class="cap">🚫 이 상대에게 금지: '+ctr.rule.ban.map(b=>esc(b.l)+" ("+b.v.join("/")+")").join(" · ")+"</p>":'<p class="cap">🚫 이 상대에겐 가이드상 금지 비율이 없습니다.</p>')+
+   (ctr.rule.src==="theory"?'<p class="note">이 항목은 가이드 원본 카운터표에 없는 <b>이론 확장</b>입니다.</p>':"")+"</div></div>";}
  document.getElementById("out").innerHTML=o;
 }
 
