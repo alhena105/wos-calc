@@ -82,7 +82,7 @@ footer a{color:var(--accent);text-decoration:none}
   </div>
   <div style="margin-top:14px" class="grid">
     <div><label>내 병비 (보 / 창 / 궁)</label><div class="ratio3"><input id="r1" type="number" value="48"><input id="r2" type="number" value="4"><input id="r3" type="number" value="48"></div></div>
-    <div><label>상대 방어 병비 (선택)</label><div class="ratio3"><input id="e1" type="number" placeholder="보"><input id="e2" type="number" placeholder="창"><input id="e3" type="number" placeholder="궁"></div></div>
+    <div><label id="eLab">상대 방어 병비 (선택)</label><div class="ratio3"><input id="e1" type="number" placeholder="보"><input id="e2" type="number" placeholder="창"><input id="e3" type="number" placeholder="궁"></div></div>
     <div><label>서버 최대 세대 (조이너 풀 제한)</label><select id="gcap"></select></div>
   </div>
   <div class="note" style="margin-top:10px" id="assump"><b>계산 가정</b> — 원정스킬은 전부 Lv.5(4성 이상)로 간주 · 확률·주기 스킬은 <b>기대값</b>으로 환산 · 병종 전용 딜 스킬은 보병 가중치 0.3을 적용한 <b>딜 지분</b>으로 환산(보병은 탱커라 병력 비중 대비 딜이 적음) · 일반공격 한정 스킬은 총딜의 80%를 일반공격으로 가정 · "확률로 N% 피해" 계열은 "피해량 증가"와 같은 칸으로 묶었습니다(effect_op 미확정).<br>전무 레벨 0 = 미보유 · 숫자 옆 칸이 전무 레벨입니다. 병비 합이 100이 아니면 자동으로 정규화합니다.</div>
@@ -379,6 +379,35 @@ const COUNTERS=[
   why:"상대 창병이 10뿐이라 내 후열이 안전하다. 창40으로 상대 주력(궁50)을 지운다. ※ 가이드 카운터표에 없는 확장 항목(이론)."}];
 const BAND_TOL=6;   // 내 병비가 금지 비율과 이 거리 안이면 밴드
 const ROW_TOL=10;   // 상대 비율이 이 거리 밖이면 밴드 판정을 내리지 않는다
+
+// ── 수비(개리슨) 밴드 판정 ────────────────────────────────────────────
+// 가이드 카운터표는 "상대 방어 → 내 랠리" 전용이다. 수비는 승리 조건이 반대라
+// 같은 표를 쓸 수 없다. 아래는 1절 병종 3역할 모델에서 파생한 규칙(이론).
+//  · 공격: 제한 시간 안에 녹여야 함 → 전방을 지우는 궁병이 필수
+//  · 수비: 버티면 이김 → 궁병의 "킬 속도" 가치가 낮고, 대신 상대 창병에게
+//          일방적으로 잡히는 순손실 자산이 된다
+// ⇒ 수비의 유일한 밴드 축: "상대 랠리에 창병이 많은데 내 궁병이 많다"
+function defenseVerdict(en,mine){
+ const enLan=en[1], enMar=en[2], enInf=en[0], myMar=mine[2], myLan=mine[1], myInf=mine[0];
+ let lvl="ok",head="✅ 밴드 아님",why=[],rec=[];
+ if(enLan>=30&&myMar>=30){lvl="ban";head="🚫 밴드 편성입니다";
+   why.push("상대 랠리의 창병 "+enLan.toFixed(0)+"%가 내 궁병 "+myMar.toFixed(0)+"%를 후열에서 직접 지웁니다. 창병은 보병을 무시하고 궁병을 때리므로 내 보병이 아무리 두꺼워도 막아주지 못합니다.");}
+ else if(enLan>=30&&myMar>=15){lvl="warn";head="⚠️ 위험 구간";
+   why.push("상대 창병 "+enLan.toFixed(0)+"%에 내 궁병 "+myMar.toFixed(0)+"%가 노출됩니다. 궁병을 더 줄이는 편이 안전합니다.");}
+ else if(enLan>=30){why.push("내 궁병 비중이 낮아 상대 창병 "+enLan.toFixed(0)+"%가 때릴 표적이 없습니다. 상대 화력의 상당 부분이 헛돕니다.");}
+ if(enMar>=40&&myLan<25) {if(lvl==="ok"){lvl="warn";head="⚠️ 아깝습니다";}
+   why.push("상대 주력이 궁병 "+enMar.toFixed(0)+"%인데 내 창병이 "+myLan.toFixed(0)+"%뿐입니다. 창병을 올리면 상대 딜러를 후열에서 직접 끊을 수 있습니다.");}
+ else if(enMar>=40) why.push("내 창병 "+myLan.toFixed(0)+"%가 상대 주력 딜러(궁병 "+enMar.toFixed(0)+"%)를 직접 저격합니다. 수비의 정석 구도입니다.");
+ if(myInf<45) why.push("내 보병이 "+myInf.toFixed(0)+"%뿐입니다. 수비는 버티는 게 승리 조건이라 전방 두께가 곧 승률입니다.");
+ // 추천
+ if(enLan>=30){rec.push("60/40 (보60·창40)","70/10/20");
+   why.push("상대가 창병 편성이라 내 궁병은 순손실입니다. 보병을 두껍게 하고 창병으로 맞받는 구도가 안전합니다.");}
+ else if(enMar>=40){rec.push("60/40 (보60·창40)","60/30/10");
+   why.push("상대 궁병이 주력이므로 창병 40%가 가장 효율적인 방어 투자입니다.");}
+ else {rec.push("60/40 (보60·창40)","50/20/30","48/4/48");
+   why.push("상대가 균형형이라 시트 방어 행의 어떤 비율이든 무난합니다. 60/40이면 상대 창병이 때릴 궁병이 없어 상대 화력 일부가 낭비됩니다.");}
+ return {lvl,head,why,rec};
+}
 const dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2]);
 
 function calc(){
@@ -434,11 +463,15 @@ function calc(){
  let ctr=null;
  if(ev[0]+ev[1]+ev[2]>0){
    const en=norm(...ev),ea=[en.inf,en.lan,en.mar];
-   const best=COUNTERS.map(c=>({c,d:dist(ea,c.m)})).sort((a,b)=>a.d-b.d)[0];
    const mine=[r.inf,r.lan,r.mar];
-   const exact=best.d<=ROW_TOL;
-   const banned=exact?best.c.ban.map(b=>({b,d:dist(mine,b.v)})).filter(x=>x.d<BAND_TOL).sort((a,b)=>a.d-b.d).map(x=>x.b)[0]:null;
-   ctr={en:ea,rule:best.c,banned,exact,d:best.d};
+   if(mode==="defender"){
+     ctr={mode,en:ea,def:defenseVerdict(ea,mine)};
+   }else{
+     const best=COUNTERS.map(c=>({c,d:dist(ea,c.m)})).sort((a,b)=>a.d-b.d)[0];
+     const exact=best.d<=ROW_TOL;
+     const banned=exact?best.c.ban.map(b=>({b,d:dist(mine,b.v)})).filter(x=>x.d<BAND_TOL).sort((a,b)=>a.d-b.d).map(x=>x.b)[0]:null;
+     ctr={mode,en:ea,rule:best.c,banned,exact,d:best.d};
+   }
  }
  render({mode,leaders,picks,r,buck,src,cls,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap});
 }
@@ -526,19 +559,32 @@ function render(d){
    '<div class="callout co-tip"><h3>📋 Ton 시트 등재 영웅만</h3><p><b>'+tSheet.map(x=>esc(x.h.kr)).join(" · ")+
    '</b></p><p class="cap">위 계산 순위에 <span class="tag t-warn">이론</span> 배지가 붙은 영웅은 실전 시트 조이너 명단에 없습니다. 대개 <b>투자 문턱</b> 때문입니다 — 전설이라 만렙 보유자가 적거나, 그 영웅을 만렙 찍은 사람은 이미 리더로 쓰고 있어 조이너로 못 뺍니다. 실전에서는 시트 쪽을 우선하세요.</p></div>':"")+"</div>";
 
- // 카운터
+ // 카운터 · 밴드
  if(ctr){
   const e=ctr.en,mine=[r.inf,r.lan,r.mar];
-  o+='<h2>⑥ 상대 카운터 · 밴드 판정</h2><div class="panel">';
-  o+='<div class="callout '+(ctr.banned?"co-warn":"co-ok")+'"><h3>'+(ctr.banned?"🚫 밴드 편성입니다":"✅ 밴드 아님")+"</h3>"+
-   "<p>상대 <b>"+e.map(v=>v.toFixed(0)).join("/")+"</b> · 내 편성 <b>"+mine.map(v=>v.toFixed(0)).join("/")+"</b>"+
-     (ctr.exact?' <span class="pill">가이드 항목: '+esc(ctr.rule.lbl)+"</span>":"")+"</p>"+
-   (ctr.banned?"<p>현재 병비는 이 상대에게 <b>쓰면 지는 편성("+esc(ctr.banned.l)+')</b>입니다. 아래 카운터로 바꾸세요.</p>':"")+
-   (!ctr.exact?'<p class="note">⚠️ 가이드 카운터표에 이 상대 비율('+e.map(v=>v.toFixed(0)).join("/")+")과 맞는 항목이 없습니다. 가장 가까운 <b>"+esc(ctr.rule.lbl)+"</b> 항목을 <b>참고용</b>으로만 보여주며, 밴드 판정은 하지 않습니다.</p>":"")+
-   "<p><b>추천 카운터:</b> "+ctr.rule.c.map(c=>'<span class="pill">'+esc(c)+"</span>").join("")+"</p>"+
-   '<p class="cap">'+esc(ctr.rule.why)+"</p>"+
-   (ctr.rule.ban.length?'<p class="cap">🚫 이 상대에게 금지: '+ctr.rule.ban.map(b=>esc(b.l)+" ("+b.v.join("/")+")").join(" · ")+"</p>":'<p class="cap">🚫 이 상대에겐 가이드상 금지 비율이 없습니다.</p>')+
-   (ctr.rule.src==="theory"?'<p class="note">이 항목은 가이드 원본 카운터표에 없는 <b>이론 확장</b>입니다.</p>':"")+"</div></div>";}
+  const enLbl=ctr.mode==="defender"?"상대 랠리":"상대 방어";
+  o+='<h2>⑥ '+(ctr.mode==="defender"?"들어오는 랠리 · 수비 밴드 판정":"상대 카운터 · 랠리 밴드 판정")+'</h2><div class="panel">';
+  if(ctr.mode==="defender"){
+   const d=ctr.def, cls=d.lvl==="ban"?"co-warn":d.lvl==="warn"?"co-tip":"co-ok";
+   o+='<div class="callout '+cls+'"><h3>'+d.head+"</h3>"+
+    "<p>"+enLbl+" <b>"+e.map(v=>v.toFixed(0)).join("/")+"</b> · 내 수비 <b>"+mine.map(v=>v.toFixed(0)).join("/")+"</b></p>"+
+    d.why.map(w=>'<p class="cap">'+esc(w)+"</p>").join("")+
+    "<p><b>추천 수비:</b> "+d.rec.map(c=>'<span class="pill">'+esc(c)+"</span>").join("")+"</p>"+
+    '<p class="note">⚠️ <b>수비 판정은 이론입니다.</b> 가이드의 카운터·밴드표는 <b>"상대 방어 → 내 랠리"</b> 전용이라 수비에 그대로 쓸 수 없습니다. 이 판정은 병종 3역할(보=탱커 / 창=상대 궁병 저격 / 궁=상대 보병 처치)에서 파생한 규칙입니다.</p>'+
+    '<p class="cap">수비의 승리 조건은 <b>버티는 것</b>이라 "빨리 녹인다"는 가치가 낮습니다. 그래서 궁병은 킬 속도 대신 <b>상대 창병에게 일방적으로 잡히는 부채</b>가 됩니다. 반대로 랠리는 제한 시간 안에 뚫어야 해서 궁병이 필수고, 그 차이 때문에 <b>같은 60/40이라도 랠리로는 밴드가 되고 수비로는 정석</b>이 됩니다.</p>'+
+    "</div></div>";
+  }else{
+   o+='<div class="callout '+(ctr.banned?"co-warn":"co-ok")+'"><h3>'+(ctr.banned?"🚫 밴드 편성입니다":"✅ 밴드 아님")+"</h3>"+
+    "<p>"+enLbl+" <b>"+e.map(v=>v.toFixed(0)).join("/")+"</b> · 내 랠리 <b>"+mine.map(v=>v.toFixed(0)).join("/")+"</b>"+
+      (ctr.exact?' <span class="pill">가이드 항목: '+esc(ctr.rule.lbl)+"</span>":"")+"</p>"+
+    (ctr.banned?"<p>현재 병비는 이 상대에게 <b>쓰면 지는 편성("+esc(ctr.banned.l)+')</b>입니다. 아래 카운터로 바꾸세요.</p>':"")+
+    (!ctr.exact?'<p class="note">⚠️ 가이드 카운터표에 이 상대 비율('+e.map(v=>v.toFixed(0)).join("/")+")과 맞는 항목이 없습니다. 가장 가까운 <b>"+esc(ctr.rule.lbl)+"</b> 항목을 <b>참고용</b>으로만 보여주며, 밴드 판정은 하지 않습니다.</p>":"")+
+    "<p><b>추천 카운터:</b> "+ctr.rule.c.map(c=>'<span class="pill">'+esc(c)+"</span>").join("")+"</p>"+
+    '<p class="cap">'+esc(ctr.rule.why)+"</p>"+
+    (ctr.rule.ban.length?'<p class="cap">🚫 이 상대에게 금지: '+ctr.rule.ban.map(b=>esc(b.l)+" ("+b.v.join("/")+")").join(" · ")+"</p>":'<p class="cap">🚫 이 상대에겐 가이드상 금지 비율이 없습니다.</p>')+
+    (ctr.rule.src==="theory"?'<p class="note">이 항목은 가이드 원본 카운터표에 없는 <b>이론 확장</b>입니다.</p>':"")+
+    '<p class="note">이 표는 <b>랠리(공격) 전용</b>입니다 — 🚫는 "이 비율로 <b>공격하면</b> 진다"는 뜻이지 수비 얘기가 아닙니다. 수비 판정은 🛡️ 수성 모드로 바꾸세요.</p>'+
+    "</div></div>";}}
  document.getElementById("out").innerHTML=o;
 }
 
@@ -556,8 +602,10 @@ function render(d){
  document.getElementById("hLan").value="mia";
  document.getElementById("hMar").value="alonso";
  const seg=(a,b)=>{document.getElementById(a).classList.add("on");document.getElementById(b).classList.remove("on");calc();};
- document.getElementById("mAtk").onclick=()=>seg("mAtk","mDef");
- document.getElementById("mDef").onclick=()=>seg("mDef","mAtk");
+ const eLab=()=>{const d=document.getElementById("mDef").classList.contains("on");
+  document.getElementById("eLab").textContent=d?"들어오는 랠리 병비 (선택)":"상대 방어 병비 (선택)";};
+ document.getElementById("mAtk").onclick=()=>{seg("mAtk","mDef");eLab();};
+ document.getElementById("mDef").onclick=()=>{seg("mDef","mAtk");eLab();};
  ["hInf","hLan","hMar","wInf","wLan","wMar","r1","r2","r3","e1","e2","e3","gcap"].forEach(id=>{
   const el=document.getElementById(id);el.addEventListener("change",calc);el.addEventListener("input",calc);});
  calc();
