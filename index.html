@@ -83,6 +83,7 @@ footer a{color:var(--accent);text-decoration:none}
   <div style="margin-top:14px" class="grid">
     <div><label>내 병비 (보 / 창 / 궁)</label><div class="ratio3"><input id="r1" type="number" value="48"><input id="r2" type="number" value="4"><input id="r3" type="number" value="48"></div></div>
     <div><label id="eLab">상대 방어 병비 (선택)</label><div class="ratio3"><input id="e1" type="number" placeholder="보"><input id="e2" type="number" placeholder="창"><input id="e3" type="number" placeholder="궁"></div></div>
+    <div><label id="nLab">동시 랠리 수 (공성)</label><div class="row2"><input id="nral" type="number" min="1" max="6" value="1" title="같은 목표를 동시에 치는 랠리 개수"><span class="cap">1 = 단일 랠리 (밴드표 기준)</span></div></div>
     <div><label>서버 최대 세대 (조이너 풀 제한)</label><select id="gcap"></select></div>
   </div>
   <div class="note" style="margin-top:10px" id="assump"><b>계산 가정</b> — 원정스킬은 전부 Lv.5(4성 이상)로 간주 · 확률·주기 스킬은 <b>기대값</b>으로 환산 · 병종 전용 딜 스킬은 보병 가중치 0.3을 적용한 <b>딜 지분</b>으로 환산(보병은 탱커라 병력 비중 대비 딜이 적음) · 일반공격 한정 스킬은 총딜의 80%를 일반공격으로 가정 · "확률로 N% 피해" 계열은 "피해량 증가"와 같은 칸으로 묶었습니다(effect_op 미확정).<br>전무 레벨 0 = 미보유 · 숫자 옆 칸이 전무 레벨입니다. 병비 합이 100이 아니면 자동으로 정규화합니다.</div>
@@ -359,11 +360,11 @@ const COUNTERS=[
   c:["40/40/20","30/20/50"],
   ban:[{v:[60,40,0],l:"60/40"}],
   why:"40/40/20은 보40 흡수·창40이 상대 궁30 저격·궁20 전방. 30/20/50은 궁50 속전속결. 반대로 60/40은 궁병이 0이라 상대 보50을 녹이지 못하고, 창40이 잡을 상대 궁도 30뿐이라 화력이 남는다."},
- {m:[60,40,0],lbl:"60/40",src:"sheet",
+ {m:[60,40,0],lbl:"60/40",src:"sheet",multiN:3,
   c:["40/20/40 + 멀티랠리 3~4개"],
   ban:[{v:[50,0,50],l:"50/50"},{v:[49,2,49],l:"49/49"}],
   why:"60/40은 만능 방어라 단일 랠리로는 못 깬다. 궁병을 절반 넣는 50/50·49/49는 상대 창40에 후열이 먼저 지워지고, 보60이 오래 버텨 역전당한다. 동시 타격이 정석이고 브래들리·카롤·불카누스가 영웅 카운터."},
- {m:[70,30,0],lbl:"70/30",src:"sheet",
+ {m:[70,30,0],lbl:"70/30",src:"sheet",multiN:3,
   c:["멀티랠리로 물량 압박"],
   ban:[{v:[50,0,50],l:"50/50"},{v:[49,2,49],l:"49/49"}],
   why:"특정 비율 카운터가 없다. 60/40과 같은 이유로 궁병 절반 편성은 금지."},
@@ -371,7 +372,7 @@ const COUNTERS=[
   c:["50/50/0 (보50·창50)","60/40"],
   ban:[{v:[50,20,30],l:"50/20/30"}],
   why:"보50이 전방을 유지하고 창50이 상대 궁60을 순삭한다. 창병이 20밖에 없는 50/20/30은 상대 궁60을 못 지워서 밴드. 여기서는 60/40이 오히려 정답 카운터다."},
- {m:[60,30,10],lbl:"60/30/10",src:"sheet",
+ {m:[60,30,10],lbl:"60/30/10",src:"sheet",multiN:2,
   c:["40/20/40 + 더블·트리플 랠리"],ban:[],
   why:"단일 랠리는 실패한다. 최소 2~3랠리 필요."},
  {m:[40,10,50],lbl:"40/10/50 (준공격)",src:"theory",
@@ -391,12 +392,15 @@ const TH ={P:46,T:36,B:26};   // 밴드
 const THW={P:41,T:31,B:21};   // 주의 = 가능 구간 하단
 const FEAS={P:[41,50],T:[31,40],B:[21,30]}; // 제약을 만족하는 임계값의 전체 가능 구간
 const SUP ={P:1,T:1,B:4};     // 각 채널을 지지하는 밴드 사례 수 (근거 강도)
-function channels(en,mine){
+// N = 동시 랠리 수. 내 화력은 N배로 들어가고, 상대 창병은 N개 랠리로 분산돼
+// 랠리당 L/N만 상대한다. N=1이 단일 랠리(가이드 밴드표의 암묵적 기준).
+function channels(en,mine,N){
+ N=Math.max(1,N||1);
  const I=en[0],L=en[1],M=en[2], l=mine[1], m=mine[2];
  return {
-  P: Math.max(0,I-m),                    // 못 지우는 상대 보병 → 시간 내 돌파 실패
-  T: Math.max(0,M-l)+Math.min(L,m),      // 미제거 상대 궁병 + 내 궁병을 때리는 상대 창병
-  B: Math.min(m,L)                       // 상대 창병에게 잡히는 내 궁병
+  P: Math.max(0,I-N*m),                     // 못 지우는 상대 보병 → 시간 내 돌파 실패
+  T: Math.max(0,M-N*l)+Math.min(L/N,m),     // 미제거 상대 궁병 + 내 궁병을 때리는 상대 창병
+  B: Math.min(m,L/N)                        // 상대 창병에게 잡히는 내 궁병
  };
 }
 const CH_TXT={
@@ -412,11 +416,17 @@ const CH_FIX={
 // mode==="defender" 면 P 채널 제외 — 수비는 제한 시간 내 격파 의무가 없어
 // "못 녹인다"가 패배 조건이 아니다. 남는 축은 T·B뿐이다.
 const dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2]);
-function modelVerdict(en,mine,mode){
- const c=channels(en,mine), keys=mode==="defender"?["T","B"]:["P","T","B"];
- const ban=keys.filter(function(k){return c[k]>=TH[k];});
- const warn=keys.filter(function(k){return c[k]>=THW[k]&&c[k]<TH[k];});
- return {c:c,keys:keys,ban:ban,warn:warn,lvl:ban.length?"ban":warn.length?"warn":"ok",mode:mode};
+function modelVerdict(en,mine,mode,N){
+ N=Math.max(1,N||1);
+ const keys=mode==="defender"?["T","B"]:["P","T","B"];
+ const judge=function(n){const c=channels(en,mine,n);
+   return {c:c,ban:keys.filter(k=>c[k]>=TH[k]),warn:keys.filter(k=>c[k]>=THW[k]&&c[k]<TH[k])};};
+ const v=judge(N);
+ // 밴드라면, 랠리를 몇 개까지 늘리면 풀리는지 (공격 전용)
+ let minN=null;
+ if(v.ban.length&&mode!=="defender"){for(let n=N+1;n<=6;n++){if(!judge(n).ban.length){minN=n;break;}}}
+ return {c:v.c,keys:keys,ban:v.ban,warn:v.warn,N:N,minN:minN,
+         lvl:v.ban.length?"ban":v.warn.length?"warn":"ok",mode:mode};
 }
 
 
@@ -474,7 +484,8 @@ function calc(){
  if(ev[0]+ev[1]+ev[2]>0){
    const en=norm(...ev),ea=[en.inf,en.lan,en.mar];
    const mine=[r.inf,r.lan,r.mar];
-   const mv=modelVerdict(ea,mine,mode);
+   const N=Math.max(1,Math.min(6,+document.getElementById("nral").value||1));
+   const mv=modelVerdict(ea,mine,mode,mode==="defender"?1:N);
    if(mode==="defender"){
      ctr={mode,en:ea,mv};
    }else{
@@ -579,7 +590,8 @@ function render(d){
   o+='<h2>⑥ '+(def?"들어오는 랠리 · 수비 밴드 판정":"상대 카운터 · 랠리 밴드 판정")+'</h2><div class="panel">';
   // 1) 3채널 모델 판정
   o+='<div class="callout '+cls+'"><h3>'+head+' <span class="tag t-warn">역산 모델</span></h3>'+
-   "<p>"+enLbl+" <b>"+e.map(v=>v.toFixed(0)).join("/")+"</b> · 내 "+(def?"수비":"랠리")+" <b>"+mine.map(v=>v.toFixed(0)).join("/")+"</b></p>"+
+   "<p>"+enLbl+" <b>"+e.map(v=>v.toFixed(0)).join("/")+"</b> · 내 "+(def?"수비":"랠리")+" <b>"+mine.map(v=>v.toFixed(0)).join("/")+"</b>"+
+     (def?"":' <span class="pill">동시 랠리 '+mv.N+"개</span>")+"</p>"+
    '<table class="hgrid"><thead><tr><th>채널</th><th>값</th><th>밴드 임계</th><th>판정</th></tr></thead><tbody>'+
    mv.keys.map(k=>{const v=mv.c[k],st=v>=TH[k]?"🚫":v>=THW[k]?"⚠️":"✅";
      return "<tr><td>"+({P:"돌파 실패",T:"미제거 위협",B:"후열 붕괴"}[k])+"</td><td class=\"ratio\">"+v.toFixed(0)+
@@ -587,6 +599,8 @@ function render(d){
    "</tbody></table>"+
    (mv.ban.concat(mv.warn).length?mv.ban.concat(mv.warn).map(k=>'<p class="cap">'+CH_TXT[k](mv.c,e,mine)+" <b>→ "+CH_FIX[k]+"</b></p>").join(""):
      '<p class="cap">세 채널 모두 임계값 아래입니다. 이 상대에게 쓸 만한 병비입니다.</p>')+
+   (mv.minN?'<p class="cap">🔁 <b>동시 랠리를 '+mv.minN+"개로 늘리면 통과합니다.</b> 상대 창병이 여러 랠리로 분산돼 랠리당 후열 손실이 "+mv.minN+"분의 1로 줄어듭니다.</p>":"")+
+   (mv.lvl==="ban"&&!mv.minN&&!def?'<p class="cap">🔒 <b>이 밴드는 멀티랠리로도 풀리지 않습니다.</b> 돌파 채널은 내 궁병 수에 비례해 줄어드는데, 궁병이 없으면 랠리를 몇 개 올려도 상대 보병을 지울 수단이 생기지 않습니다.</p>':"")+
    (def?'<p class="note"><b>수비는 돌파 채널을 뺍니다.</b> 제한 시간 안에 격파할 의무가 없어 "못 녹인다"가 패배 조건이 아닙니다. 그래서 같은 60/40이라도 랠리로는 밴드가 되고 수비로는 정석이 됩니다.</p>':"")+
    '<p class="note">임계값은 가이드 밴드표 12점(카운터 7·밴드 5)을 라벨 데이터로 역산한 값입니다 — 가능 구간 <b>돌파 41~50 · 위협 31~40 · 후열 21~30</b>의 중앙값. 후열 채널은 밴드 4건이 지지해 견고하고, 돌파·위협은 각각 1건씩만 지지하므로 표 밖 상황에서는 참고로 보세요.</p>'+
    "</div>";
@@ -599,6 +613,11 @@ function render(d){
     "<p><b>추천 카운터:</b> "+ctr.rule.c.map(c=>'<span class="pill">'+esc(c)+"</span>").join("")+"</p>"+
     '<p class="cap">'+esc(ctr.rule.why)+"</p>"+
     (ctr.rule.ban.length?'<p class="cap">🚫 이 상대에게 금지: '+ctr.rule.ban.map(b=>esc(b.l)+" ("+b.v.join("/")+")").join(" · ")+"</p>":'<p class="cap">🚫 이 상대에겐 가이드상 금지 비율이 없습니다.</p>')+
+    ((ctr.exact&&!ctr.banned&&mv.lvl==="ban")?'<div class="callout co-tip"><h3>⚖️ 모델과 시트가 엇갈립니다 — 시트를 따르세요</h3>'+
+       "<p>모델은 <b>동시 랠리 "+mv.N+"개 기준</b>으로 밴드라고 봅니다."+
+       (ctr.rule.multiN?" 그런데 시트의 이 행은 <b>애초에 멀티랠리 "+ctr.rule.multiN+"개 이상을 전제</b>합니다 — 가이드 본문도 \"단일 랠리로는 못 깬다\"고 말합니다. 위 입력에서 동시 랠리 수를 "+ctr.rule.multiN+"로 올리면 모델도 통과합니다.":"")+"</p>"+
+       "<p>그리고 시트의 추천은 <b>상대 방어를 모르는 상태에서의 안전빵</b>입니다. 가이드의 5개 방어 비율 전부에 대해 위반 정도를 계산하면, 멀티랠리 3개 기준으로 <b>40/20/40은 5개 전부 통과</b>(최악 0.51)인 반면 <b>49/49는 1개, 50/50은 2개에서 밴드</b>가 납니다. 특정 매치업 성능이 아니라 <b>최악의 경우가 가장 덜 나쁜 편성</b>이라 뽑힌 겁니다.</p>"+
+       "</div>":"")+
     '<p class="note">이 표는 <b>랠리(공격) 전용</b>입니다 — 🚫는 "이 비율로 <b>공격하면</b> 진다"는 뜻이지 수비 얘기가 아닙니다. 수비 판정은 🛡️ 수성 모드로 바꾸세요. <b>표와 모델이 엇갈리면 표를 따르세요.</b></p>'+
     "</div>";}
   o+="</div>";}
@@ -620,10 +639,12 @@ function render(d){
  document.getElementById("hMar").value="alonso";
  const seg=(a,b)=>{document.getElementById(a).classList.add("on");document.getElementById(b).classList.remove("on");calc();};
  const eLab=()=>{const d=document.getElementById("mDef").classList.contains("on");
-  document.getElementById("eLab").textContent=d?"들어오는 랠리 병비 (선택)":"상대 방어 병비 (선택)";};
+  document.getElementById("eLab").textContent=d?"들어오는 랠리 병비 (선택)":"상대 방어 병비 (선택)";
+  const n=document.getElementById("nral");n.disabled=d;n.parentElement.parentElement.style.opacity=d?.4:1;
+  document.getElementById("nLab").textContent=d?"동시 랠리 수 (수성에선 사용 안 함)":"동시 랠리 수 (공성)";};
  document.getElementById("mAtk").onclick=()=>{seg("mAtk","mDef");eLab();};
  document.getElementById("mDef").onclick=()=>{seg("mDef","mAtk");eLab();};
- ["hInf","hLan","hMar","wInf","wLan","wMar","r1","r2","r3","e1","e2","e3","gcap"].forEach(id=>{
+ ["hInf","hLan","hMar","wInf","wLan","wMar","r1","r2","r3","e1","e2","e3","gcap","nral"].forEach(id=>{
   const el=document.getElementById(id);el.addEventListener("change",calc);el.addEventListener("input",calc);});
  calc();
 })();
