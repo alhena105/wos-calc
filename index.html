@@ -380,35 +380,45 @@ const COUNTERS=[
 const BAND_TOL=6;   // 내 병비가 금지 비율과 이 거리 안이면 밴드
 const ROW_TOL=10;   // 상대 비율이 이 거리 밖이면 밴드 판정을 내리지 않는다
 
-// ── 수비(개리슨) 밴드 판정 ────────────────────────────────────────────
-// 가이드 카운터표는 "상대 방어 → 내 랠리" 전용이다. 수비는 승리 조건이 반대라
-// 같은 표를 쓸 수 없다. 아래는 1절 병종 3역할 모델에서 파생한 규칙(이론).
-//  · 공격: 제한 시간 안에 녹여야 함 → 전방을 지우는 궁병이 필수
-//  · 수비: 버티면 이김 → 궁병의 "킬 속도" 가치가 낮고, 대신 상대 창병에게
-//          일방적으로 잡히는 순손실 자산이 된다
-// ⇒ 수비의 유일한 밴드 축: "상대 랠리에 창병이 많은데 내 궁병이 많다"
-function defenseVerdict(en,mine){
- const enLan=en[1], enMar=en[2], enInf=en[0], myMar=mine[2], myLan=mine[1], myInf=mine[0];
- let lvl="ok",head="✅ 밴드 아님",why=[],rec=[];
- if(enLan>=30&&myMar>=30){lvl="ban";head="🚫 밴드 편성입니다";
-   why.push("상대 랠리의 창병 "+enLan.toFixed(0)+"%가 내 궁병 "+myMar.toFixed(0)+"%를 후열에서 직접 지웁니다. 창병은 보병을 무시하고 궁병을 때리므로 내 보병이 아무리 두꺼워도 막아주지 못합니다.");}
- else if(enLan>=30&&myMar>=15){lvl="warn";head="⚠️ 위험 구간";
-   why.push("상대 창병 "+enLan.toFixed(0)+"%에 내 궁병 "+myMar.toFixed(0)+"%가 노출됩니다. 궁병을 더 줄이는 편이 안전합니다.");}
- else if(enLan>=30){why.push("내 궁병 비중이 낮아 상대 창병 "+enLan.toFixed(0)+"%가 때릴 표적이 없습니다. 상대 화력의 상당 부분이 헛돕니다.");}
- if(enMar>=40&&myLan<25) {if(lvl==="ok"){lvl="warn";head="⚠️ 아깝습니다";}
-   why.push("상대 주력이 궁병 "+enMar.toFixed(0)+"%인데 내 창병이 "+myLan.toFixed(0)+"%뿐입니다. 창병을 올리면 상대 딜러를 후열에서 직접 끊을 수 있습니다.");}
- else if(enMar>=40) why.push("내 창병 "+myLan.toFixed(0)+"%가 상대 주력 딜러(궁병 "+enMar.toFixed(0)+"%)를 직접 저격합니다. 수비의 정석 구도입니다.");
- if(myInf<45) why.push("내 보병이 "+myInf.toFixed(0)+"%뿐입니다. 수비는 버티는 게 승리 조건이라 전방 두께가 곧 승률입니다.");
- // 추천
- if(enLan>=30){rec.push("60/40 (보60·창40)","70/10/20");
-   why.push("상대가 창병 편성이라 내 궁병은 순손실입니다. 보병을 두껍게 하고 창병으로 맞받는 구도가 안전합니다.");}
- else if(enMar>=40){rec.push("60/40 (보60·창40)","60/30/10");
-   why.push("상대 궁병이 주력이므로 창병 40%가 가장 효율적인 방어 투자입니다.");}
- else {rec.push("60/40 (보60·창40)","50/20/30","48/4/48");
-   why.push("상대가 균형형이라 시트 방어 행의 어떤 비율이든 무난합니다. 60/40이면 상대 창병이 때릴 궁병이 없어 상대 화력 일부가 낭비됩니다.");}
- return {lvl,head,why,rec};
+// ── 밴드 3채널 모델 (가이드 밴드표에서 역산) ──────────────────────────
+// 밴드표 12점(카운터 7 · 밴드 5)을 라벨 데이터로 보고, 세 채널의 임계값을
+// "모든 카운터는 통과 · 모든 밴드는 최소 한 채널 초과"라는 제약으로 풀었다.
+//   가능 구간  t_P 41~50 · t_T 31~40 · t_B 21~30   → 중앙값 채택
+// ※ 가이드가 '멀티랠리 전제'라고 명시한 카운터 2건(상대 60/40·60/30/10)은
+//   단일 랠리 모델의 대상이 아니라 제외했다. 실제로 그 2건을 넣으면
+//   해가 존재하지 않는다(상대 70/30-내 50/50 밴드와 특징벡터가 완전히 같음).
+const TH ={P:46,T:36,B:26};   // 밴드
+const THW={P:41,T:31,B:21};   // 주의 = 가능 구간 하단
+const FEAS={P:[41,50],T:[31,40],B:[21,30]}; // 제약을 만족하는 임계값의 전체 가능 구간
+const SUP ={P:1,T:1,B:4};     // 각 채널을 지지하는 밴드 사례 수 (근거 강도)
+function channels(en,mine){
+ const I=en[0],L=en[1],M=en[2], l=mine[1], m=mine[2];
+ return {
+  P: Math.max(0,I-m),                    // 못 지우는 상대 보병 → 시간 내 돌파 실패
+  T: Math.max(0,M-l)+Math.min(L,m),      // 미제거 상대 궁병 + 내 궁병을 때리는 상대 창병
+  B: Math.min(m,L)                       // 상대 창병에게 잡히는 내 궁병
+ };
 }
+const CH_TXT={
+ P:function(c,en,mine){return "<b>돌파 실패 "+c.P.toFixed(0)+"</b> — 상대 보병 "+en[0].toFixed(0)+"% 중 내 궁병 "+mine[2].toFixed(0)+"%로 감당 못 하는 몫입니다. 랠리는 제한 시간 안에 전방을 지워야 하는데 수단이 모자랍니다.";},
+ T:function(c,en,mine){return "<b>미제거 위협 "+c.T.toFixed(0)+"</b> — 내 창병이 못 지운 상대 궁병 "+Math.max(0,en[2]-mine[1]).toFixed(0)+"% + 내 궁병을 때리는 상대 창병 "+Math.min(en[1],mine[2]).toFixed(0)+"%. 계속 얻어맞는 양입니다.";},
+ B:function(c,en,mine){return "<b>후열 붕괴 "+c.B.toFixed(0)+"</b> — 내 궁병 "+mine[2].toFixed(0)+"% 중 상대 창병 "+en[1].toFixed(0)+"%에게 잡히는 몫입니다. 창병은 보병을 무시하고 궁병을 때리므로 전방 두께가 막아주지 못합니다.";}
+};
+const CH_FIX={
+ P:"궁병을 늘리세요. 상대 보병을 지울 수 있는 유일한 병종입니다.",
+ T:"창병을 늘려 상대 궁병을 먼저 끊거나, 내 궁병을 줄여 상대 창병의 표적을 없애세요.",
+ B:"궁병 비중을 낮추세요. 상대 창병이 많은 한 궁병은 순손실입니다."
+};
+// mode==="defender" 면 P 채널 제외 — 수비는 제한 시간 내 격파 의무가 없어
+// "못 녹인다"가 패배 조건이 아니다. 남는 축은 T·B뿐이다.
 const dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2]);
+function modelVerdict(en,mine,mode){
+ const c=channels(en,mine), keys=mode==="defender"?["T","B"]:["P","T","B"];
+ const ban=keys.filter(function(k){return c[k]>=TH[k];});
+ const warn=keys.filter(function(k){return c[k]>=THW[k]&&c[k]<TH[k];});
+ return {c:c,keys:keys,ban:ban,warn:warn,lvl:ban.length?"ban":warn.length?"warn":"ok",mode:mode};
+}
+
 
 function calc(){
  const mode=document.getElementById("mAtk").classList.contains("on")?"rally":"defender";
@@ -464,13 +474,14 @@ function calc(){
  if(ev[0]+ev[1]+ev[2]>0){
    const en=norm(...ev),ea=[en.inf,en.lan,en.mar];
    const mine=[r.inf,r.lan,r.mar];
+   const mv=modelVerdict(ea,mine,mode);
    if(mode==="defender"){
-     ctr={mode,en:ea,def:defenseVerdict(ea,mine)};
+     ctr={mode,en:ea,mv};
    }else{
      const best=COUNTERS.map(c=>({c,d:dist(ea,c.m)})).sort((a,b)=>a.d-b.d)[0];
      const exact=best.d<=ROW_TOL;
      const banned=exact?best.c.ban.map(b=>({b,d:dist(mine,b.v)})).filter(x=>x.d<BAND_TOL).sort((a,b)=>a.d-b.d).map(x=>x.b)[0]:null;
-     ctr={mode,en:ea,rule:best.c,banned,exact,d:best.d};
+     ctr={mode,en:ea,rule:best.c,banned,exact,d:best.d,mv};
    }
  }
  render({mode,leaders,picks,r,buck,src,cls,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap});
@@ -561,30 +572,36 @@ function render(d){
 
  // 카운터 · 밴드
  if(ctr){
-  const e=ctr.en,mine=[r.inf,r.lan,r.mar];
-  const enLbl=ctr.mode==="defender"?"상대 랠리":"상대 방어";
-  o+='<h2>⑥ '+(ctr.mode==="defender"?"들어오는 랠리 · 수비 밴드 판정":"상대 카운터 · 랠리 밴드 판정")+'</h2><div class="panel">';
-  if(ctr.mode==="defender"){
-   const d=ctr.def, cls=d.lvl==="ban"?"co-warn":d.lvl==="warn"?"co-tip":"co-ok";
-   o+='<div class="callout '+cls+'"><h3>'+d.head+"</h3>"+
-    "<p>"+enLbl+" <b>"+e.map(v=>v.toFixed(0)).join("/")+"</b> · 내 수비 <b>"+mine.map(v=>v.toFixed(0)).join("/")+"</b></p>"+
-    d.why.map(w=>'<p class="cap">'+esc(w)+"</p>").join("")+
-    "<p><b>추천 수비:</b> "+d.rec.map(c=>'<span class="pill">'+esc(c)+"</span>").join("")+"</p>"+
-    '<p class="note">⚠️ <b>수비 판정은 이론입니다.</b> 가이드의 카운터·밴드표는 <b>"상대 방어 → 내 랠리"</b> 전용이라 수비에 그대로 쓸 수 없습니다. 이 판정은 병종 3역할(보=탱커 / 창=상대 궁병 저격 / 궁=상대 보병 처치)에서 파생한 규칙입니다.</p>'+
-    '<p class="cap">수비의 승리 조건은 <b>버티는 것</b>이라 "빨리 녹인다"는 가치가 낮습니다. 그래서 궁병은 킬 속도 대신 <b>상대 창병에게 일방적으로 잡히는 부채</b>가 됩니다. 반대로 랠리는 제한 시간 안에 뚫어야 해서 궁병이 필수고, 그 차이 때문에 <b>같은 60/40이라도 랠리로는 밴드가 되고 수비로는 정석</b>이 됩니다.</p>'+
-    "</div></div>";
-  }else{
-   o+='<div class="callout '+(ctr.banned?"co-warn":"co-ok")+'"><h3>'+(ctr.banned?"🚫 밴드 편성입니다":"✅ 밴드 아님")+"</h3>"+
-    "<p>"+enLbl+" <b>"+e.map(v=>v.toFixed(0)).join("/")+"</b> · 내 랠리 <b>"+mine.map(v=>v.toFixed(0)).join("/")+"</b>"+
-      (ctr.exact?' <span class="pill">가이드 항목: '+esc(ctr.rule.lbl)+"</span>":"")+"</p>"+
-    (ctr.banned?"<p>현재 병비는 이 상대에게 <b>쓰면 지는 편성("+esc(ctr.banned.l)+')</b>입니다. 아래 카운터로 바꾸세요.</p>':"")+
-    (!ctr.exact?'<p class="note">⚠️ 가이드 카운터표에 이 상대 비율('+e.map(v=>v.toFixed(0)).join("/")+")과 맞는 항목이 없습니다. 가장 가까운 <b>"+esc(ctr.rule.lbl)+"</b> 항목을 <b>참고용</b>으로만 보여주며, 밴드 판정은 하지 않습니다.</p>":"")+
+  const e=ctr.en,mine=[r.inf,r.lan,r.mar],mv=ctr.mv,def=ctr.mode==="defender";
+  const enLbl=def?"들어오는 랠리":"상대 방어";
+  const cls=mv.lvl==="ban"?"co-warn":mv.lvl==="warn"?"co-tip":"co-ok";
+  const head=mv.lvl==="ban"?"🚫 밴드 편성입니다":mv.lvl==="warn"?"⚠️ 주의 구간":"✅ 밴드 아님";
+  o+='<h2>⑥ '+(def?"들어오는 랠리 · 수비 밴드 판정":"상대 카운터 · 랠리 밴드 판정")+'</h2><div class="panel">';
+  // 1) 3채널 모델 판정
+  o+='<div class="callout '+cls+'"><h3>'+head+' <span class="tag t-warn">역산 모델</span></h3>'+
+   "<p>"+enLbl+" <b>"+e.map(v=>v.toFixed(0)).join("/")+"</b> · 내 "+(def?"수비":"랠리")+" <b>"+mine.map(v=>v.toFixed(0)).join("/")+"</b></p>"+
+   '<table class="hgrid"><thead><tr><th>채널</th><th>값</th><th>밴드 임계</th><th>판정</th></tr></thead><tbody>'+
+   mv.keys.map(k=>{const v=mv.c[k],st=v>=TH[k]?"🚫":v>=THW[k]?"⚠️":"✅";
+     return "<tr><td>"+({P:"돌파 실패",T:"미제거 위협",B:"후열 붕괴"}[k])+"</td><td class=\"ratio\">"+v.toFixed(0)+
+       "</td><td>"+TH[k]+' <span class="cap">(가능 '+FEAS[k][0]+"~"+FEAS[k][1]+" · 근거 "+SUP[k]+"건)</span></td><td>"+st+"</td></tr>";}).join("")+
+   "</tbody></table>"+
+   (mv.ban.concat(mv.warn).length?mv.ban.concat(mv.warn).map(k=>'<p class="cap">'+CH_TXT[k](mv.c,e,mine)+" <b>→ "+CH_FIX[k]+"</b></p>").join(""):
+     '<p class="cap">세 채널 모두 임계값 아래입니다. 이 상대에게 쓸 만한 병비입니다.</p>')+
+   (def?'<p class="note"><b>수비는 돌파 채널을 뺍니다.</b> 제한 시간 안에 격파할 의무가 없어 "못 녹인다"가 패배 조건이 아닙니다. 그래서 같은 60/40이라도 랠리로는 밴드가 되고 수비로는 정석이 됩니다.</p>':"")+
+   '<p class="note">임계값은 가이드 밴드표 12점(카운터 7·밴드 5)을 라벨 데이터로 역산한 값입니다 — 가능 구간 <b>돌파 41~50 · 위협 31~40 · 후열 21~30</b>의 중앙값. 후열 채널은 밴드 4건이 지지해 견고하고, 돌파·위협은 각각 1건씩만 지지하므로 표 밖 상황에서는 참고로 보세요.</p>'+
+   "</div>";
+  // 2) 시트 표 룩업 (공격 전용, 권위)
+  if(!def){
+   o+='<div class="callout '+(ctr.banned?"co-warn":"co-ok")+'"><h3>'+(ctr.banned?"🚫 시트 표: 밴드":"✅ 시트 표: 밴드 아님")+' <span class="tag t-ok">시트</span></h3>'+
+    (ctr.exact?"<p>가이드 카운터표 <b>"+esc(ctr.rule.lbl)+"</b> 행에 해당합니다.</p>":
+      '<p class="note">가이드 카운터표에 이 상대 비율과 맞는 항목이 없습니다(가장 가까운 항목 '+esc(ctr.rule.lbl)+"). 표 판정은 생략하고 위 모델 결과를 보세요.</p>")+
+    (ctr.banned?"<p>표상 <b>"+esc(ctr.banned.l)+"</b>은 이 상대에게 금지입니다.</p>":"")+
     "<p><b>추천 카운터:</b> "+ctr.rule.c.map(c=>'<span class="pill">'+esc(c)+"</span>").join("")+"</p>"+
     '<p class="cap">'+esc(ctr.rule.why)+"</p>"+
     (ctr.rule.ban.length?'<p class="cap">🚫 이 상대에게 금지: '+ctr.rule.ban.map(b=>esc(b.l)+" ("+b.v.join("/")+")").join(" · ")+"</p>":'<p class="cap">🚫 이 상대에겐 가이드상 금지 비율이 없습니다.</p>')+
-    (ctr.rule.src==="theory"?'<p class="note">이 항목은 가이드 원본 카운터표에 없는 <b>이론 확장</b>입니다.</p>':"")+
-    '<p class="note">이 표는 <b>랠리(공격) 전용</b>입니다 — 🚫는 "이 비율로 <b>공격하면</b> 진다"는 뜻이지 수비 얘기가 아닙니다. 수비 판정은 🛡️ 수성 모드로 바꾸세요.</p>'+
-    "</div></div>";}}
+    '<p class="note">이 표는 <b>랠리(공격) 전용</b>입니다 — 🚫는 "이 비율로 <b>공격하면</b> 진다"는 뜻이지 수비 얘기가 아닙니다. 수비 판정은 🛡️ 수성 모드로 바꾸세요. <b>표와 모델이 엇갈리면 표를 따르세요.</b></p>'+
+    "</div>";}
+  o+="</div>";}
  document.getElementById("out").innerHTML=o;
 }
 
