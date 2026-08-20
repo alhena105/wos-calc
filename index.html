@@ -63,6 +63,9 @@ tr.dead td{opacity:.5}
 .callout ul{margin:5px 0 0;padding-left:19px;font-size:13px}
 .bar{height:7px;background:var(--card2);border-radius:4px;overflow:hidden;margin-top:4px;min-width:70px}
 .bar i{display:block;height:100%;background:linear-gradient(90deg,#2fbf71,#e6b23a,#e5567a)}
+.chip{display:inline-block;font-size:11px;padding:3px 9px;margin:4px 4px 0 0;border-radius:20px;background:var(--card2);border:1px solid var(--line);color:var(--sub);cursor:pointer;font-family:inherit}
+.chip:hover{border-color:var(--accent);color:#fff}
+.sumwarn{font-size:11px;margin-top:5px;color:var(--skip)}
 .pill{display:inline-block;font-size:11px;padding:2px 9px;border-radius:20px;background:var(--card2);border:1px solid var(--line);color:var(--sub);margin:0 4px 4px 0}
 footer{margin-top:36px;color:var(--muted);font-size:12px;text-align:center;border-top:1px solid var(--line);padding-top:16px}
 footer a{color:var(--accent);text-decoration:none}
@@ -81,8 +84,8 @@ footer a{color:var(--accent);text-decoration:none}
     <div><label>궁병 리더</label><div class="row2"><select id="hMar"></select><input id="wMar" type="number" min="0" max="10" value="10" title="전무 레벨"></div></div>
   </div>
   <div style="margin-top:14px" class="grid">
-    <div><label>내 병비 (보 / 창 / 궁)</label><div class="ratio3"><input id="r1" type="number" value="48"><input id="r2" type="number" value="4"><input id="r3" type="number" value="48"></div></div>
-    <div><label id="eLab">상대 방어 병비 (선택)</label><div class="ratio3"><input id="e1" type="number" placeholder="보"><input id="e2" type="number" placeholder="창"><input id="e3" type="number" placeholder="궁"></div></div>
+    <div><label>내 병비 <span class="cap">(보 / 창 / 궁 — 세 칸 모두 채우세요)</span></label><div class="ratio3"><input id="r1" type="number" value="48" placeholder="보"><input id="r2" type="number" value="4" placeholder="창"><input id="r3" type="number" value="48" placeholder="궁"></div><div id="rPre"></div><div id="rSum" class="sumwarn"></div></div>
+    <div><label id="eLab">상대 방어 병비 (선택)</label><div class="ratio3"><input id="e1" type="number" placeholder="보"><input id="e2" type="number" placeholder="창"><input id="e3" type="number" placeholder="궁"></div><div id="ePre"></div><div id="eSum" class="sumwarn"></div></div>
     <div><label>서버 최대 세대 (조이너 풀 제한)</label><select id="gcap"></select></div>
   </div>
   <div class="note" style="margin-top:10px" id="assump"><b>계산 가정</b> — 원정스킬은 전부 Lv.5(4성 이상)로 간주 · 확률·주기 스킬은 <b>기대값</b>으로 환산 · 병종 전용 딜 스킬은 보병 가중치 0.3을 적용한 <b>딜 지분</b>으로 환산(보병은 탱커라 병력 비중 대비 딜이 적음) · 일반공격 한정 스킬은 총딜의 80%를 일반공격으로 가정 · "확률로 N% 피해" 계열은 "피해량 증가"와 같은 칸으로 묶었습니다(effect_op 미확정).<br>전무 레벨 0 = 미보유 · 숫자 옆 칸이 전무 레벨입니다. 병비 합이 100이 아니면 자동으로 정규화합니다.</div>
@@ -613,12 +616,16 @@ function render(d){
   // 1) 시트 표 룩업 (공격 전용 · 1차 자료)
   if(!def){
    o+='<div class="callout '+(ctr.banned?"co-warn":"co-ok")+'"><h3>'+(ctr.banned?"🚫 시트 표: 밴드":"✅ 시트 표: 밴드 아님")+' <span class="tag t-ok">시트</span></h3>'+
+    "<p>판정 대상 — "+enLbl+" <b>"+e.map(v=>v.toFixed(0)).join("/")+"</b> · 내 랠리 <b>"+mine.map(v=>v.toFixed(0)).join("/")+"</b> <span class=\"cap\">(보/창/궁, 정규화 후)</span></p>"+
     (ctr.exact?"<p>가이드 카운터표 <b>"+esc(ctr.rule.lbl)+"</b> 행에 해당합니다.</p>":
       '<p class="note">가이드 카운터표에 이 상대 비율과 맞는 항목이 없습니다(가장 가까운 항목 '+esc(ctr.rule.lbl)+"). 표 판정은 생략하고 위 모델 결과를 보세요.</p>")+
     (ctr.banned?"<p>표상 <b>"+esc(ctr.banned.l)+"</b>은 이 상대에게 금지입니다.</p>":"")+
     "<p><b>추천 카운터:</b> "+ctr.rule.c.map(c=>'<span class="pill">'+esc(c)+"</span>").join("")+"</p>"+
     '<p class="cap">'+esc(ctr.rule.why)+"</p>"+
-    (ctr.rule.ban.length?'<p class="cap">🚫 이 상대에게 금지: '+ctr.rule.ban.map(b=>esc(b.l)+" ("+b.v.join("/")+")").join(" · ")+"</p>":'<p class="cap">🚫 이 상대에겐 가이드상 금지 비율이 없습니다.</p>')+
+    (ctr.rule.ban.length?'<p class="cap">🚫 이 상대에게 금지: '+ctr.rule.ban.map(b=>{
+      const near=dist(mine,b.v)<BAND_TOL;
+      return (near?"<b>":"")+esc(b.l)+" ("+b.v.join("/")+")"+(near?" ← 현재 편성</b>":"");}).join(" · ")+
+      (ctr.banned?"":'<br><span class="cap">현재 편성 '+mine.map(v=>v.toFixed(0)).join("/")+"은 위 금지 비율 어느 것과도 일치하지 않습니다.</span>")+"</p>":'<p class="cap">🚫 이 상대에겐 가이드상 금지 비율이 없습니다.</p>')+
     ((ctr.exact&&!ctr.banned&&mv.lvl==="ban")?'<div class="callout co-warn"><h3>⚖️ 지표와 시트가 엇갈립니다 — 시트를 따르세요</h3>'+
        "<p>참고 지표는 밴드라고 보지만 <b>시트는 이 편성을 카운터로 인정</b>합니다. 이 불일치는 <b>설명되지 않은 상태</b>입니다.</p>"+
        "<p>이전 버전은 \"시트가 멀티랠리를 전제하니 랠리를 늘리면 지표도 통과한다\"고 설명했지만, 그 설명은 <b>철회했습니다</b> — 동시 랠리는 화력이 합쳐지는 게 아니라 각 랠리가 따로 전투하므로 랠리 수를 늘려도 한 전투의 판정은 그대로입니다.</p>"+
@@ -649,6 +656,30 @@ function render(d){
  document.getElementById("out").innerHTML=o;
 }
 
+// ── 병비 프리셋 & 합계 경고 ────────────────────────────────────────────
+// 2자리 표기(60/40 등)를 손으로 3칸에 옮기다 틀리는 사고가 잦다.
+// 예: "60/40"을 보60·궁40으로 잘못 넣으면 창병 기본값 4가 남아 58/4/38이 된다.
+const PRESETS=[
+ ["60/40","보60·창40",60,40,0],["70/30","보70·창30",70,30,0],["70/10/20","완전방어 Gen7~",70,10,20],
+ ["50/50","보50·궁50",50,0,50],["49/49","보49·창2·궁49",49,2,49],["48/4/48","보48·창4·궁48",48,4,48],
+ ["40/60","초방어 보40·궁60",40,0,60],["50/20/30","하이브리드",50,20,30],["40/20/40","하이브리드",40,20,40],
+ ["40/40/20","창병 카운터",40,40,20],["30/20/50","궁병 속결",30,20,50],["60/30/10","방어",60,30,10]];
+function mountPresets(boxId,ids){
+ const box=document.getElementById(boxId);
+ box.innerHTML=PRESETS.map((p,i)=>'<button type="button" class="chip" data-i="'+i+'" title="'+p[1]+'">'+p[0]+"</button>").join("");
+ box.onclick=e=>{const b=e.target.closest(".chip"); if(!b)return;
+  const p=PRESETS[+b.dataset.i];
+  ids.forEach((id,k)=>{const el=document.getElementById(id); el.value=p[2+k];});
+  ids.forEach(id=>document.getElementById(id).dispatchEvent(new Event("input",{bubbles:true})));};
+}
+function showSum(sumId,ids){
+ const v=ids.map(id=>+document.getElementById(id).value||0), t=v[0]+v[1]+v[2];
+ const el=document.getElementById(sumId);
+ if(t===0){el.textContent="";return;}
+ if(t===100){el.textContent="";return;}
+ const n=v.map(x=>(x/t*100).toFixed(0)).join("/");
+ el.innerHTML="⚠️ 입력 합이 <b>"+t+"</b>입니다 → <b>"+n+"</b> 로 정규화해서 계산합니다. 의도한 비율이 맞는지 확인하세요.";
+}
 // ── init ──
 (function(){
  const mk=(sel,cls)=>{const el=document.getElementById(sel);
@@ -668,8 +699,11 @@ function render(d){
 };
  document.getElementById("mAtk").onclick=()=>{seg("mAtk","mDef");eLab();};
  document.getElementById("mDef").onclick=()=>{seg("mDef","mAtk");eLab();};
+ mountPresets("rPre",["r1","r2","r3"]); mountPresets("ePre",["e1","e2","e3"]);
+ const sums=()=>{showSum("rSum",["r1","r2","r3"]);showSum("eSum",["e1","e2","e3"]);};
  ["hInf","hLan","hMar","wInf","wLan","wMar","r1","r2","r3","e1","e2","e3","gcap"].forEach(id=>{
-  const el=document.getElementById(id);el.addEventListener("change",calc);el.addEventListener("input",calc);});
+  const el=document.getElementById(id);const f=()=>{sums();calc();};el.addEventListener("change",f);el.addEventListener("input",f);});
+ sums();
  calc();
 })();
 </script></body></html>
