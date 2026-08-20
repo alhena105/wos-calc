@@ -73,31 +73,99 @@ footer a{color:var(--accent);text-decoration:none}
 </style>
 </head>
 <body><div class="wrap">
-<h1>WOS 편성 계산기 <span class="cap">— 조이너 · 위젯 · 칸 진단</span></h1>
-<div class="sub">리더 3명과 병비를 넣으면 <b>SkillMod 칸 포화 · 위젯 발동 · 병종 전용 스킬 사망 · 조이너 한계 배율</b>을 자동 계산합니다. 영웅 45명 데이터 내장.</div>
+<div style="display:flex;justify-content:flex-end"><span class="seg" style="margin-bottom:6px"><button id="lgKo" class="on">한국어</button><button id="lgEn">English</button></span></div>
+<h1 id="h1"></h1>
+<div class="sub" id="sub"></div>
 
 <div class="panel">
-  <div style="margin-bottom:14px"><span class="seg"><button id="mAtk" class="on">⚔️ 공성</button><button id="mDef">🛡️ 수성</button></span></div>
+  <div style="margin-bottom:14px"><span class="seg"><button id="mAtk" class="on"></button><button id="mDef"></button></span></div>
   <div class="grid">
-    <div><label>보병 리더</label><div class="row2"><select id="hInf"></select><input id="wInf" type="number" min="0" max="10" value="10" title="전무 레벨"></div></div>
-    <div><label>창병 리더</label><div class="row2"><select id="hLan"></select><input id="wLan" type="number" min="0" max="10" value="10" title="전무 레벨"></div></div>
-    <div><label>궁병 리더</label><div class="row2"><select id="hMar"></select><input id="wMar" type="number" min="0" max="10" value="10" title="전무 레벨"></div></div>
+    <div><label id="lbInf"></label><div class="row2"><select id="hInf"></select><input id="wInf" type="number" min="0" max="10" value="10" title="전무 레벨"></div></div>
+    <div><label id="lbLan"></label><div class="row2"><select id="hLan"></select><input id="wLan" type="number" min="0" max="10" value="10" title="전무 레벨"></div></div>
+    <div><label id="lbMar"></label><div class="row2"><select id="hMar"></select><input id="wMar" type="number" min="0" max="10" value="10" title="전무 레벨"></div></div>
   </div>
   <div style="margin-top:14px" class="grid">
-    <div><label>내 병비 <span class="cap">(보 / 창 / 궁 — 세 칸 모두 채우세요)</span></label><div class="ratio3"><input id="r1" type="number" value="48" placeholder="보"><input id="r2" type="number" value="4" placeholder="창"><input id="r3" type="number" value="48" placeholder="궁"></div><div id="rPre"></div><div id="rSum" class="sumwarn"></div></div>
+    <div><label id="lbMine"></label><div class="ratio3"><input id="r1" type="number" value="48" placeholder="보"><input id="r2" type="number" value="4" placeholder="창"><input id="r3" type="number" value="48" placeholder="궁"></div><div id="rPre"></div><div id="rSum" class="sumwarn"></div></div>
     <div><label id="eLab">상대 방어 병비 (선택)</label><div class="ratio3"><input id="e1" type="number" placeholder="보"><input id="e2" type="number" placeholder="창"><input id="e3" type="number" placeholder="궁"></div><div id="ePre"></div><div id="eSum" class="sumwarn"></div></div>
-    <div><label>서버 최대 세대 (조이너 풀 제한)</label><select id="gcap"></select></div>
+    <div><label id="lbGcap"></label><select id="gcap"></select></div>
   </div>
-  <div class="note" style="margin-top:10px" id="assump"><b>계산 가정</b> — 원정스킬은 전부 Lv.5(4성 이상)로 간주 · 확률·주기 스킬은 <b>기대값</b>으로 환산 · 병종 전용 딜 스킬은 보병 가중치 0.3을 적용한 <b>딜 지분</b>으로 환산(보병은 탱커라 병력 비중 대비 딜이 적음) · 일반공격 한정 스킬은 총딜의 80%를 일반공격으로 가정 · "확률로 N% 피해" 계열은 "피해량 증가"와 같은 칸으로 묶었습니다(effect_op 미확정).<br>전무 레벨 0 = 미보유 · 숫자 옆 칸이 전무 레벨입니다. 병비 합이 100이 아니면 자동으로 정규화합니다.</div>
+  <div class="note" style="margin-top:10px" id="assump"></div>
 </div>
 
 <div id="out"></div>
 <footer>
-데이터 출처: <a href="https://wosheroes.com/">wosheroes</a> · <a href="https://www.whiteoutsurvival-community.com/">whiteoutsurvival-community</a> · <a href="https://www.whiteoutsurvival.wiki/">whiteoutsurvival.wiki</a> (2026-08-15 수집)<br>
-계산 모델: <a href="https://blog.astris.kr/posts/f7a87706-3c2f-40c0-b282-d77a311ab4e3">랠리 편성 × 조이너 스킬 × 데미지 공식 통합 해설</a> · 확률/주기 스킬은 기대값으로 환산한 근사치입니다.
+<span id="srcData"></span><br>
+<span id="srcModel"></span>
 </footer>
 </div>
 <script>
+/* ── i18n ──────────────────────────────────────────────────────────────
+   L(ko,en)  : 인라인 문자열 쌍. 본문 옆에 번역을 두어 누락을 막는다.
+   HN(hero)  : 영웅 표시명 (LANG에 따라 kr/en)
+   STR       : part1.html의 정적 마크업 대응표
+   언어 결정 순서: ?lang= 쿼리 > navigator.language > 기본 ko
+------------------------------------------------------------------------ */
+var LANG=(function(){
+ try{
+  var q=new URLSearchParams(location.search).get("lang");
+  if(q==="en"||q==="ko")return q;
+  var n=(navigator.language||"ko").toLowerCase();
+  return n.indexOf("ko")===0?"ko":"en";
+ }catch(e){return "ko";}
+})();
+function L(ko,en){return LANG==="en"?en:ko;}
+function HN(h){return LANG==="en"?(h.en||h.kr):h.kr;}
+var CLSN={infantry:["보병","Infantry"],lancer:["창병","Lancer"],marksman:["궁병","Marksman"]};
+function CN(c){return L(CLSN[c][0],CLSN[c][1]);}
+
+var STR={
+ title:["WOS 편성 계산기 — 조이너·위젯·칸 진단","WOS Formation Calculator — joiners, widgets, slot saturation"],
+ h1:['WOS 편성 계산기 <span class="cap">— 조이너 · 위젯 · 칸 진단</span>',
+     'WOS Formation Calculator <span class="cap">— joiners · widgets · slot diagnosis</span>'],
+ sub:['리더 3명과 병비를 넣으면 <b>SkillMod 칸 포화 · 위젯 발동 · 병종 전용 스킬 사망 · 조이너 한계 배율</b>을 자동 계산합니다. 영웅 45명 데이터 내장.',
+      'Enter three leaders and a troop ratio and it works out <b>SkillMod slot saturation, widget activation, dead class-locked skills and joiner marginal multipliers</b>. 45 heroes built in.'],
+ mAtk:["⚔️ 공성","⚔️ Rally"], mDef:["🛡️ 수성","🛡️ Garrison"],
+ lbInf:["보병 리더","Infantry leader"], lbLan:["창병 리더","Lancer leader"], lbMar:["궁병 리더","Marksman leader"],
+ wTip:["전무 레벨","Exclusive-gear level"],
+ lbMine:['내 병비 <span class="cap">(보 / 창 / 궁 — 세 칸 모두 채우세요)</span>',
+         'My ratio <span class="cap">(inf / lancer / marksman — fill all three)</span>'],
+ lbEnA:["상대 방어 병비 (선택)","Their defense ratio (optional)"],
+ lbEnD:["들어오는 랠리 병비 (선택)","Incoming rally ratio (optional)"],
+ phInf:["보","inf"], phLan:["창","lan"], phMar:["궁","mar"],
+ lbGcap:["서버 최대 세대 (조이너 풀 제한)","Server's highest generation (limits the joiner pool)"],
+ assump:['<b>계산 가정</b> — 원정스킬은 전부 Lv.5(4성 이상)로 간주 · 확률·주기 스킬은 <b>기대값</b>으로 환산 · 병종 전용 딜 스킬은 보병 가중치 0.3을 적용한 <b>딜 지분</b>으로 환산(보병은 탱커라 병력 비중 대비 딜이 적음) · 일반공격 한정 스킬은 총딜의 80%를 일반공격으로 가정 · "확률로 N% 피해" 계열은 "피해량 증가"와 같은 칸으로 묶었습니다(effect_op 미확정).<br>전무 레벨 0 = 미보유 · 숫자 옆 칸이 전무 레벨입니다. 병비 합이 100이 아니면 자동으로 정규화합니다.',
+   '<b>Assumptions</b> — every expedition skill is treated as Lv.5 (4★ or above) · chance-based and periodic skills are converted to <b>expected value</b> · class-locked damage skills are converted to a <b>damage share</b> with infantry weighted 0.3 (infantry tanks, so it contributes less damage than its headcount) · normal-attack-only skills assume 80% of total damage is normal attacks · "N% damage on a chance" is grouped into the same slot as "damage bonus" (effect_op unconfirmed).<br>Exclusive-gear level 0 = not owned; the box beside each hero is its level. If the ratio does not add to 100 it is normalised automatically.'],
+ srcData:['데이터 출처: <a href="https://wosheroes.com/">wosheroes</a> · <a href="https://www.whiteoutsurvival-community.com/">whiteoutsurvival-community</a> · <a href="https://www.whiteoutsurvival.wiki/">whiteoutsurvival.wiki</a> (2026-08-15 수집)',
+   'Data: <a href="https://wosheroes.com/">wosheroes</a> · <a href="https://www.whiteoutsurvival-community.com/">whiteoutsurvival-community</a> · <a href="https://www.whiteoutsurvival.wiki/">whiteoutsurvival.wiki</a> (collected 2026-08-15)'],
+ srcModel:['계산 모델: <a href="https://blog.astris.kr/posts/f7a87706-3c2f-40c0-b282-d77a311ab4e3">랠리 편성 × 조이너 스킬 × 데미지 공식 통합 해설</a> · 확률/주기 스킬은 기대값으로 환산한 근사치입니다.',
+   'Model: <a href="https://blog.astris.kr/posts/adb04f46-d525-46a6-810c-940b72f26c77">Rally Comps × Joiner Skills × the Damage Formula</a> · chance and periodic skills are expected-value approximations.'],
+ pick:["— 선택 —","— select —"],
+ needLeader:["리더를 한 명 이상 선택하세요.","Select at least one leader."]
+};
+function S(k){return STR[k][LANG==="en"?1:0];}
+function applyStatic(){
+ document.title=S("title");
+ document.documentElement.lang=LANG;
+ var set=function(id,html){var el=document.getElementById(id); if(el)el.innerHTML=html;};
+ set("h1",S("h1")); set("sub",S("sub"));
+ set("mAtk",S("mAtk")); set("mDef",S("mDef"));
+ set("lbInf",S("lbInf")); set("lbLan",S("lbLan")); set("lbMar",S("lbMar"));
+ set("lbMine",S("lbMine")); set("lbGcap",S("lbGcap"));
+ set("assump",S("assump")); set("srcData",S("srcData")); set("srcModel",S("srcModel"));
+ ["wInf","wLan","wMar"].forEach(function(id){var e=document.getElementById(id); if(e)e.title=S("wTip");});
+ [["r1","phInf"],["r2","phLan"],["r3","phMar"],["e1","phInf"],["e2","phLan"],["e3","phMar"]]
+   .forEach(function(p){var e=document.getElementById(p[0]); if(e)e.placeholder=S(p[1]);});
+ var d=document.getElementById("mDef").classList.contains("on");
+ document.getElementById("eLab").innerHTML=d?S("lbEnD"):S("lbEnA");
+ document.getElementById("lgKo").classList.toggle("on",LANG==="ko");
+ document.getElementById("lgEn").classList.toggle("on",LANG==="en");
+}
+function setLang(l){
+ if(l===LANG)return;
+ LANG=l;
+ try{var u=new URL(location.href); u.searchParams.set("lang",l); history.replaceState(null,"",u);}catch(e){}
+ applyStatic(); rebuildSelects(); calc();
+}
 // WOS 편성 계산기 — 영웅 데이터베이스
 // 출처: wosheroes.com / whiteoutsurvival-community.com / whiteoutsurvival.wiki (2026-08-15 수집)
 // slot 코드: A=피해량↑ An=일반공격피해↑ B=공격력↑ C=체력↑ D=받는피해↓ DEF=방어력↑
@@ -106,236 +174,236 @@ footer a{color:var(--accent);text-decoration:none}
 const HEROES = [
 // ── Epic (원정스킬 2개, 전용무기 없음) ──
 {id:"jessie",s:1,kr:"제시",en:"Jessie",cls:"lancer",gen:0,rar:"epic",
- exp:[{n:"Stand of Arms",slot:"A",v:.25,t:"전 부대 피해량 +25%"},
-      {n:"Bulwarks",slot:"D",v:.20,t:"전 부대 받는 피해 −20%"}],w:null},
+ exp:[{n:"Stand of Arms",slot:"A",v:.25,t:"전 부대 피해량 +25%",te:"all troops damage +25%"},
+      {n:"Bulwarks",slot:"D",v:.20,t:"전 부대 받는 피해 −20%",te:"all troops damage taken −20%"}],w:null},
 {id:"jasser",s:1,kr:"재서",en:"Jasser",cls:"marksman",gen:0,rar:"epic",
- exp:[{n:"Tactical Genius",slot:"A",v:.25,t:"전 부대 피해량 +25%"},
-      {n:"Enlightened Warfare",slot:"ECO",v:0,t:"연구 속도 +15%"}],w:null},
+ exp:[{n:"Tactical Genius",slot:"A",v:.25,t:"전 부대 피해량 +25%",te:"all troops damage +25%"},
+      {n:"Enlightened Warfare",slot:"ECO",v:0,t:"연구 속도 +15%",te:"research speed +15%"}],w:null},
 {id:"seoyoon",s:1,kr:"서윤",en:"Seo-yoon",cls:"marksman",gen:0,rar:"epic",
- exp:[{n:"Rallying Beat",slot:"B",v:.25,t:"전 부대 공격력 +25%"},
-      {n:"Soothing Dance",slot:"ECO",v:0,t:"의무실 치료 속도 +50%"}],w:null},
+ exp:[{n:"Rallying Beat",slot:"B",v:.25,t:"전 부대 공격력 +25%",te:"all troops attack +25%"},
+      {n:"Soothing Dance",slot:"ECO",v:0,t:"의무실 치료 속도 +50%",te:"infirmary healing speed +50%"}],w:null},
 {id:"patrick",s:1,kr:"패트릭",en:"Patrick",cls:"lancer",gen:0,rar:"epic",
- exp:[{n:"Super Nutrients",slot:"C",v:.25,t:"전 부대 체력 +25%"},
-      {n:"Caloric Booster",slot:"B",v:.25,t:"전 부대 공격력 +25%"}],w:null},
+ exp:[{n:"Super Nutrients",slot:"C",v:.25,t:"전 부대 체력 +25%",te:"all troops health +25%"},
+      {n:"Caloric Booster",slot:"B",v:.25,t:"전 부대 공격력 +25%",te:"all troops attack +25%"}],w:null},
 {id:"sergey",s:1,kr:"세르게이",en:"Sergey",cls:"infantry",gen:0,rar:"epic",
- exp:[{n:"Defenders' Edge",slot:"D",v:.20,t:"전 부대 받는 피해 −20%"},
-      {n:"Weaken",slot:"H",v:.20,t:"적 전 부대 공격력 −20%"}],w:null},
+ exp:[{n:"Defenders' Edge",slot:"D",v:.20,t:"전 부대 받는 피해 −20%",te:"all troops damage taken −20%"},
+      {n:"Weaken",slot:"H",v:.20,t:"적 전 부대 공격력 −20%",te:"all enemy troops attack −20%"}],w:null},
 {id:"bahiti",s:1,kr:"바히티",en:"Bahiti",cls:"marksman",gen:0,rar:"epic",
- exp:[{n:"Sixth Sense",slot:"D",v:.20,t:"전 부대 받는 피해 −20%"},
-      {n:"Fluorescence",slot:"A",v:.25,p:"50%",t:"50% 확률 피해량 +50%"}],w:null},
+ exp:[{n:"Sixth Sense",slot:"D",v:.20,t:"전 부대 받는 피해 −20%",te:"all troops damage taken −20%"},
+      {n:"Fluorescence",slot:"A",v:.25,p:"50%",pe:"50% chance",t:"50% 확률 피해량 +50%",te:"50% chance: damage +50%"}],w:null},
 {id:"lumak",kr:"루막 보칸",en:"Lumak Bokan",cls:"lancer",gen:0,rar:"epic",
- exp:[{n:"Tactical Deception",slot:"J",v:.20,t:"적 전 부대 피해량 −20%"},
-      {n:"Emerald Warrior",slot:"ECO",v:0,t:"사냥 행군 속도 +100%"}],w:null},
+ exp:[{n:"Tactical Deception",slot:"J",v:.20,t:"적 전 부대 피해량 −20%",te:"all enemy troops damage −20%"},
+      {n:"Emerald Warrior",slot:"ECO",v:0,t:"사냥 행군 속도 +100%",te:"hunting march speed +100%"}],w:null},
 // ── Gen 1 ──
 {id:"jeronimo",s:1,kr:"제로니모",en:"Jeronimo",cls:"infantry",gen:1,rar:"leg",
- exp:[{n:"Battle Manifesto",slot:"A",v:.25,t:"전 부대 피해량 +25%"},
-      {n:"Swordmentor",slot:"B",v:.25,t:"전 부대 공격력 +25%"},
-      {n:"Expert Swordsmanship",slot:"A",v:.15,p:"4턴중 2턴",t:"4턴마다 2턴 피해량 +30% (시간평균 15%)"}],
+ exp:[{n:"Battle Manifesto",slot:"A",v:.25,t:"전 부대 피해량 +25%",te:"all troops damage +25%"},
+      {n:"Swordmentor",slot:"B",v:.25,t:"전 부대 공격력 +25%",te:"all troops attack +25%"},
+      {n:"Expert Swordsmanship",slot:"A",v:.15,p:"4턴중 2턴",pe:"2 turns out of 4",t:"4턴마다 2턴 피해량 +30% (시간평균 15%)",te:"2 turns out of every 4: damage +30% (time-averaged 15%)"}],
  w:{side:"rally",stat:"Attack",name:"Discernment"}},
 {id:"natalia",kr:"나탈리아",en:"Natalia",cls:"infantry",gen:1,rar:"leg",
- exp:[{n:"Feral Protection",slot:"D",v:.20,p:"40%",t:"40% 확률 받는 피해 −50%"},
-      {n:"Queen of the Wild",slot:"B",v:.25,t:"전 부대 공격력 +25%"},
-      {n:"Call of the Wild",slot:"A",v:.25,t:"전 부대 피해량 +25%"}],
+ exp:[{n:"Feral Protection",slot:"D",v:.20,p:"40%",pe:"40% chance",t:"40% 확률 받는 피해 −50%",te:"40% chance: damage taken −50%"},
+      {n:"Queen of the Wild",slot:"B",v:.25,t:"전 부대 공격력 +25%",te:"all troops attack +25%"},
+      {n:"Call of the Wild",slot:"A",v:.25,t:"전 부대 피해량 +25%",te:"all troops damage +25%"}],
  w:{side:"rally",stat:"Lethality",name:"Invincibles"}},
 {id:"molly",s:1,kr:"몰리",en:"Molly",cls:"lancer",gen:1,rar:"leg",
- exp:[{n:"Snow's Grace",slot:"D",v:.20,p:"40%",t:"40% 확률 받는 피해 −50%"},
-      {n:"Ice Dominion",slot:"A",v:.25,p:"50%",t:"50% 확률 피해량 +50%"},
-      {n:"Youthful Rage",slot:"A",v:.25,t:"전 부대 피해량 +25%"}],
+ exp:[{n:"Snow's Grace",slot:"D",v:.20,p:"40%",pe:"40% chance",t:"40% 확률 받는 피해 −50%",te:"40% chance: damage taken −50%"},
+      {n:"Ice Dominion",slot:"A",v:.25,p:"50%",pe:"50% chance",t:"50% 확률 피해량 +50%",te:"50% chance: damage +50%"},
+      {n:"Youthful Rage",slot:"A",v:.25,t:"전 부대 피해량 +25%",te:"all troops damage +25%"}],
  w:{side:"defender",stat:"Lethality",name:"Snowy Blessing"}},
 {id:"zinman",s:1,kr:"진만",en:"Zinman",cls:"marksman",gen:1,rar:"leg",
- exp:[{n:"Implacable",slot:"DEF",v:.10,t:"방어력 +10% / 체력 +10%",also:{slot:"C",v:.10}},
-      {n:"Bastionist",slot:"ECO",v:0,t:"자원 소모 −15% / 건설 속도 +15%"},
-      {n:"Positional Battler",slot:"E",v:.25,t:"전 부대 파괴력 +25%"}],
+ exp:[{n:"Implacable",slot:"DEF",v:.10,t:"방어력 +10% / 체력 +10%",te:"defense +10% / health +10%",also:{slot:"C",v:.10}},
+      {n:"Bastionist",slot:"ECO",v:0,t:"자원 소모 −15% / 건설 속도 +15%",te:"resource cost −15% / construction speed +15%"},
+      {n:"Positional Battler",slot:"E",v:.25,t:"전 부대 파괴력 +25%",te:"all troops lethality +25%"}],
  w:{side:"defender",stat:"Attack",name:"Defend to Attack"}},
 // ── Gen 2 ──
 {id:"flint",kr:"플린트",en:"Flint",cls:"infantry",gen:2,rar:"leg",
- exp:[{n:"Pyromaniac",slot:"X",k:"dmg",v:1.0,tgt:"infantry",t:"보병 피해량 +100%"},
-      {n:"Burning Resolve",slot:"B",v:.25,t:"전 부대 공격력 +25%"},
-      {n:"Immolation",slot:"E",v:.25,t:"전 부대 파괴력 +25%"}],
+ exp:[{n:"Pyromaniac",slot:"X",k:"dmg",v:1.0,tgt:"infantry",t:"보병 피해량 +100%",te:"infantry damage +100%"},
+      {n:"Burning Resolve",slot:"B",v:.25,t:"전 부대 공격력 +25%",te:"all troops attack +25%"},
+      {n:"Immolation",slot:"E",v:.25,t:"전 부대 파괴력 +25%",te:"all troops lethality +25%"}],
  w:{side:"defender",stat:"Attack",name:"Dragon's Breath",note:"볼트 기준(웹 미검증)"}},
 {id:"philly",s:1,kr:"필리",en:"Philly",cls:"lancer",gen:2,rar:"leg",
- exp:[{n:"Vigor Tactics",slot:"B",v:.15,t:"공격력 +15% / 방어력 +10%",also:{slot:"DEF",v:.10}},
-      {n:"Dosage Boost",slot:"A",v:.50,p:"25%",t:"25% 확률 200% 피해"},
-      {n:"Energizing Shot",slot:"D",v:.20,p:"40%",t:"40% 확률 받는 피해 −50%"}],
+ exp:[{n:"Vigor Tactics",slot:"B",v:.15,t:"공격력 +15% / 방어력 +10%",te:"attack +15% / defense +10%",also:{slot:"DEF",v:.10}},
+      {n:"Dosage Boost",slot:"A",v:.50,p:"25%",pe:"25% chance",t:"25% 확률 200% 피해",te:"25% chance: 200% damage"},
+      {n:"Energizing Shot",slot:"D",v:.20,p:"40%",pe:"40% chance",t:"40% 확률 받는 피해 −50%",te:"40% chance: damage taken −50%"}],
  w:{side:"defender",stat:"Health",name:"First Aid Training"}},
 {id:"alonso",s:1,kr:"알론소",en:"Alonso",cls:"marksman",gen:2,rar:"leg",
- exp:[{n:"Onslaught",slot:"E",v:.20,p:"40%",t:"40% 확률 파괴력 +50%"},
-      {n:"Iron Strength",slot:"J",v:.10,p:"20%",t:"20% 확률 적 피해량 −50%"},
-      {n:"Poison Harpoon",slot:"A",v:.25,p:"50%",t:"50% 확률 추가피해 +50%"}],
+ exp:[{n:"Onslaught",slot:"E",v:.20,p:"40%",pe:"40% chance",t:"40% 확률 파괴력 +50%",te:"40% chance: lethality +50%"},
+      {n:"Iron Strength",slot:"J",v:.10,p:"20%",pe:"20% chance",t:"20% 확률 적 피해량 −50%",te:"20% chance: enemy damage −50%"},
+      {n:"Poison Harpoon",slot:"A",v:.25,p:"50%",pe:"50% chance",t:"50% 확률 추가피해 +50%",te:"50% chance: +50% extra damage"}],
  w:{side:"rally",stat:"Lethality",name:"Harpoon Enhancement"}},
 // ── Gen 3 ──
 {id:"logan",kr:"로건",en:"Logan",cls:"infantry",gen:3,rar:"leg",
- exp:[{n:"Lion's Might",slot:"H",v:.20,t:"적 전 부대 공격력 −20%"},
-      {n:"Lion Intimidation",slot:"D",v:.20,t:"전 부대 받는 피해 −20%"},
-      {n:"Leader Inspiration",slot:"C",v:.25,t:"전 부대 체력 +25%"}],
+ exp:[{n:"Lion's Might",slot:"H",v:.20,t:"적 전 부대 공격력 −20%",te:"all enemy troops attack −20%"},
+      {n:"Lion Intimidation",slot:"D",v:.20,t:"전 부대 받는 피해 −20%",te:"all troops damage taken −20%"},
+      {n:"Leader Inspiration",slot:"C",v:.25,t:"전 부대 체력 +25%",te:"all troops health +25%"}],
  w:{side:"defender",stat:"Defense",name:"Strong Protection"}},
 {id:"mia",s:1,kr:"미아",en:"Mia",cls:"lancer",gen:3,rar:"leg",
- exp:[{n:"Bad Luck Streak",slot:"G",v:.25,p:"50%",t:"50% 확률 적 받는 피해 +50%"},
-      {n:"Lucky Charm",slot:"A",v:.25,p:"50%",t:"50% 확률 피해량 +50%"},
-      {n:"Ritual Deciphering",slot:"D",v:.20,p:"40%",t:"40% 확률 받는 피해 −50%"}],
+ exp:[{n:"Bad Luck Streak",slot:"G",v:.25,p:"50%",pe:"50% chance",t:"50% 확률 적 받는 피해 +50%",te:"50% chance: enemy damage taken +50%"},
+      {n:"Lucky Charm",slot:"A",v:.25,p:"50%",pe:"50% chance",t:"50% 확률 피해량 +50%",te:"50% chance: damage +50%"},
+      {n:"Ritual Deciphering",slot:"D",v:.20,p:"40%",pe:"40% chance",t:"40% 확률 받는 피해 −50%",te:"40% chance: damage taken −50%"}],
  w:{side:"rally",stat:"Attack",name:"Rally of Fate"}},
 {id:"greg",s:1,kr:"그렉",en:"Greg",cls:"marksman",gen:3,rar:"leg",
- exp:[{n:"Sword of Justice",slot:"A",v:.08,p:"20%",t:"20% 확률 피해량 +40%(3턴)"},
-      {n:"Deterrence of Law",slot:"J",v:.10,p:"20%",t:"20% 확률 적 피해량 −50%"},
-      {n:"Law and Order",slot:"C",v:.25,t:"전 부대 체력 +25%"}],
+ exp:[{n:"Sword of Justice",slot:"A",v:.08,p:"20%",pe:"20% chance",t:"20% 확률 피해량 +40%(3턴)",te:"20% chance: damage +40% (3 turns)"},
+      {n:"Deterrence of Law",slot:"J",v:.10,p:"20%",pe:"20% chance",t:"20% 확률 적 피해량 −50%",te:"20% chance: enemy damage −50%"},
+      {n:"Law and Order",slot:"C",v:.25,t:"전 부대 체력 +25%",te:"all troops health +25%"}],
  w:{side:"rally",stat:"Health",name:"Trumpet of Justice"}},
 // ── Gen 4 ──
 {id:"ahmose",kr:"아모세",en:"Ahmose",cls:"infantry",gen:4,rar:"leg",
- exp:[{n:"Viper Formation",slot:"X",k:"sur",v:.35,tgt:"infantry",t:"4공격마다 2턴 보병 받피 −70%, 창·궁 −30%"},
-      {n:"Prayer of Flame",slot:"X",k:"dmg",v:1.0,tgt:"infantry",t:"보병 피해량 +100%"},
-      {n:"Blade of Light",slot:"X",k:"dmg",v:.60,tgt:"infantry",t:"보병 공격당 피해 +60% & 대상 받피 +25%"}],
+ exp:[{n:"Viper Formation",slot:"X",k:"sur",v:.35,tgt:"infantry",t:"4공격마다 2턴 보병 받피 −70%, 창·궁 −30%",te:"every 4th attack, 2 turns: infantry damage taken −70%, lancer/marksman −30%"},
+      {n:"Prayer of Flame",slot:"X",k:"dmg",v:1.0,tgt:"infantry",t:"보병 피해량 +100%",te:"infantry damage +100%"},
+      {n:"Blade of Light",slot:"X",k:"dmg",v:.60,tgt:"infantry",t:"보병 공격당 피해 +60% & 대상 받피 +25%",te:"infantry, per attack: +60% damage & target takes +25% damage"}],
  w:{side:"defender",stat:"Health",name:"Oath of Guardian"}},
 {id:"reina",s:1,kr:"레이나",en:"Reina",cls:"lancer",gen:4,rar:"leg",
- exp:[{n:"Assassin's Instinct",slot:"An",v:.30,t:"일반공격 피해 +30%"},
-      {n:"Swift Jive",slot:"DODGE",v:.20,t:"일반공격 20% 회피"},
-      {n:"Shadow Blade",slot:"X",k:"dmg",v:.50,tgt:"lancer",t:"창병 25% 확률 200% 추가공격"}],
+ exp:[{n:"Assassin's Instinct",slot:"An",v:.30,t:"일반공격 피해 +30%",te:"normal-attack damage +30%"},
+      {n:"Swift Jive",slot:"DODGE",v:.20,t:"일반공격 20% 회피",te:"20% chance to dodge normal attacks"},
+      {n:"Shadow Blade",slot:"X",k:"dmg",v:.50,tgt:"lancer",t:"창병 25% 확률 200% 추가공격",te:"lancers, 25% chance: a 200% extra attack"}],
  w:{side:"rally",stat:"Lethality",name:"Fiery Invasion"}},
 {id:"lynn",s:1,kr:"린",en:"Lynn",cls:"marksman",gen:4,rar:"leg",
- exp:[{n:"Song of Lion",slot:"A",v:.20,p:"40%",t:"40% 확률 피해량 +50%"},
-      {n:"Melancholic Ballad",slot:"J",v:.20,t:"적 전 부대 피해량 −20%"},
-      {n:"Oonai Cadenza",slot:"X",k:"dmg",v:.05,tgt:"marksman",t:"궁병 3공격마다 공격력 +5% 누적"}],
+ exp:[{n:"Song of Lion",slot:"A",v:.20,p:"40%",pe:"40% chance",t:"40% 확률 피해량 +50%",te:"40% chance: damage +50%"},
+      {n:"Melancholic Ballad",slot:"J",v:.20,t:"적 전 부대 피해량 −20%",te:"all enemy troops damage −20%"},
+      {n:"Oonai Cadenza",slot:"X",k:"dmg",v:.05,tgt:"marksman",t:"궁병 3공격마다 공격력 +5% 누적",te:"marksmen, every 3rd attack: attack +5%, stacking"}],
  w:{side:"defender",stat:"Lethality",name:"Iranon's Determination"}},
 // ── Gen 5 ──
 {id:"hector",kr:"헥터",en:"Hector",cls:"infantry",gen:5,rar:"leg",
- exp:[{n:"Survival Instincts",slot:"D",v:.20,p:"40%",t:"40% 확률 받는 피해 −50%"},
-      {n:"Rampant",slot:"X",k:"dmg",v:2.0,tgt:"infantry",t:"보병 피해량 +200%, 궁병 +100% (10회 감쇠)"},
-      {n:"Blitz",slot:"A",v:.50,p:"25%",t:"25% 확률 200% 피해"}],
+ exp:[{n:"Survival Instincts",slot:"D",v:.20,p:"40%",pe:"40% chance",t:"40% 확률 받는 피해 −50%",te:"40% chance: damage taken −50%"},
+      {n:"Rampant",slot:"X",k:"dmg",v:2.0,tgt:"infantry",t:"보병 피해량 +200%, 궁병 +100% (10회 감쇠)",te:"infantry damage +200%, marksmen +100% (decays over 10 procs)"},
+      {n:"Blitz",slot:"A",v:.50,p:"25%",pe:"25% chance",t:"25% 확률 200% 피해",te:"25% chance: 200% damage"}],
  w:{side:"defender",stat:"Attack",name:"Goliath"}},
 {id:"norah",s:1,kr:"노라",en:"Norah",cls:"lancer",gen:5,rar:"leg",
- exp:[{n:"Combined Arms",slot:"X",k:"dmg",v:.15,tgt:"inf+mar",t:"보병·궁병 받피 −15% & 피해량 +15%"},
-      {n:"Sneak Strike",slot:"X",k:"dmg",v:.20,tgt:"lancer",t:"창병 20% 확률 추가피해 +100%"},
-      {n:"Momentum",slot:"A",v:.25,p:"창병 5공격마다",t:"피해량 +25% & 받피 −25% (2턴)",also:{slot:"D",v:.25}}],
+ exp:[{n:"Combined Arms",slot:"X",k:"dmg",v:.15,tgt:"inf+mar",t:"보병·궁병 받피 −15% & 피해량 +15%",te:"infantry & marksmen: damage taken −15% and damage +15%"},
+      {n:"Sneak Strike",slot:"X",k:"dmg",v:.20,tgt:"lancer",t:"창병 20% 확률 추가피해 +100%",te:"lancers, 20% chance: +100% extra damage"},
+      {n:"Momentum",slot:"A",v:.25,p:"창병 5공격마다",pe:"lancers, every 5th attack",t:"피해량 +25% & 받피 −25% (2턴)",te:"damage +25% & damage taken −25% (2 turns)",also:{slot:"D",v:.25}}],
  w:{side:"defender",stat:"Defense",name:"True Grit"}},
 {id:"gwen",kr:"그웬",en:"Gwen",cls:"marksman",gen:5,rar:"leg",
- exp:[{n:"Eagle Vision",slot:"G",v:.25,t:"적 받는 피해 +25%"},
-      {n:"Air Dominance",slot:"A",v:.20,p:"5공격마다",t:"5공격마다 추가피해 +100%"},
-      {n:"Blastmaster",slot:"X",k:"dmg",v:.50,tgt:"marksman",t:"궁병 4공격마다 추가피해 +50%"}],
+ exp:[{n:"Eagle Vision",slot:"G",v:.25,t:"적 받는 피해 +25%",te:"enemy damage taken +25%"},
+      {n:"Air Dominance",slot:"A",v:.20,p:"5공격마다",pe:"every 5th attack",t:"5공격마다 추가피해 +100%",te:"every 5th attack: +100% extra damage"},
+      {n:"Blastmaster",slot:"X",k:"dmg",v:.50,tgt:"marksman",t:"궁병 4공격마다 추가피해 +50%",te:"marksmen, every 4th attack: +50% extra damage"}],
  w:{side:"rally",stat:"Lethality",name:"Marauder"}},
 // ── Gen 6 ──
 {id:"wuming",s:1,kr:"우밍",en:"Wu Ming",cls:"infantry",gen:6,rar:"leg",
- exp:[{n:"Shadow's Evasion",slot:"X",k:"sur",v:.30,tgt:"infantry",t:"보병 일반공격 받피 −25% / 스킬 받피 −30%"},
-      {n:"Crescent Uplift",slot:"A",v:.20,t:"전 부대 피해량 +20%"},
-      {n:"Elemental Resonance",slot:"A",v:.25,t:"전 부대 스킬 피해 +25%"}],
+ exp:[{n:"Shadow's Evasion",slot:"X",k:"sur",v:.30,tgt:"infantry",t:"보병 일반공격 받피 −25% / 스킬 받피 −30%",te:"infantry: normal-attack damage taken −25% / skill damage taken −30%"},
+      {n:"Crescent Uplift",slot:"A",v:.20,t:"전 부대 피해량 +20%",te:"all troops damage +20%"},
+      {n:"Elemental Resonance",slot:"A",v:.25,t:"전 부대 스킬 피해 +25%",te:"all troops skill damage +25%"}],
  w:{side:"defender",stat:"Defense",name:"Steel Discipline"}},
 {id:"renee",s:1,kr:"르네",en:"Renee",cls:"lancer",gen:6,rar:"leg",
- exp:[{n:"Nightmare Trace",slot:"X",k:"dmg",v:1.0,tgt:"lancer",t:"창병 2턴마다 추가딜 200%"},
-      {n:"Dreamcatcher",slot:"X",k:"dmg",v:1.5,tgt:"lancer",t:"표식 대상 창병 피해량 +150%"},
-      {n:"Dreamslice",slot:"A",v:.35,t:"표식 대상 전 부대 피해량 +75%"}],
+ exp:[{n:"Nightmare Trace",slot:"X",k:"dmg",v:1.0,tgt:"lancer",t:"창병 2턴마다 추가딜 200%",te:"lancers, every 2 turns: +200% extra damage"},
+      {n:"Dreamcatcher",slot:"X",k:"dmg",v:1.5,tgt:"lancer",t:"표식 대상 창병 피해량 +150%",te:"vs marked targets: lancer damage +150%"},
+      {n:"Dreamslice",slot:"A",v:.35,t:"표식 대상 전 부대 피해량 +75%",te:"vs marked targets: all troops damage +75%"}],
  w:{side:"rally",stat:"Lethality",name:"Wistful Enchantment"}},
 {id:"wayne",kr:"웨인",en:"Wayne",cls:"marksman",gen:6,rar:"leg",
- exp:[{n:"Thunder Strike",slot:"A",v:.25,p:"4턴마다",t:"4턴마다 전 부대 추가공격 100%"},
-      {n:"Roundabout Hit",slot:"X",k:"dmg",v:.40,tgt:"marksman",t:"궁병 격턴 적 창병 +40%/궁병 +20% 추가피해"},
-      {n:"Fleet",slot:"CRIT",v:.25,t:"전 부대 치명률 +25%"}],
+ exp:[{n:"Thunder Strike",slot:"A",v:.25,p:"4턴마다",pe:"every 4 turns",t:"4턴마다 전 부대 추가공격 100%",te:"every 4 turns: all troops deal a 100% extra attack"},
+      {n:"Roundabout Hit",slot:"X",k:"dmg",v:.40,tgt:"marksman",t:"궁병 격턴 적 창병 +40%/궁병 +20% 추가피해",te:"marksmen, every other turn: +40% extra vs enemy lancers, +20% vs marksmen"},
+      {n:"Fleet",slot:"CRIT",v:.25,t:"전 부대 치명률 +25%",te:"all troops crit rate +25%"}],
  w:{side:"defender",stat:"Lethality",name:"Offensive Defense"}},
 // ── Gen 7 ──
 {id:"edith",kr:"에디스",en:"Edith",cls:"infantry",gen:7,rar:"leg",
- exp:[{n:"Strategic Balance",slot:"X",k:"sur",v:.20,tgt:"mar+lan",t:"궁병 받피 −20% / 창병 피해량 +20%"},
-      {n:"Ironclad",slot:"X",k:"sur",v:.20,tgt:"infantry",t:"보병 받는 피해 −20%"},
-      {n:"Steel Sentinel",slot:"C",v:.25,t:"전 부대 체력 +25%"}],
+ exp:[{n:"Strategic Balance",slot:"X",k:"sur",v:.20,tgt:"mar+lan",t:"궁병 받피 −20% / 창병 피해량 +20%",te:"marksman damage taken −20% / lancer damage +20%"},
+      {n:"Ironclad",slot:"X",k:"sur",v:.20,tgt:"infantry",t:"보병 받는 피해 −20%",te:"infantry damage taken −20%"},
+      {n:"Steel Sentinel",slot:"C",v:.25,t:"전 부대 체력 +25%",te:"all troops health +25%"}],
  w:{side:"defender",stat:"Health",name:"Fortworks"}},
 {id:"gordon",kr:"고든",en:"Gordon",cls:"lancer",gen:7,rar:"leg",
- exp:[{n:"Venom Infusion",slot:"X",k:"dmg",v:.50,tgt:"lancer",t:"창병 2공격마다 추가딜 100% + 독(적 딜 −20%)"},
-      {n:"Chemical Terror",slot:"X",k:"dmg",v:1.5,tgt:"lancer",t:"창병 피해량 +150% & 적 피해량 −30% (3턴마다)"},
-      {n:"Toxic Release",slot:"G",v:.30,p:"4턴마다 2턴",t:"적 보병 받피 +30% & 적 궁병 피해량 −30%"}],
+ exp:[{n:"Venom Infusion",slot:"X",k:"dmg",v:.50,tgt:"lancer",t:"창병 2공격마다 추가딜 100% + 독(적 딜 −20%)",te:"lancers, every 2nd attack: +100% extra damage + poison (enemy damage −20%)"},
+      {n:"Chemical Terror",slot:"X",k:"dmg",v:1.5,tgt:"lancer",t:"창병 피해량 +150% & 적 피해량 −30% (3턴마다)",te:"lancer damage +150% & enemy damage −30% (every 3 turns)"},
+      {n:"Toxic Release",slot:"G",v:.30,p:"4턴마다 2턴",pe:"2 turns out of every 4",t:"적 보병 받피 +30% & 적 궁병 피해량 −30%",te:"enemy infantry damage taken +30% & enemy marksman damage −30%"}],
  w:{side:"rally",stat:"Lethality",name:"Bio Assault"}},
 {id:"bradley",kr:"브래들리",en:"Bradley",cls:"marksman",gen:7,rar:"leg",
- exp:[{n:"Veteran's Might",slot:"B",v:.25,t:"전 부대 공격력 +25%"},
-      {n:"Power Shot",slot:"A",v:.25,t:"적 창병에 +30% / 적 보병에 +25% 피해"},
-      {n:"Tactical Assistance",slot:"A",v:.15,p:"4턴중 2턴",t:"4턴마다 2턴 피해량 +30%"}],
+ exp:[{n:"Veteran's Might",slot:"B",v:.25,t:"전 부대 공격력 +25%",te:"all troops attack +25%"},
+      {n:"Power Shot",slot:"A",v:.25,t:"적 창병에 +30% / 적 보병에 +25% 피해",te:"+30% damage vs enemy lancers / +25% vs enemy infantry"},
+      {n:"Tactical Assistance",slot:"A",v:.15,p:"4턴중 2턴",pe:"2 turns out of 4",t:"4턴마다 2턴 피해량 +30%",te:"2 turns out of every 4: damage +30%"}],
  w:{side:"defender",stat:"Attack",name:"Siege Insight"}},
 // ── Gen 8 ──
 {id:"gatot",s:1,kr:"가톳",en:"Gatot",cls:"infantry",gen:8,rar:"leg",
- exp:[{n:"Golden Guard",slot:"X",k:"sur",v:.30,tgt:"infantry",t:"보병 방어력 +30%"},
-      {n:"King's Bestowal",slot:"X",k:"sur",v:.30,tgt:"infantry",t:"보병 공격 시 보호막(공격력 30%)"},
-      {n:"Royal Legion",slot:"H",v:.25,t:"적 전 부대 공격력 −25%"}],
+ exp:[{n:"Golden Guard",slot:"X",k:"sur",v:.30,tgt:"infantry",t:"보병 방어력 +30%",te:"infantry defense +30%"},
+      {n:"King's Bestowal",slot:"X",k:"sur",v:.30,tgt:"infantry",t:"보병 공격 시 보호막(공격력 30%)",te:"infantry attacks grant a shield (30% of attack)"},
+      {n:"Royal Legion",slot:"H",v:.25,t:"적 전 부대 공격력 −25%",te:"all enemy troops attack −25%"}],
  w:{side:"defender",stat:"Defense",name:"Indestructible City"}},
 {id:"sonya",kr:"소냐",en:"Sonya",cls:"lancer",gen:8,rar:"leg",
- exp:[{n:"Treasure Hunter",slot:"A",v:.20,t:"전 부대 피해량 +20%"},
-      {n:"Bounty Temptation",slot:"B",v:.25,p:"2공격마다",t:"창병 피해 +75% & 전 부대 공격력 +25%(1턴)"},
-      {n:"Torrential Impact",slot:"X",k:"dmg",v:2.5,tgt:"lancer",t:"창병 5턴마다 250% 피해 + 기절"}],
+ exp:[{n:"Treasure Hunter",slot:"A",v:.20,t:"전 부대 피해량 +20%",te:"all troops damage +20%"},
+      {n:"Bounty Temptation",slot:"B",v:.25,p:"2공격마다",pe:"every 2nd attack",t:"창병 피해 +75% & 전 부대 공격력 +25%(1턴)",te:"lancer damage +75% & all troops attack +25% (1 turn)"},
+      {n:"Torrential Impact",slot:"X",k:"dmg",v:2.5,tgt:"lancer",t:"창병 5턴마다 250% 피해 + 기절",te:"lancers, every 5 turns: 250% damage + stun"}],
  w:{side:"defender",stat:"Lethality",name:"Vortex Turret"}},
 {id:"hendrik",s:1,kr:"헨드릭",en:"Hendrik",cls:"marksman",gen:8,rar:"leg",
- exp:[{n:"Worm's Ravage",slot:"F",v:.25,t:"적 전 부대 방어력 −25%"},
-      {n:"Armor of Barnacles",slot:"DEF",v:.15,p:"4턴중 2턴",t:"4턴마다 2턴 방어력 +30%"},
-      {n:"Dagon's Heir",slot:"X",k:"dmg",v:.40,tgt:"marksman",t:"궁병과 3턴마다 합공 40%"}],
+ exp:[{n:"Worm's Ravage",slot:"F",v:.25,t:"적 전 부대 방어력 −25%",te:"all enemy troops defense −25%"},
+      {n:"Armor of Barnacles",slot:"DEF",v:.15,p:"4턴중 2턴",pe:"2 turns out of 4",t:"4턴마다 2턴 방어력 +30%",te:"2 turns out of every 4: defense +30%"},
+      {n:"Dagon's Heir",slot:"X",k:"dmg",v:.40,tgt:"marksman",t:"궁병과 3턴마다 합공 40%",te:"joint strike with marksmen every 3 turns, 40%"}],
  w:{side:"rally",stat:"Attack",name:"Abyssal Blessing"}},
 // ── Gen 9 ──
 {id:"magnus",kr:"마그누스",en:"Magnus",cls:"infantry",gen:9,rar:"leg",
- exp:[{n:"Rapacious",slot:"B",v:.25,t:"전 부대 공격력 +25%"},
-      {n:"Iron Phalanx",slot:"X",k:"sur",v:.50,tgt:"infantry",p:"40%",t:"보병 40% 확률 방어력 +50%"},
-      {n:"Iceman",slot:"X",k:"sur",v:.10,tgt:"inf+mar",t:"보병 받피 −10% / 궁병 피해 +10%"}],
+ exp:[{n:"Rapacious",slot:"B",v:.25,t:"전 부대 공격력 +25%",te:"all troops attack +25%"},
+      {n:"Iron Phalanx",slot:"X",k:"sur",v:.50,tgt:"infantry",p:"40%",pe:"40% chance",t:"보병 40% 확률 방어력 +50%",te:"infantry, 40% chance: defense +50%"},
+      {n:"Iceman",slot:"X",k:"sur",v:.10,tgt:"inf+mar",t:"보병 받피 −10% / 궁병 피해 +10%",te:"infantry damage taken −10% / marksman damage +10%"}],
  w:{side:"defender",stat:"Health",name:"Valoric Inspiration"}},
 {id:"fred",kr:"프레드",en:"Fred",cls:"lancer",gen:9,rar:"leg",
- exp:[{n:"Hydraulic Suppression",slot:"I",v:.20,t:"적 전 부대 파괴력 −20%"},
-      {n:"Acidification",slot:"G",v:.20,t:"적 보병 받는 피해 +20%"},
-      {n:"Floodbringer",slot:"X",k:"dmg",v:2.0,tgt:"lancer",t:"창병 4격마다 추가피해 +200% & 적 딜 −20%"}],
+ exp:[{n:"Hydraulic Suppression",slot:"I",v:.20,t:"적 전 부대 파괴력 −20%",te:"all enemy troops lethality −20%"},
+      {n:"Acidification",slot:"G",v:.20,t:"적 보병 받는 피해 +20%",te:"enemy infantry damage taken +20%"},
+      {n:"Floodbringer",slot:"X",k:"dmg",v:2.0,tgt:"lancer",t:"창병 4격마다 추가피해 +200% & 적 딜 −20%",te:"lancers, every 4th hit: +200% extra damage & enemy damage −20%"}],
  w:{side:"rally",stat:"Attack",name:"Call of the Firefighter"}},
 {id:"xura",kr:"주라",en:"Xura",cls:"marksman",gen:9,rar:"leg",
- exp:[{n:"Fungal Fog",slot:"D",v:.20,t:"전 부대 받는 피해 −20%"},
-      {n:"Piercing Arrow",slot:"X",k:"dmg",v:1.0,tgt:"marksman",t:"궁병 2격마다 추가피해 +100% & 대상 받피 +25%"},
-      {n:"Unorthodoxy",slot:"X",k:"dmg",v:.15,tgt:"marksman",t:"궁병 피해량 +10% / 받피 −15%"}],
+ exp:[{n:"Fungal Fog",slot:"D",v:.20,t:"전 부대 받는 피해 −20%",te:"all troops damage taken −20%"},
+      {n:"Piercing Arrow",slot:"X",k:"dmg",v:1.0,tgt:"marksman",t:"궁병 2격마다 추가피해 +100% & 대상 받피 +25%",te:"marksmen, every 2nd hit: +100% extra damage & target takes +25% damage"},
+      {n:"Unorthodoxy",slot:"X",k:"dmg",v:.15,tgt:"marksman",t:"궁병 피해량 +10% / 받피 −15%",te:"marksman damage +10% / damage taken −15%"}],
  w:{side:"defender",stat:"Attack",name:"Gaiac Hymn"}},
 // ── Gen 10 ──
 {id:"gregory",kr:"그레고리",en:"Gregory",cls:"infantry",gen:10,rar:"leg",
- exp:[{n:"Legion of the Sun",slot:"B",v:.15,t:"공격력 +15% / 방어력 +10%",also:{slot:"DEF",v:.10}},
-      {n:"Charged Assault",slot:"CRIT",v:.25,t:"전 부대 치명 확률 +25%"},
-      {n:"Unbroken",slot:"X",k:"sur",v:.20,tgt:"infantry",t:"보병 받는 피해 −20%"}],
+ exp:[{n:"Legion of the Sun",slot:"B",v:.15,t:"공격력 +15% / 방어력 +10%",te:"attack +15% / defense +10%",also:{slot:"DEF",v:.10}},
+      {n:"Charged Assault",slot:"CRIT",v:.25,t:"전 부대 치명 확률 +25%",te:"all troops crit chance +25%"},
+      {n:"Unbroken",slot:"X",k:"sur",v:.20,tgt:"infantry",t:"보병 받는 피해 −20%",te:"infantry damage taken −20%"}],
  w:{side:"defender",stat:"Lethality",name:"Day of the Guard"}},
 {id:"freya",kr:"프레야",en:"Freya",cls:"lancer",gen:10,rar:"leg",
- exp:[{n:"Fog of War",slot:"H",v:.20,t:"적 전 부대 공격력 −20%"},
-      {n:"Blood Moon Scythe",slot:"X",k:"dmg",v:.50,tgt:"lancer",p:"50%",t:"창병 50% 확률 100% 추가피해"},
-      {n:"Night's Vengeance",slot:"X",k:"dmg",v:.15,tgt:"inf+mar",t:"보병·궁병 받피 −15% & 피해량 +15%"}],
+ exp:[{n:"Fog of War",slot:"H",v:.20,t:"적 전 부대 공격력 −20%",te:"all enemy troops attack −20%"},
+      {n:"Blood Moon Scythe",slot:"X",k:"dmg",v:.50,tgt:"lancer",p:"50%",pe:"50% chance",t:"창병 50% 확률 100% 추가피해",te:"lancers, 50% chance: +100% extra damage"},
+      {n:"Night's Vengeance",slot:"X",k:"dmg",v:.15,tgt:"inf+mar",t:"보병·궁병 받피 −15% & 피해량 +15%",te:"infantry & marksmen: damage taken −15% and damage +15%"}],
  w:{side:"defender",stat:"Defense",name:"Defender of the Watch"}},
 {id:"blanchette",kr:"블랑쳇",en:"Blanchette",cls:"marksman",gen:10,rar:"leg",
- exp:[{n:"Armed to the Teeth",slot:"E",v:.25,t:"전 부대 파괴력 +25%"},
-      {n:"Blood Hunter",slot:"X",k:"dmg",v:.75,tgt:"marksman",t:"궁병 3라운드마다 추가피해 +75%"},
-      {n:"Crimson Sniper",slot:"X",k:"dmg",v:.40,tgt:"marksman",t:"궁병 2격마다 적 창병 +40%/궁병 +20%"}],
+ exp:[{n:"Armed to the Teeth",slot:"E",v:.25,t:"전 부대 파괴력 +25%",te:"all troops lethality +25%"},
+      {n:"Blood Hunter",slot:"X",k:"dmg",v:.75,tgt:"marksman",t:"궁병 3라운드마다 추가피해 +75%",te:"marksmen, every 3rd round: +75% extra damage"},
+      {n:"Crimson Sniper",slot:"X",k:"dmg",v:.40,tgt:"marksman",t:"궁병 2격마다 적 창병 +40%/궁병 +20%",te:"marksmen, every 2nd hit: +40% vs enemy lancers, +20% vs marksmen"}],
  w:{side:"rally",stat:"Lethality",name:"Lightning Strike"}},
 // ── Gen 11 ──
 {id:"eleonora",kr:"엘레오노라",en:"Eleonora",cls:"infantry",gen:11,rar:"leg",
- exp:[{n:"Scorching Sun",slot:"C",v:.25,t:"전 부대 체력 +25%"},
-      {n:"Solaris Nexus",slot:"X",k:"sur",v:.10,tgt:"inf+mar",t:"보병 받피 −10% / 궁병 피해량 +10%"},
-      {n:"Soaring Flame",slot:"A",v:.25,p:"보병 5공격마다",t:"피해량 +25% & 받피 −25% (2턴)",also:{slot:"D",v:.25}}],
+ exp:[{n:"Scorching Sun",slot:"C",v:.25,t:"전 부대 체력 +25%",te:"all troops health +25%"},
+      {n:"Solaris Nexus",slot:"X",k:"sur",v:.10,tgt:"inf+mar",t:"보병 받피 −10% / 궁병 피해량 +10%",te:"infantry damage taken −10% / marksman damage +10%"},
+      {n:"Soaring Flame",slot:"A",v:.25,p:"보병 5공격마다",pe:"infantry, every 5th attack",t:"피해량 +25% & 받피 −25% (2턴)",te:"damage +25% & damage taken −25% (2 turns)",also:{slot:"D",v:.25}}],
  w:{side:"defender",stat:"Health",name:"Last Fortress"}},
 {id:"lloyd",kr:"로이드",en:"Lloyd",cls:"lancer",gen:11,rar:"leg",
- exp:[{n:"Bird Invasion",slot:"I",v:.20,t:"적 전 부대 파괴력 −20%"},
-      {n:"Iceflare Bomb",slot:"X",k:"dmg",v:1.5,tgt:"lancer",t:"창병 3턴마다 공격력 +150% & 적 파괴력 −30%"},
-      {n:"Ingenious Mastery",slot:"E",v:.20,p:"40%",t:"40% 확률 파괴력 +50%"}],
+ exp:[{n:"Bird Invasion",slot:"I",v:.20,t:"적 전 부대 파괴력 −20%",te:"all enemy troops lethality −20%"},
+      {n:"Iceflare Bomb",slot:"X",k:"dmg",v:1.5,tgt:"lancer",t:"창병 3턴마다 공격력 +150% & 적 파괴력 −30%",te:"lancers, every 3 turns: attack +150% & enemy lethality −30%"},
+      {n:"Ingenious Mastery",slot:"E",v:.20,p:"40%",pe:"40% chance",t:"40% 확률 파괴력 +50%",te:"40% chance: lethality +50%"}],
  w:{side:"defender",stat:"Attack",name:"Steel Maze"}},
 {id:"rufus",kr:"루퍼스",en:"Rufus",cls:"marksman",gen:11,rar:"leg",
- exp:[{n:"Inferno Regiment",slot:"B",v:.25,t:"전 부대 공격력 +25%"},
-      {n:"Armor Crush",slot:"X",k:"dmg",v:.60,tgt:"marksman",t:"궁병 매 공격 추가피해 +60% & 대상 받피 +25%"},
-      {n:"Wrathful Quake",slot:"I",v:.10,p:"20%",t:"20% 확률 적 파괴력 −50%(2턴)"}],
+ exp:[{n:"Inferno Regiment",slot:"B",v:.25,t:"전 부대 공격력 +25%",te:"all troops attack +25%"},
+      {n:"Armor Crush",slot:"X",k:"dmg",v:.60,tgt:"marksman",t:"궁병 매 공격 추가피해 +60% & 대상 받피 +25%",te:"marksmen, every attack: +60% extra damage & target takes +25% damage"},
+      {n:"Wrathful Quake",slot:"I",v:.10,p:"20%",pe:"20% chance",t:"20% 확률 적 파괴력 −50%(2턴)",te:"20% chance: enemy lethality −50% (2 turns)"}],
  w:{side:"rally",stat:"Attack",name:"Blazing Legion"}},
 // ── Gen 12~13 ──
 {id:"herbjorg",kr:"헤르보르",en:"Hervor",cls:"infantry",gen:12,rar:"leg",
- exp:[{n:"Call For Blood",slot:"E",v:.25,t:"전 부대 파괴력 +25%"},
-      {n:"Undying",slot:"X",k:"sur",v:.30,tgt:"infantry",t:"보병 일반 받피 −25% / 스킬 받피 −30%"},
-      {n:"Battlethirsty",slot:"X",k:"sur",v:.15,tgt:"infantry",t:"보병 받피 −15% / 피해량 +10%"}],
+ exp:[{n:"Call For Blood",slot:"E",v:.25,t:"전 부대 파괴력 +25%",te:"all troops lethality +25%"},
+      {n:"Undying",slot:"X",k:"sur",v:.30,tgt:"infantry",t:"보병 일반 받피 −25% / 스킬 받피 −30%",te:"infantry: normal-attack damage taken −25% / skill damage taken −30%"},
+      {n:"Battlethirsty",slot:"X",k:"sur",v:.15,tgt:"infantry",t:"보병 받피 −15% / 피해량 +10%",te:"infantry damage taken −15% / damage +10%"}],
  w:{side:"defender",stat:"Defense",name:"Fort of Rock"}},
 {id:"karol",kr:"카롤",en:"Karol",cls:"lancer",gen:12,rar:"leg",
- exp:[{n:"In the Wings",slot:"D",v:.20,t:"전 부대 받는 피해 −20%"},
-      {n:"Shieldbreaker",slot:"A",v:.25,t:"적 창병에 +30% / 적 보병에 +25% 피해"},
-      {n:"Standard of Ages",slot:"B",v:.15,t:"공격력 +15% / 방어력 +10%",also:{slot:"DEF",v:.10}}],
+ exp:[{n:"In the Wings",slot:"D",v:.20,t:"전 부대 받는 피해 −20%",te:"all troops damage taken −20%"},
+      {n:"Shieldbreaker",slot:"A",v:.25,t:"적 창병에 +30% / 적 보병에 +25% 피해",te:"+30% damage vs enemy lancers / +25% vs enemy infantry"},
+      {n:"Standard of Ages",slot:"B",v:.15,t:"공격력 +15% / 방어력 +10%",te:"attack +15% / defense +10%",also:{slot:"DEF",v:.10}}],
  w:{side:"rally",stat:"Attack",name:"Triumphant March"}},
 {id:"ligeia",kr:"리게이아",en:"Ligeia",cls:"marksman",gen:12,rar:"leg",
- exp:[{n:"Nerf Poison",slot:"F",v:.25,t:"적 전 부대 방어력 −25%"},
-      {n:"Corrosion",slot:"X",k:"dmg",v:1.0,tgt:"marksman",t:"궁병 2격마다 추가피해 +100% & 대상 받피 +25%"},
-      {n:"Toxic Tip",slot:"X",k:"dmg",v:1.0,tgt:"marksman",t:"궁병 2격마다 피해 +100% & 적 피해량 −20%"}],
+ exp:[{n:"Nerf Poison",slot:"F",v:.25,t:"적 전 부대 방어력 −25%",te:"all enemy troops defense −25%"},
+      {n:"Corrosion",slot:"X",k:"dmg",v:1.0,tgt:"marksman",t:"궁병 2격마다 추가피해 +100% & 대상 받피 +25%",te:"marksmen, every 2nd hit: +100% extra damage & target takes +25% damage"},
+      {n:"Toxic Tip",slot:"X",k:"dmg",v:1.0,tgt:"marksman",t:"궁병 2격마다 피해 +100% & 적 피해량 −20%",te:"marksmen, every 2nd hit: +100% damage & enemy damage −20%"}],
  w:{side:"defender",stat:"Lethality",name:"Trap Nest"}},
 {id:"vulcanus",kr:"불카누스",en:"Vulcanus",cls:"marksman",gen:13,rar:"leg",
- exp:[{n:"Raging Storm",slot:"H",v:.20,t:"적 전 부대 공격력 −20%"},
-      {n:"Breaker Steel",slot:"A",v:.20,p:"5공격마다",t:"5공격마다 추가피해 +100%"},
-      {n:"True Strike",slot:"X",k:"dmg",v:.60,tgt:"marksman",t:"적 보·창 방어력 −60% & 궁병 공격력 +60%"}],
+ exp:[{n:"Raging Storm",slot:"H",v:.20,t:"적 전 부대 공격력 −20%",te:"all enemy troops attack −20%"},
+      {n:"Breaker Steel",slot:"A",v:.20,p:"5공격마다",pe:"every 5th attack",t:"5공격마다 추가피해 +100%",te:"every 5th attack: +100% extra damage"},
+      {n:"True Strike",slot:"X",k:"dmg",v:.60,tgt:"marksman",t:"적 보·창 방어력 −60% & 궁병 공격력 +60%",te:"enemy infantry & lancer defense −60% and marksman attack +60%"}],
  w:{side:"rally",stat:"Attack",name:"Born King"}}
 ];
 const SLOTS={
- A:{n:"피해량 증가",k:"dmg"},An:{n:"일반공격 피해",k:"dmg"},B:{n:"공격력 증가",k:"dmg"},
- E:{n:"파괴력 증가",k:"dmg"},F:{n:"적 방어력 감소",k:"dmg"},G:{n:"적 받는 피해 증가",k:"dmg"},
- CRIT:{n:"치명률",k:"dmg"},
- C:{n:"체력 증가",k:"sur"},D:{n:"받는 피해 감소",k:"sur"},DEF:{n:"방어력 증가",k:"sur"},
- H:{n:"적 공격력 감소",k:"sur"},I:{n:"적 파괴력 감소",k:"sur"},J:{n:"적 피해량 감소",k:"sur"},
- DODGE:{n:"회피",k:"sur"}};
+ A:{n:L("피해량 증가","Damage bonus"),k:"dmg"},An:{n:L("일반공격 피해","Normal-attack damage"),k:"dmg"},B:{n:L("공격력 증가","Attack bonus"),k:"dmg"},
+ E:{n:L("파괴력 증가","Lethality bonus"),k:"dmg"},F:{n:L("적 방어력 감소","Enemy defense down"),k:"dmg"},G:{n:L("적 받는 피해 증가","Enemy damage taken up"),k:"dmg"},
+ CRIT:{n:L("치명률","Crit rate"),k:"dmg"},
+ C:{n:L("체력 증가","Health bonus"),k:"sur"},D:{n:L("받는 피해 감소","Damage taken down"),k:"sur"},DEF:{n:L("방어력 증가","Defense bonus"),k:"sur"},
+ H:{n:L("적 공격력 감소","Enemy attack down"),k:"sur"},I:{n:L("적 파괴력 감소","Enemy lethality down"),k:"sur"},J:{n:L("적 피해량 감소","Enemy damage down"),k:"sur"},
+ DODGE:{n:L("회피","Dodge"),k:"sur"}};
 const ORDER=["A","An","B","E","F","G","CRIT","C","D","DEF","H","I","J","DODGE"];
 const byId=Object.fromEntries(HEROES.map(h=>[h.id,h]));
 const wpct=l=>l<2?0:5+(Math.floor(l/2)-1)*2.5;
@@ -350,8 +418,8 @@ function dmgShare(t,r){
    t==="inf+mar"?r.inf*DW.infantry+r.mar:t==="mar+lan"?r.mar+r.lan:tot;
  return p/tot;}
 const NA_SHARE=.8; // 일반공격이 총딜에서 차지하는 비중 가정
-const tgtName={infantry:"보병",lancer:"창병",marksman:"궁병","inf+mar":"보병+궁병","mar+lan":"궁병+창병"};
-function tgtStat(t,r){const v=tgtRatio(t,r);return v<5?["dead","사망",v]:v<20?["weak","약함",v]:["ok","정상",v];}
+const tgtName={infantry:L("보병","infantry"),lancer:L("창병","lancers"),marksman:L("궁병","marksmen"),"inf+mar":L("보병+궁병","infantry+marksmen"),"mar+lan":L("궁병+창병","marksmen+lancers")};
+function tgtStat(t,r){const v=tgtRatio(t,r);return v<5?["dead",L("사망","dead"),v]:v<20?["weak",L("약함","weak"),v]:["ok",L("정상","ok"),v];}
 
 // 비율은 [보병,창병,궁병]. 2자리 약칭 해석 규칙:
 //  60/40 = 보60·창40 (궁0)   70/30 = 보70·창30 (궁0)
@@ -361,25 +429,25 @@ const COUNTERS=[
  {m:[50,20,30],lbl:"50/20/30",src:"sheet",cv:[[40,40,20],[30,20,50]],
   c:["40/40/20","30/20/50"],
   ban:[{v:[60,40,0],l:"60/40"}],
-  why:"40/40/20은 보40 흡수·창40이 상대 궁30 저격·궁20 전방. 30/20/50은 궁50 속전속결. 반대로 60/40은 궁병이 0이라 상대 보50을 녹이지 못하고, 창40이 잡을 상대 궁도 30뿐이라 화력이 남는다."},
+  why:L("40/40/20은 보40 흡수·창40이 상대 궁30 저격·궁20 전방. 30/20/50은 궁50 속전속결. 반대로 60/40은 궁병이 0이라 상대 보50을 녹이지 못하고, 창40이 잡을 상대 궁도 30뿐이라 화력이 남는다.","40/40/20: 40 infantry absorb, 40 lancers snipe their 30 marksmen, 20 marksmen work the front. 30/20/50: 50 marksmen for a fast kill. 60/40, by contrast, has zero marksmen so it never melts their 50 infantry, and its 40 lancers only have 30 marksmen to hunt — the surplus is wasted.")},
  {m:[60,40,0],lbl:"60/40",src:"sheet",cv:[[40,20,40]],
-  c:["40/20/40 + 멀티랠리 3~4개"],
+  c:[L("40/20/40 + 멀티랠리 3~4개","40/20/40 + 3-4 rallies")],
   ban:[{v:[50,0,50],l:"50/50"},{v:[49,2,49],l:"49/49"}],
-  why:"60/40은 만능 방어라 단일 랠리로는 못 깬다. 궁병을 절반 넣는 50/50·49/49는 상대 창40에 후열이 먼저 지워지고, 보60이 오래 버텨 역전당한다. 동시 타격이 정석이고 브래들리·카롤·불카누스가 영웅 카운터."},
+  why:L("60/40은 만능 방어라 단일 랠리로는 못 깬다. 궁병을 절반 넣는 50/50·49/49는 상대 창40에 후열이 먼저 지워지고, 보60이 오래 버텨 역전당한다. 동시 타격이 정석이고 브래들리·카롤·불카누스가 영웅 카운터.","60/40 is the all-purpose defense and a single rally will not break it. Comps that are half marksmen (50/50, 49/49) lose their back line to those 40 lancers while 60 infantry stall long enough to turn it around. Simultaneous strikes are the standard answer; Bradley, Karol and Vulcanus are the hero counters.")},
  {m:[70,30,0],lbl:"70/30",src:"sheet",cv:[],
-  c:["멀티랠리로 물량 압박"],
+  c:[L("멀티랠리로 물량 압박","Multi-rally pressure")],
   ban:[{v:[50,0,50],l:"50/50"},{v:[49,2,49],l:"49/49"}],
-  why:"특정 비율 카운터가 없다. 60/40과 같은 이유로 궁병 절반 편성은 금지."},
- {m:[40,0,60],lbl:"40/60 (초방어)",src:"sheet",cv:[[50,50,0],[60,40,0]],
-  c:["50/50/0 (보50·창50)","60/40"],
+  why:L("특정 비율 카운터가 없다. 60/40과 같은 이유로 궁병 절반 편성은 금지.","No specific ratio counters it. Half-marksman comps are banned for the same reason as against 60/40.")},
+ {m:[40,0,60],lbl:L("40/60 (초방어)","40/60 (ultra-defense)"),src:"sheet",cv:[[50,50,0],[60,40,0]],
+  c:[L("50/50/0 (보50·창50)","50/50/0 (50 inf · 50 lancer)"),"60/40"],
   ban:[{v:[50,20,30],l:"50/20/30"}],
-  why:"보50이 전방을 유지하고 창50이 상대 궁60을 순삭한다. 창병이 20밖에 없는 50/20/30은 상대 궁60을 못 지워서 밴드. 여기서는 60/40이 오히려 정답 카운터다."},
+  why:L("보50이 전방을 유지하고 창50이 상대 궁60을 순삭한다. 창병이 20밖에 없는 50/20/30은 상대 궁60을 못 지워서 밴드. 여기서는 60/40이 오히려 정답 카운터다.","50 infantry hold the front while 50 lancers erase their 60 marksmen. 50/20/30 only brings 20 lancers, cannot clear those 60 marksmen, and is therefore banned. Here 60/40 is actually the correct counter.")},
  {m:[60,30,10],lbl:"60/30/10",src:"sheet",cv:[[40,20,40]],
-  c:["40/20/40 + 더블·트리플 랠리"],ban:[],
-  why:"단일 랠리는 실패한다. 최소 2~3랠리 필요."},
- {m:[40,10,50],lbl:"40/10/50 (준공격)",src:"theory",cv:[[40,40,20],[50,40,10]],
+  c:[L("40/20/40 + 더블·트리플 랠리","40/20/40 + double or triple rally")],ban:[],
+  why:L("단일 랠리는 실패한다. 최소 2~3랠리 필요.","A single rally fails. You need at least 2-3.")},
+ {m:[40,10,50],lbl:L("40/10/50 (준공격)","40/10/50 (semi-offensive)"),src:"theory",cv:[[40,40,20],[50,40,10]],
   c:["40/40/20","50/40/10"],ban:[],
-  why:"상대 창병이 10뿐이라 내 후열이 안전하다. 창40으로 상대 주력(궁50)을 지운다. ※ 가이드 카운터표에 없는 확장 항목(이론)."}];
+  why:L("상대 창병이 10뿐이라 내 후열이 안전하다. 창40으로 상대 주력(궁50)을 지운다. ※ 가이드 카운터표에 없는 확장 항목(이론).","With only 10 lancers on their side your back line is safe. 40 lancers erase their main damage (50 marksmen). Note: an extension not present in the guide's counter table (theory).")}];
 const BAND_TOL=6;   // 내 병비가 금지 비율과 이 거리 안이면 밴드
 const ROW_TOL=10;   // 상대 비율이 이 거리 밖이면 밴드 판정을 내리지 않는다
 
@@ -415,27 +483,34 @@ function channels(en,mine,N){
  };
 }
 const CH_TXT={
- P:function(c,en,mine){return "<b>대보병 화력 부족 "+c.P.toFixed(0)+"</b> — 상대 보병 "+en[0].toFixed(0)+"%에 비해 내 궁병이 "+mine[2].toFixed(0)+"%로 적습니다. 궁병은 보병 상대 <b>+10% 보너스</b>(T1 원거리 사격)를 받는 유일한 병종이라, 보병 위주 방어를 상대할 때 효율이 가장 좋습니다. <span class=\"cap\">※ 궁병이 없어도 보병·창병이 상대 보병을 때립니다. 이 지표는 '못 잡는다'가 아니라 '효율이 나쁘다'입니다.</span>";},
- T:function(c,en,mine){return "<b>상성 열세 "+c.T.toFixed(0)+"</b> — 내 창병이 못 받아내는 상대 궁병 "+Math.max(0,en[2]-mine[1]).toFixed(0)+"% + 내 궁병에 상성이 붙는 상대 창병 "+Math.min(en[1],mine[2]).toFixed(0)+"%. 상성 보너스가 상대 쪽으로 기우는 양입니다.";},
- B:function(c,en,mine){return "<b>후열 노출 "+c.B.toFixed(0)+"</b> — 내 궁병 "+mine[2].toFixed(0)+"%가 상대 창병 "+en[1].toFixed(0)+"%의 상성 대상입니다(창→사 +10%, 그리고 T7 Ambusher가 <b>20% 확률</b>로 전열을 우회해 직격). 사수는 방어·체력이 가장 낮아 맞으면 손실이 큽니다.";}
+ P:function(c,en,mine){return L(
+   "<b>대보병 화력 부족 "+c.P.toFixed(0)+"</b> — 상대 보병 "+en[0].toFixed(0)+"%에 비해 내 궁병이 "+mine[2].toFixed(0)+"%로 적습니다. 궁병은 보병 상대 <b>+10% 보너스</b>(T1 원거리 사격)를 받는 유일한 병종이라, 보병 위주 방어를 상대할 때 효율이 가장 좋습니다. <span class=\"cap\">※ 궁병이 없어도 보병·창병이 상대 보병을 때립니다. 이 지표는 '못 잡는다'가 아니라 '효율이 나쁘다'입니다.</span>",
+   "<b>Anti-infantry shortfall "+c.P.toFixed(0)+"</b> — they field "+en[0].toFixed(0)+"% infantry but you only bring "+mine[2].toFixed(0)+"% marksmen. Marksmen are the only class with a <b>+10% bonus vs infantry</b> (T1 Ranged Strike), so they are the most efficient answer to an infantry-heavy defense. <span class=\"cap\">Note: you still kill infantry without marksmen — infantry and lancers hit them too. This reads as 'inefficient', not 'impossible'.</span>");},
+ T:function(c,en,mine){return L(
+   "<b>상성 열세 "+c.T.toFixed(0)+"</b> — 내 창병이 못 받아내는 상대 궁병 "+Math.max(0,en[2]-mine[1]).toFixed(0)+"% + 내 궁병에 상성이 붙는 상대 창병 "+Math.min(en[1],mine[2]).toFixed(0)+"%. 상성 보너스가 상대 쪽으로 기우는 양입니다.",
+   "<b>Counter deficit "+c.T.toFixed(0)+"</b> — "+Math.max(0,en[2]-mine[1]).toFixed(0)+"% of their marksmen your lancers do not cover, plus "+Math.min(en[1],mine[2]).toFixed(0)+"% of their lancers that have your marksmen in range. This is how far the counter bonus tilts their way.");},
+ B:function(c,en,mine){return L(
+   "<b>후열 노출 "+c.B.toFixed(0)+"</b> — 내 궁병 "+mine[2].toFixed(0)+"%가 상대 창병 "+en[1].toFixed(0)+"%의 상성 대상입니다(창→사 +10%, 그리고 T7 Ambusher가 <b>20% 확률</b>로 전열을 우회해 직격). 사수는 방어·체력이 가장 낮아 맞으면 손실이 큽니다.",
+   "<b>Back-line exposure "+c.B.toFixed(0)+"</b> — your "+mine[2].toFixed(0)+"% marksmen are the counter target of their "+en[1].toFixed(0)+"% lancers (lancer→marksman +10%, and T7 Ambusher bypasses the front line on a <b>20% chance</b>). Marksmen have the lowest defense and health, so those hits cost the most.");}
 };
 const CH_FIX={
- P:"궁병 비중을 올리면 상대 보병에 +10% 상성이 붙습니다.",
- T:"창병을 늘려 상대 궁병에 상성을 걸거나, 내 궁병을 줄여 상대 창병의 상성 대상을 줄이세요.",
- B:"궁병 비중을 낮추거나 보병을 늘려 전열을 두껍게 하세요."
+ P:L("궁병 비중을 올리면 상대 보병에 +10% 상성이 붙습니다.","Raise your marksman share to pick up the +10% counter against their infantry."),
+ T:L("창병을 늘려 상대 궁병에 상성을 걸거나, 내 궁병을 줄여 상대 창병의 상성 대상을 줄이세요.","Add lancers to counter their marksmen, or cut your marksmen so their lancers have fewer targets."),
+ B:L("궁병 비중을 낮추거나 보병을 늘려 전열을 두껍게 하세요.","Lower your marksman share, or add infantry to thicken the front line.")
 };
+const CH_NAME={P:L("대보병 화력","Anti-infantry"),T:L("상성 열세","Counter deficit"),B:L("후열 노출","Back-line exposure")};
 // 실제 메커니즘 (병종 스탯 시스템 가이드) — 화면 하단 참고용
 const MECH={
- rps:[["보병 → 창병","T1 Master Brawler","공격 데미지 +10%"],
-      ["창병 → 사수","T1 Charge","공격 데미지 +10%"],
-      ["사수 → 보병","T1 Ranged Strike","공격 데미지 +10%"]],
- t7:[["보병 T7 Bands of Steel","창병에 대한 방어력 +10%"],
-     ["사수 T7 Volley","공격 시 10% 확률로 2회 타격"],
-     ["창병 T7 Ambusher","20% 확률로 보병 뒤의 사수를 직접 공격"]],
- stat:[["보병","전열","10","13","15","10"],["창병","중열","13","11","11","14"],["사수","후열","14","10","10","15"]]
+ rps:[[L("보병 → 창병","Infantry → Lancer"),"T1 Master Brawler",L("공격 데미지 +10%","Attack damage +10%")],
+      [L("창병 → 사수","Lancer → Marksman"),"T1 Charge",L("공격 데미지 +10%","Attack damage +10%")],
+      [L("사수 → 보병","Marksman → Infantry"),"T1 Ranged Strike",L("공격 데미지 +10%","Attack damage +10%")]],
+ t7:[[L("보병 T7 Bands of Steel","Infantry T7 Bands of Steel"),L("창병에 대한 방어력 +10%","+10% defense vs lancers")],
+     [L("사수 T7 Volley","Marksman T7 Volley"),L("공격 시 10% 확률로 2회 타격","10% chance to strike twice")],
+     [L("창병 T7 Ambusher","Lancer T7 Ambusher"),L("20% 확률로 보병 뒤 사수 직격","20% chance to hit the marksmen behind the infantry")]],
+ stat:[[L("보병","Infantry"),L("전열","Front"),"10","13","15","10"],
+       [L("창병","Lancer"),L("중열","Middle"),"13","11","11","14"],
+       [L("사수","Marksman"),L("후열","Back"),"14","10","10","15"]]
 };
-// mode==="defender" 면 P 채널 제외 — 수비는 제한 시간 내 격파 의무가 없어
-// "못 녹인다"가 패배 조건이 아니다. 남는 축은 T·B뿐이다.
 const dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2]);
 function modelVerdict(en,mine,mode){
  const keys=mode==="defender"?["T","B"]:["P","T","B"];
@@ -453,7 +528,7 @@ function calc(){
  const r=norm(+document.getElementById("r1").value||0,+document.getElementById("r2").value||0,+document.getElementById("r3").value||0);
  const leaders=picks.filter(p=>p.hero);
  const out=document.getElementById("out");
- if(leaders.length===0){out.innerHTML='<div class="callout co-tip"><p>리더를 한 명 이상 선택하세요.</p></div>';return;}
+ if(leaders.length===0){out.innerHTML='<div class="callout co-tip"><p>'+S("needLeader")+'</p></div>';return;}
 
  // ── 칸 집계 ──
  const buck={},src={},cls=[];
@@ -461,7 +536,7 @@ function calc(){
  leaders.forEach(({hero})=>hero.exp.forEach(e=>{
    if(e.slot==="ECO")return;
    if(e.slot==="X"){const[st,lbl,v]=tgtStat(e.tgt,r);cls.push({hero,e,st,lbl,v});return;}
-   const add=(sl,val)=>{if(buck[sl]===undefined)return;buck[sl]+=val;src[sl].push(hero.kr+" "+e.n+" +"+(val*100).toFixed(0)+"%");};
+   const add=(sl,val)=>{if(buck[sl]===undefined)return;buck[sl]+=val;src[sl].push(HN(hero)+" "+e.n+" +"+(val*100).toFixed(0)+"%");};
    add(e.slot,e.v); if(e.also)add(e.also.slot,e.also.v);
  }));
 
@@ -482,9 +557,9 @@ function calc(){
    if(e.slot==="X"){const[st,lbl,v]=tgtStat(e.tgt,r);cond=st+"|"+tgtName[e.tgt]+" "+v.toFixed(0)+"% ("+lbl+")";
      if(st==="dead")return{h,e,mul:1,detail:["병종 비중 부족 → 사망"],cond,dup:lid.has(h.id)};
      const sh=e.k==="sur"?tgtRatio(e.tgt,r)/100:dmgShare(e.tgt,r);
-     mul=1+e.v*sh;detail.push((e.k==="sur"?"병력":"딜")+" 지분 "+(sh*100).toFixed(0)+"% 환산");
+     mul=1+e.v*sh;detail.push(L((e.k==="sur"?"병력":"딜")+" 지분 "+(sh*100).toFixed(0)+"% 환산",(e.k==="sur"?"headcount":"damage")+" share "+(sh*100).toFixed(0)+"%"));
    }else if(e.slot==="An"){
-     mul=1+e.v*NA_SHARE;detail.push("일반공격 비중 "+(NA_SHARE*100)+"% 가정");
+     mul=1+e.v*NA_SHARE;detail.push(L("일반공격 비중 "+(NA_SHARE*100)+"% 가정","assumes normal attacks are "+(NA_SHARE*100)+"% of damage"));
    }else{
      const step=(sl,val)=>{const b=buck[sl];if(b===undefined)return;const m=(b+val)/b;mul*=m;
        detail.push(sl+" "+b.toFixed(2)+"→"+(b+val).toFixed(2)+" ×"+m.toFixed(3));};
@@ -517,154 +592,154 @@ function calc(){
 }
 const esc=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
 const sTag=s=>'<span class="slot s-'+(["A","B","E","F","G","C","D"].includes(s)?s:"X")+'">'+s+'</span>';
-const statKr={Attack:"공격력",Defense:"방어력",Lethality:"파괴력",Health:"체력"};
+const statKr={Attack:L("공격력","Attack"),Defense:L("방어력","Defense"),Lethality:L("파괴력","Lethality"),Health:L("체력","Health")};
 
 function render(d){
  const {mode,leaders,picks,r,buck,src,cls,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap}=d;
  let o="";
- const modeKr=mode==="rally"?"공성(랠리)":"수성(개리슨)";
- o+='<h2>① 리더 구성 <span>'+modeKr+" · 병비 "+r.inf.toFixed(0)+"/"+r.lan.toFixed(0)+"/"+r.mar.toFixed(0)+'</span></h2>';
- o+='<div class="panel"><table><thead><tr><th>슬롯</th><th>영웅</th><th>원정 3스킬</th><th>전무</th></tr></thead><tbody>';
- ["보병","창병","궁병"].forEach((c,i)=>{const p=picks[i];
-  if(!p.hero){o+='<tr><td class="b">'+c+'</td><td class="note" colspan="3">미선택</td></tr>';return;}
+ const modeKr=mode==="rally"?L("공성(랠리)","Rally (offense)"):L("수성(개리슨)","Garrison (defense)");
+ o+='<h2>'+L("① 리더 구성","① Leaders")+' <span>'+modeKr+L(" · 병비 "," · ratio ")+r.inf.toFixed(0)+"/"+r.lan.toFixed(0)+"/"+r.mar.toFixed(0)+'</span></h2>';
+ o+='<div class="panel"><table><thead><tr><th>'+L("슬롯","Slot")+'</th><th>'+L("영웅","Hero")+'</th><th>'+L("원정 3스킬","Expedition skills")+'</th><th>'+L("전무","Gear")+'</th></tr></thead><tbody>';
+ [L("보병","Infantry"),L("창병","Lancer"),L("궁병","Marksman")].forEach((c,i)=>{const p=picks[i];
+  if(!p.hero){o+='<tr><td class="b">'+c+'</td><td class="note" colspan="3">'+L("미선택","not selected")+'</td></tr>';return;}
   const sk=p.hero.exp.map(e=>{
-    if(e.slot==="ECO")return'<div class="note">'+esc(e.n)+" — 비전투</div>";
+    if(e.slot==="ECO")return'<div class="note">'+esc(e.n)+L(" — 비전투"," — non-combat")+"</div>";
     if(e.slot==="X"){const[st]=tgtStat(e.tgt,r);
-      return'<div'+(st==="dead"?' style="opacity:.45"':"")+">"+sTag("X")+esc(e.t)+
+      return'<div'+(st==="dead"?' style="opacity:.45"':"")+">"+sTag("X")+esc(L(e.t,e.te||e.t))+
         '<span class="tag t-'+(st==="dead"?"bad":st==="weak"?"warn":"ok")+'">'+tgtName[e.tgt]+" "+tgtRatio(e.tgt,r).toFixed(0)+"%</span></div>";}
-    return"<div>"+sTag(e.slot)+esc(e.t)+(e.also?" "+sTag(e.also.slot):"")+"</div>";}).join("");
-  o+='<tr><td class="b">'+c+'</td><td class="b">'+esc(p.hero.kr)+'<div class="note">'+esc(p.hero.en)+" · Gen "+p.hero.gen+"</div></td><td>"+sk+"</td><td>Lv."+p.wl+"</td></tr>";});
+    return"<div>"+sTag(e.slot)+esc(L(e.t,e.te||e.t))+(e.also?" "+sTag(e.also.slot):"")+"</div>";}).join("");
+  o+='<tr><td class="b">'+c+'</td><td class="b">'+esc(HN(p.hero))+'<div class="note">'+(LANG==="en"?"":esc(p.hero.en)+" · ")+"Gen "+p.hero.gen+"</div></td><td>"+sk+"</td><td>Lv."+p.wl+"</td></tr>";});
  o+="</tbody></table></div>";
 
  // 칸 진단
- o+='<h2>② SkillMod 칸 진단 <span>포화도</span></h2><div class="panel"><table><thead><tr><th>칸</th><th>이름</th><th>값</th><th>포화</th><th>구성</th></tr></thead><tbody>';
+ o+='<h2>'+L("② SkillMod 칸 진단","② SkillMod slot diagnosis")+' <span>'+L("포화도","saturation")+'</span></h2><div class="panel"><table><thead><tr><th>'+L("칸","Slot")+'</th><th>'+L("이름","Name")+'</th><th>'+L("값","Value")+'</th><th>'+L("포화","Saturation")+'</th><th>'+L("구성","Sources")+'</th></tr></thead><tbody>';
  const used=ORDER.filter(s=>buck[s]>1);
  const empty=ORDER.filter(s=>buck[s]===1);
  used.sort((a,b)=>buck[b]-buck[a]).forEach(s=>{
-  const v=buck[s],pc=Math.min(100,(v-1)/0.9*100),sat=v>=1.6?"포화":v>=1.4?"주의":"여유";
-  o+='<tr'+(v>=1.6?' class="hi"':"")+"><td>"+sTag(s)+'</td><td>'+SLOTS[s].n+'<div class="note">'+(SLOTS[s].k==="dmg"?"딜":"생존")+
+  const v=buck[s],pc=Math.min(100,(v-1)/0.9*100),sat=v>=1.6?L("포화","saturated"):v>=1.4?L("주의","filling"):L("여유","room");
+  o+='<tr'+(v>=1.6?' class="hi"':"")+"><td>"+sTag(s)+'</td><td>'+SLOTS[s].n+'<div class="note">'+(SLOTS[s].k==="dmg"?L("딜","damage"):L("생존","survival"))+
    '</div></td><td class="big">'+v.toFixed(2)+'</td><td><span class="tag t-'+(v>=1.6?"bad":v>=1.4?"warn":"ok")+'">'+sat+
    '</span><div class="bar"><i style="width:'+pc.toFixed(0)+'%"></i></div></td><td class="note">'+src[s].map(esc).join("<br>")+"</td></tr>";});
  o+="</tbody></table>";
- if(empty.length)o+='<div class="callout co-ok"><h3>🟢 빈 칸 — 조이너 1순위 후보</h3><p>'+
+ if(empty.length)o+='<div class="callout co-ok"><h3>'+L("🟢 빈 칸 — 조이너 1순위 후보","🟢 Empty slots — top joiner targets")+'</h3><p>'+
    empty.map(s=>'<span class="pill">'+s+" "+SLOTS[s].n+"</span>").join("")+"</p></div>";
  o+="</div>";
 
  // 위젯
- o+='<h2>③ 위젯 <span>'+(mode==="rally"?"집결(Rally)":"수비(Defender)")+"용만 발동</span></h2><div class=\"panel\"><table><thead><tr><th>영웅</th><th>위젯 스킬</th><th>스탯</th><th>방향</th><th>Lv</th><th>효과</th></tr></thead><tbody>";
- if(!wg.length)o+='<tr><td colspan="6" class="note">전용무기 보유 영웅 없음 (에픽은 전용무기가 없습니다)</td></tr>';
- wg.forEach(x=>{o+="<tr"+(x.fire?' class="hi"':' class="dead"')+"><td class=\"b\">"+esc(x.hero.kr)+"</td><td class=\"cap\">"+esc(x.w.name)+
-  "</td><td>"+statKr[x.w.stat]+"</td><td>"+(x.w.side==="rally"?"집결":"수비")+
-  '</td><td>'+x.lv+'</td><td>'+(x.fire?'<span class="big">+'+x.pct+"%</span>":'<span class="tag t-bad">'+(x.lv<2?"Lv.2 미만":"방향 불일치 → 0")+"</span>")+"</td></tr>";});
+ o+='<h2>'+L("③ 위젯","③ Widgets")+' <span>'+(mode==="rally"?L("집결(Rally)","Rally"):L("수비(Defender)","Defender"))+L("용만 발동","-side only")+'</span></h2>'+'<div class="panel"><table><thead><tr><th>'+L("영웅","Hero")+'</th><th>'+L("위젯 스킬","Widget skill")+'</th><th>'+L("스탯","Stat")+'</th><th>'+L("방향","Side")+'</th><th>Lv</th><th>'+L("효과","Effect")+'</th></tr></thead><tbody>';
+ if(!wg.length)o+='<tr><td colspan="6" class="note">'+L("전용무기 보유 영웅 없음 (에픽은 전용무기가 없습니다)","No hero with exclusive gear (epics have none)")+'</td></tr>';
+ wg.forEach(x=>{o+="<tr"+(x.fire?' class="hi"':' class="dead"')+"><td class=\"b\">"+esc(HN(x.hero))+"</td><td class=\"cap\">"+esc(x.w.name)+
+  "</td><td>"+statKr[x.w.stat]+"</td><td>"+(x.w.side==="rally"?L("집결","Rally"):L("수비","Defender"))+
+  '</td><td>'+x.lv+'</td><td>'+(x.fire?'<span class="big">+'+x.pct+"%</span>":'<span class="tag t-bad">'+(x.lv<2?L("Lv.2 미만","below Lv.2"):L("방향 불일치 → 0","wrong side → 0"))+"</span>")+"</td></tr>";});
  o+="</tbody></table>";
  const sk=Object.keys(wstat);
  if(sk.length){
   const dup=sk.filter(s=>wg.filter(x=>x.fire&&x.w.stat===s).length>1);
-  o+='<div class="callout '+(dup.length?"co-warn":"co-key")+'"><h3>'+(dup.length?"⚠️ 스탯 중복":"🔑 위젯 결과")+"</h3><p>"+
+  o+='<div class="callout '+(dup.length?"co-warn":"co-key")+'"><h3>'+(dup.length?L("⚠️ 스탯 중복","⚠️ Duplicate stat"):L("🔑 위젯 결과","🔑 Widget result"))+"</h3><p>"+
     sk.map(s=>statKr[s]+" <b>+"+wstat[s]+"%</b>").join(" × ")+" = <b>×"+wmul.toFixed(3)+"</b></p>"+
-    '<p class="cap">딜 축(공격×파괴력) ×'+wDmg.toFixed(3)+" · 생존 축(방어×체력) ×"+wSur.toFixed(3)+" · 발동 "+wg.filter(x=>x.fire).length+"개 / "+wg.length+"개</p>"+
-    (dup.length?"<p>"+dup.map(s=>statKr[s]).join("·")+" 이 겹쳐 <b>합연산</b>으로 뭉칩니다. 다른 스탯 위젯으로 바꾸면 곱연산이 됩니다.</p>":"")+"</div>";}
+    '<p class="cap">'+L("딜 축(공격×파괴력) ×","Damage axis (attack×lethality) ×")+wDmg.toFixed(3)+L(" · 생존 축(방어×체력) ×"," · survival axis (defense×health) ×")+wSur.toFixed(3)+L(" · 발동 "," · active ")+wg.filter(x=>x.fire).length+" / "+wg.length+"</p>"+
+    (dup.length?"<p>"+dup.map(s=>statKr[s]).join("·")+L(" 이 겹쳐 <b>합연산</b>으로 뭉칩니다. 다른 스탯 위젯으로 바꾸면 곱연산이 됩니다."," collide, so they stack <b>additively</b>. Swap one for a widget on a different stat and they multiply instead.")+"</p>":"")+"</div>";}
  o+="</div>";
 
  // 병종 전용
  if(cls.length){
-  o+='<h2>④ 병종 전용 · 주기형 스킬 판정</h2><div class="panel"><table><thead><tr><th>영웅</th><th>스킬</th><th>대상</th><th>현재 비중</th><th>판정</th></tr></thead><tbody>';
-  cls.forEach(c=>{o+="<tr"+(c.st==="dead"?' class="dead"':c.st==="ok"?' class="hi"':"")+'><td class="b">'+esc(c.hero.kr)+"</td><td>"+esc(c.e.n)+
-   '<div class="note">'+esc(c.e.t)+"</div></td><td>"+tgtName[c.e.tgt]+"</td><td>"+c.v.toFixed(0)+
+  o+='<h2>'+L("④ 병종 전용 · 주기형 스킬 판정","④ Class-locked and periodic skills")+'</h2><div class="panel"><table><thead><tr><th>'+L("영웅","Hero")+'</th><th>'+L("스킬","Skill")+'</th><th>'+L("대상","Target")+'</th><th>'+L("현재 비중","Current share")+'</th><th>'+L("판정","Verdict")+'</th></tr></thead><tbody>';
+  cls.forEach(c=>{o+="<tr"+(c.st==="dead"?' class="dead"':c.st==="ok"?' class="hi"':"")+'><td class="b">'+esc(HN(c.hero))+"</td><td>"+esc(c.e.n)+
+   '<div class="note">'+esc(L(c.e.t,c.e.te||c.e.t))+"</div></td><td>"+tgtName[c.e.tgt]+"</td><td>"+c.v.toFixed(0)+
    '%</td><td><span class="tag t-'+(c.st==="dead"?"bad":c.st==="weak"?"warn":"ok")+'">'+c.lbl+"</span></td></tr>";});
   o+="</tbody></table>";
   const dead=cls.filter(c=>c.st==="dead");
-  if(dead.length)o+='<div class="callout co-warn"><h3>⚠️ 죽은 스킬 '+dead.length+"개</h3><p>"+
-    dead.map(c=>"<b>"+esc(c.hero.kr)+" "+esc(c.e.n)+"</b> — "+tgtName[c.e.tgt]+" 비중 "+c.v.toFixed(0)+"%").join("<br>")+
-    "</p><p>해당 병종을 늘리거나, 병종 전용 스킬이 없는 영웅으로 교체하세요.</p></div>";
-  o+='<div class="callout co-tip"><h3>📖 실제 병종 메커니즘 (병종 스탯 시스템 가이드)</h3>'+
-   "<p><b>상성은 전용 타겟팅이 아니라 +10% 공격 보너스입니다.</b> 모든 병종이 모든 병종을 때립니다 — 궁병이 없어도 보병을 잡습니다.</p>"+
-   '<table class="hgrid"><thead><tr><th>상성</th><th>스킬</th><th>효과</th></tr></thead><tbody>'+
+  if(dead.length)o+='<div class="callout co-warn"><h3>'+L("⚠️ 죽은 스킬 ","⚠️ Dead skills: ")+dead.length+L("개","")+"</h3><p>"+
+    dead.map(c=>"<b>"+esc(HN(c.hero))+" "+esc(c.e.n)+"</b> — "+tgtName[c.e.tgt]+L(" 비중 "," share ")+c.v.toFixed(0)+"%").join("<br>")+
+    "</p><p>"+L("해당 병종을 늘리거나, 병종 전용 스킬이 없는 영웅으로 교체하세요.","Raise that troop type, or swap in a hero without class-locked skills.")+"</p></div>";
+  o+='<div class="callout co-tip"><h3>'+L("📖 실제 병종 메커니즘 (병종 스탯 시스템 가이드)","📖 How troop counters actually work (troop stat guide)")+'</h3>'+
+   L("<p><b>상성은 전용 타겟팅이 아니라 +10% 공격 보너스입니다.</b> 모든 병종이 모든 병종을 때립니다 — 궁병이 없어도 보병을 잡습니다.</p>","<p><b>The counter triangle is a +10% attack bonus, not exclusive targeting.</b> Every troop type hits every other type — you kill infantry without marksmen.</p>")+
+   '<table class="hgrid"><thead><tr><th>'+L("상성","Counter")+'</th><th>'+L("스킬","Skill")+'</th><th>'+L("효과","Effect")+'</th></tr></thead><tbody>'+
    MECH.rps.map(r=>"<tr><td>"+r[0]+"</td><td>"+r[1]+"</td><td>"+r[2]+"</td></tr>").join("")+"</tbody></table>"+
-   '<table class="hgrid"><thead><tr><th>T7 스킬</th><th>효과</th></tr></thead><tbody>'+
+   '<table class="hgrid"><thead><tr><th>'+L("T7 스킬","T7 skill")+'</th><th>'+L("효과","Effect")+'</th></tr></thead><tbody>'+
    MECH.t7.map(r=>"<tr><td>"+r[0]+"</td><td>"+r[1]+"</td></tr>").join("")+"</tbody></table>"+
-   '<p class="cap">창병의 후열 침투는 <b>20% 확률</b>입니다(100% 아님). "창병이 궁병을 순삭한다"는 표현은 실제 수치보다 과장돼 있습니다.</p>'+
-   '<table class="hgrid"><thead><tr><th>병종</th><th>배치</th><th>공격</th><th>방어</th><th>체력</th><th>치명</th></tr></thead><tbody>'+
+   '<p class="cap">'+L('창병의 후열 침투는 <b>20% 확률</b>입니다(100% 아님). "창병이 궁병을 순삭한다"는 표현은 실제 수치보다 과장돼 있습니다.','The lancer back-line bypass is a <b>20% chance</b>, not 100%. Phrases like "their lancers delete your marksmen instantly" overstate what the numbers support.')+'</p>'+
+   '<table class="hgrid"><thead><tr><th>'+L("병종","Type")+'</th><th>'+L("배치","Row")+'</th><th>'+L("공격","Atk")+'</th><th>'+L("방어","Def")+'</th><th>'+L("체력","HP")+'</th><th>'+L("치명","Leth")+'</th></tr></thead><tbody>'+
    MECH.stat.map(r=>"<tr><td>"+r[0]+"</td><td>"+r[1]+"</td><td>"+r[2]+"</td><td>"+r[3]+"</td><td>"+r[4]+"</td><td>"+r[5]+"</td></tr>").join("")+"</tbody></table>"+
-   '<p class="cap">T10 기준. 사수는 공격·치명 최고 / 방어·체력 최저, 보병은 반대. 창병은 균형형.</p>'+
+   '<p class="cap">'+L("T10 기준. 사수는 공격·치명 최고 / 방어·체력 최저, 보병은 반대. 창병은 균형형.","At T10. Marksmen top attack and lethality, bottom defense and health; infantry the reverse; lancers balanced.")+'</p>'+
    "</div>";
   o+="</div>";}
 
  // 조이너
- o+='<h2>⑤ 조이너 한계 배율 순위 <span>S1만 기여 · 상위 4명만 채택'+(gcap<99?' · Gen '+gcap+' 이하':'')+'</span></h2><div class="panel"><table><thead><tr><th>#</th><th>조이너</th><th>S1 스킬</th><th>칸</th><th>계산</th><th>배율</th></tr></thead><tbody>';
+ o+='<h2>'+L("⑤ 조이너 한계 배율 순위","⑤ Joiner marginal multiplier ranking")+' <span>'+L("S1만 기여 · 상위 4명만 채택","only S1 counts · top 4 are taken")+(gcap<99?(LANG==="en"?' · Gen '+gcap+' and below':' · Gen '+gcap+' 이하'):'')+'</span></h2><div class="panel"><table><thead><tr><th>#</th><th>'+L("조이너","Joiner")+'</th><th>'+L("S1 스킬","S1 skill")+'</th><th>'+L("칸","Slot")+'</th><th>'+L("계산","Working")+'</th><th>'+L("배율","Multiplier")+'</th></tr></thead><tbody>';
  rank.slice(0,14).forEach((x,i)=>{
   const dmg=x.e.slot!=="X"&&SLOTS[x.e.slot]&&SLOTS[x.e.slot].k==="dmg";
-  o+="<tr"+(i<4&&!x.dup?' class="hi"':x.mul<=1.001?' class="dead"':"")+"><td>"+(i+1)+'</td><td class="b">'+esc(x.h.kr)+
-   (x.dup?'<span class="tag t-bad">리더 중복</span>':"")+(x.h.s?'<span class="tag t-ok">시트</span>':'<span class="tag t-warn">이론</span>')+
-   '</td><td class="cap">'+esc(x.e.t)+"</td><td>"+(x.e.slot==="X"?sTag("X"):sTag(x.e.slot)+(x.e.also?sTag(x.e.also.slot):""))+
+  o+="<tr"+(i<4&&!x.dup?' class="hi"':x.mul<=1.001?' class="dead"':"")+"><td>"+(i+1)+'</td><td class="b">'+esc(HN(x.h))+
+   (x.dup?'<span class="tag t-bad">'+L("리더 중복","already a leader")+'</span>':"")+(x.h.s?'<span class="tag t-ok">'+L("시트","sheet")+'</span>':'<span class="tag t-warn">'+L("이론","theory")+'</span>')+
+   '</td><td class="cap">'+esc(L(x.e.t,x.e.te||x.e.t))+"</td><td>"+(x.e.slot==="X"?sTag("X"):sTag(x.e.slot)+(x.e.also?sTag(x.e.also.slot):""))+
    (x.cond?'<div class="note">'+x.cond.split("|")[1]+"</div>":"")+'</td><td class="note">'+x.detail.map(esc).join("<br>")+
-   '</td><td class="big">×'+x.mul.toFixed(3)+'<div class="note">'+(x.e.slot==="X"?"조건부":dmg?"딜":"생존")+"</div></td></tr>";});
+   '</td><td class="big">×'+x.mul.toFixed(3)+'<div class="note">'+(x.e.slot==="X"?L("조건부","conditional"):dmg?L("딜","damage"):L("생존","survival"))+"</div></td></tr>";});
  o+="</tbody></table>";
  const top=rank.filter(x=>!x.dup&&x.mul>1.001).slice(0,4);
  const tSheet=rank.filter(x=>!x.dup&&x.mul>1.001&&x.h.s).slice(0,4);
- o+='<div class="callout co-key" id="rec"><h3>⭐ 추천 조이너 4명</h3><p><b>'+top.map(x=>esc(x.h.kr)).join(" · ")+
-  '</b></p><p class="cap">딜 배율 ×'+top.filter(x=>x.e.slot!=="X"&&SLOTS[x.e.slot]&&SLOTS[x.e.slot].k==="dmg").reduce((a,x)=>a*x.mul,1).toFixed(3)+
-  " · 리더와 겹치는 영웅은 자동 제외했습니다.</p>"+
-  (rank.filter(x=>x.dup).length?'<p class="cap">🚫 리더 중복 금지: '+rank.filter(x=>x.dup).map(x=>esc(x.h.kr)).join(" · ")+"</p>":"")+"</div>"+
+ o+='<div class="callout co-key" id="rec"><h3>'+L("⭐ 추천 조이너 4명","⭐ Recommended four joiners")+'</h3><p><b>'+top.map(x=>esc(HN(x.h))).join(" · ")+
+  '</b></p><p class="cap">'+L("딜 배율 ×","Damage multiplier ×")+top.filter(x=>x.e.slot!=="X"&&SLOTS[x.e.slot]&&SLOTS[x.e.slot].k==="dmg").reduce((a,x)=>a*x.mul,1).toFixed(3)+
+  L(" · 리더와 겹치는 영웅은 자동 제외했습니다."," · heroes already used as leaders are excluded automatically.")+"</p>"+
+  (rank.filter(x=>x.dup).length?'<p class="cap">'+L("🚫 리더 중복 금지: ","🚫 Cannot double as joiners: ")+rank.filter(x=>x.dup).map(x=>esc(HN(x.h))).join(" · ")+"</p>":"")+"</div>"+
   (top.map(x=>x.h.id).join()!==tSheet.map(x=>x.h.id).join()?
-   '<div class="callout co-tip"><h3>📋 Ton 시트 등재 영웅만</h3><p><b>'+tSheet.map(x=>esc(x.h.kr)).join(" · ")+
-   '</b></p><p class="cap">위 계산 순위에 <span class="tag t-warn">이론</span> 배지가 붙은 영웅은 실전 시트 조이너 명단에 없습니다. 대개 <b>투자 문턱</b> 때문입니다 — 전설이라 만렙 보유자가 적거나, 그 영웅을 만렙 찍은 사람은 이미 리더로 쓰고 있어 조이너로 못 뺍니다. 실전에서는 시트 쪽을 우선하세요.</p></div>':"")+"</div>";
+   '<div class="callout co-tip"><h3>'+L("📋 Ton 시트 등재 영웅만","📋 Sheet-listed heroes only")+'</h3><p><b>'+tSheet.map(x=>esc(HN(x.h))).join(" · ")+
+   '</b></p><p class="cap">'+L('위 계산 순위에 <span class="tag t-warn">이론</span> 배지가 붙은 영웅은 실전 시트 조이너 명단에 없습니다. 대개 <b>투자 문턱</b> 때문입니다 — 전설이라 만렙 보유자가 적거나, 그 영웅을 만렙 찍은 사람은 이미 리더로 쓰고 있어 조이너로 못 뺍니다. 실전에서는 시트 쪽을 우선하세요.','Heroes tagged <span class="tag t-warn">theory</span> above are not on the sheet’s practical joiner list, usually because of the <b>investment threshold</b> — legendaries few players max, or whose owners already run them as leaders and cannot spare them as joiners. In practice, prefer the sheet.')+'</p></div>':"")+"</div>";
 
  // 카운터 · 밴드
  if(ctr){
   const e=ctr.en,mine=[r.inf,r.lan,r.mar],mv=ctr.mv,def=ctr.mode==="defender";
-  const enLbl=def?"들어오는 랠리":"상대 방어";
+  const enLbl=def?L("들어오는 랠리","Incoming rally"):L("상대 방어","Their defense");
   const cls=mv.lvl==="ban"?"co-warn":mv.lvl==="warn"?"co-tip":"co-ok";
-  const head=mv.lvl==="ban"?"🚫 밴드 편성입니다":mv.lvl==="warn"?"⚠️ 주의 구간":"✅ 밴드 아님";
-  o+='<h2>⑥ '+(def?"들어오는 랠리 · 수비 밴드 판정":"상대 카운터 · 랠리 밴드 판정")+'</h2><div class="panel">';
+  const head=mv.lvl==="ban"?L("🚫 밴드 편성입니다","🚫 Banned comp"):mv.lvl==="warn"?L("⚠️ 주의 구간","⚠️ Caution zone"):L("✅ 밴드 아님","✅ Not banned");
+  o+='<h2>⑥ '+(def?L("들어오는 랠리 · 수비 밴드 판정","Incoming rally · garrison ban check"):L("상대 카운터 · 랠리 밴드 판정","Counter table · rally ban check"))+'</h2><div class="panel">';
   // 1) 시트 표 룩업 (공격 전용 · 1차 자료) — ban / counter / silent / noRow 4상태
   if(!def){
    const V=ctr.verdict;
-   const box={ban:["co-warn","🚫 시트 표: 금지 편성"],
-               counter:["co-ok","✅ 시트 표: 추천 카운터"],
-               silent:["co-tip","➖ 시트 표: 언급 없음 — 판단 유보"],
-               noRow:["co-tip","➖ 시트 표: 해당 행 없음 — 판단 유보"]}[V];
-   o+='<div class="callout '+box[0]+'"><h3>'+box[1]+' <span class="tag t-ok">시트</span></h3>'+
-    "<p>판정 대상 — "+enLbl+" <b>"+e.map(v=>v.toFixed(0)).join("/")+"</b> · 내 랠리 <b>"+mine.map(v=>v.toFixed(0)).join("/")+"</b> <span class=\"cap\">(보/창/궁, 정규화 후)</span></p>"+
-    (ctr.exact?"<p>가이드 카운터표 <b>"+esc(ctr.rule.lbl)+"</b> 행에 해당합니다.</p>":
-      '<p class="note">가이드 카운터표에 이 상대 비율과 맞는 항목이 없습니다(가장 가까운 항목 '+esc(ctr.rule.lbl)+").</p>")+
-    (V==="ban"?"<p>표상 <b>"+esc(ctr.banned.l)+"</b>은 이 상대에게 <b>금지</b>입니다.</p>":"")+
-    (V==="counter"?"<p>현재 편성은 이 행의 <b>추천 카운터</b>에 해당합니다.</p>":"")+
-    (V==="silent"?'<div class="callout co-warn"><h3>⚠️ "밴드 아님"이 아니라 "표에 없음"입니다</h3>'+
-       "<p>현재 편성 <b>"+mine.map(v=>v.toFixed(0)).join("/")+"</b>은 이 행의 <b>추천 카운터에도, 금지 목록에도</b> 들어 있지 않습니다. "+
-       "가이드의 마지막 열은 <b>금지 목록이지 승인 목록이 아닙니다</b> — 금지에 없다고 좋은 편성이라는 뜻이 아니라, <b>시트가 이 비율을 다루지 않은 것</b>입니다.</p>"+
-       "<p>이 행의 추천 카운터로 바꾸거나, 아래 참고 지표를 감안해서 직접 판단하세요.</p></div>":"")+
-    "<p><b>추천 카운터:</b> "+ctr.rule.c.map(c=>'<span class="pill">'+esc(c)+"</span>").join("")+"</p>"+
+   const box={ban:["co-warn",L("🚫 시트 표: 금지 편성","🚫 Sheet: banned comp")],
+               counter:["co-ok",L("✅ 시트 표: 추천 카운터","✅ Sheet: recommended counter")],
+               silent:["co-tip",L("➖ 시트 표: 언급 없음 — 판단 유보","➖ Sheet: not mentioned — no verdict")],
+               noRow:["co-tip",L("➖ 시트 표: 해당 행 없음 — 판단 유보","➖ Sheet: no matching row — no verdict")]}[V];
+   o+='<div class="callout '+box[0]+'"><h3>'+box[1]+' <span class="tag t-ok">'+L("시트","sheet")+'</span></h3>'+
+    "<p>"+L("판정 대상 — ","Evaluated — ")+enLbl+" <b>"+e.map(v=>v.toFixed(0)).join("/")+"</b> · "+L("내 랠리","my rally")+" <b>"+mine.map(v=>v.toFixed(0)).join("/")+"</b> <span class=\"cap\">"+L("(보/창/궁, 정규화 후)","(inf/lan/mar, after normalising)")+"</span></p>"+
+    (ctr.exact?"<p>"+L("가이드 카운터표 <b>","Matches the guide's <b>")+esc(ctr.rule.lbl)+L("</b> 행에 해당합니다.","</b> row.")+"</p>":
+      '<p class="note">'+L("가이드 카운터표에 이 상대 비율과 맞는 항목이 없습니다(가장 가까운 항목 ","The guide's counter table has no row for this enemy ratio (nearest: ")+esc(ctr.rule.lbl)+").</p>")+
+    (V==="ban"?"<p>"+L("표상 <b>","The table lists <b>")+esc(ctr.banned.l)+L("</b>은 이 상대에게 <b>금지</b>입니다.","</b> as <b>banned</b> against this defense.")+"</p>":"")+
+    (V==="counter"?"<p>"+L("현재 편성은 이 행의 <b>추천 카운터</b>에 해당합니다.","Your comp is one of this row's <b>recommended counters</b>.")+"</p>":"")+
+    (V==="silent"?'<div class="callout co-warn"><h3>'+L('⚠️ "밴드 아님"이 아니라 "표에 없음"입니다','⚠️ This is "not in the table", not "approved"')+'</h3>'+
+       "<p>"+L("현재 편성 <b>","Your comp <b>")+mine.map(v=>v.toFixed(0)).join("/")+L("</b>은 이 행의 <b>추천 카운터에도, 금지 목록에도</b> 들어 있지 않습니다. ","</b> appears in neither the recommended counters nor the ban list for this row. ")+
+       L("가이드의 마지막 열은 <b>금지 목록이지 승인 목록이 아닙니다</b> — 금지에 없다고 좋은 편성이라는 뜻이 아니라, <b>시트가 이 비율을 다루지 않은 것</b>입니다.","The guide's last column is a <b>ban list, not an approval list</b> — absence from it does not mean the comp is good, only that <b>the sheet does not cover this ratio</b>.")+"</p>"+
+       "<p>"+L("이 행의 추천 카운터로 바꾸거나, 아래 참고 지표를 감안해서 직접 판단하세요.","Switch to one of this row's recommended counters, or judge for yourself with the indicator below in mind.")+"</p></div>":"")+
+    "<p><b>"+L("추천 카운터:","Recommended counters:")+"</b> "+ctr.rule.c.map(c=>'<span class="pill">'+esc(c)+"</span>").join("")+"</p>"+
     '<p class="cap">'+esc(ctr.rule.why)+"</p>"+
-    (ctr.rule.ban.length?'<p class="cap">🚫 이 상대에게 금지: '+ctr.rule.ban.map(b=>{
+    (ctr.rule.ban.length?'<p class="cap">'+L("🚫 이 상대에게 금지: ","🚫 Banned against this defense: ")+ctr.rule.ban.map(b=>{
       const near=dist(mine,b.v)<BAND_TOL;
-      return (near?"<b>":"")+esc(b.l)+" ("+b.v.join("/")+")"+(near?" ← 현재 편성</b>":"");}).join(" · ")+"</p>":
-      '<p class="cap">🚫 이 상대에겐 가이드상 금지 비율이 없습니다.</p>')+
-    (ctr.rule.src==="theory"?'<p class="note">이 항목은 가이드 원본 카운터표에 없는 <b>이론 확장</b>입니다.</p>':"")+
-    '<p class="note">이 표는 <b>랠리(공격) 전용</b>입니다 — 🚫는 "이 비율로 <b>공격하면</b> 진다"는 뜻이지 수비 얘기가 아닙니다. 수비 판정은 🛡️ 수성 모드로 바꾸세요. <b>표와 지표가 엇갈리면 표를 따르세요.</b></p>'+
-    ((V==="counter"&&mv.lvl==="ban")?'<div class="callout co-warn"><h3>⚖️ 지표와 시트가 엇갈립니다 — 시트를 따르세요</h3>'+
-       "<p>참고 지표는 밴드라고 보지만 <b>시트는 이 편성을 추천 카운터로 명시</b>합니다. 이 불일치는 <b>설명되지 않은 상태</b>입니다.</p>"+
-       "<p>이전 버전은 \"시트가 멀티랠리를 전제하니 랠리를 늘리면 지표도 통과한다\"고 설명했지만, 그 설명은 <b>철회했습니다</b> — 동시 랠리는 화력이 합쳐지는 게 아니라 각 랠리가 따로 전투하므로 랠리 수를 늘려도 한 전투의 판정은 그대로입니다.</p>"+
-       "<p><b>지표를 믿지 마세요.</b> 이건 밴드표 12점에 맞춘 곡선이고, 시트가 1차 자료입니다.</p>"+
+      return (near?"<b>":"")+esc(b.l)+" ("+b.v.join("/")+")"+(near?L(" ← 현재 편성</b>"," ← your comp</b>"):"");}).join(" · ")+"</p>":
+      '<p class="cap">'+L("🚫 이 상대에겐 가이드상 금지 비율이 없습니다.","🚫 The guide lists no banned ratio against this defense.")+"</p>")+
+    (ctr.rule.src==="theory"?'<p class="note">'+L("이 항목은 가이드 원본 카운터표에 없는 <b>이론 확장</b>입니다.","This row is a <b>theoretical extension</b> not present in the guide's original table.")+"</p>":"")+
+    '<p class="note">'+L('이 표는 <b>랠리(공격) 전용</b>입니다 — 🚫는 "이 비율로 <b>공격하면</b> 진다"는 뜻이지 수비 얘기가 아닙니다. 수비 판정은 🛡️ 수성 모드로 바꾸세요. <b>표와 지표가 엇갈리면 표를 따르세요.</b>','This table is <b>rally-only</b> — a 🚫 means "you lose if you <b>attack</b> with this ratio", not a statement about defending. For a garrison verdict switch to 🛡️ Garrison mode. <b>If the table and the indicator disagree, follow the table.</b>')+"</p>"+
+    ((V==="counter"&&mv.lvl==="ban")?'<div class="callout co-warn"><h3>'+L("⚖️ 지표와 시트가 엇갈립니다 — 시트를 따르세요","⚖️ The indicator disagrees with the sheet — follow the sheet")+'</h3>'+
+       "<p>"+L("참고 지표는 밴드라고 보지만 <b>시트는 이 편성을 추천 카운터로 명시</b>합니다. 이 불일치는 <b>설명되지 않은 상태</b>입니다.","The indicator calls this a ban, but <b>the sheet explicitly lists it as a recommended counter</b>. This disagreement is <b>unexplained</b>.")+"</p>"+
+       "<p>"+L('이전 버전은 "시트가 멀티랠리를 전제하니 랠리를 늘리면 지표도 통과한다"고 설명했지만, 그 설명은 <b>철회했습니다</b> — 동시 랠리는 화력이 합쳐지는 게 아니라 각 랠리가 따로 전투하므로 랠리 수를 늘려도 한 전투의 판정은 그대로입니다.','An earlier version explained it as "the sheet assumes multi-rally, so more rallies would clear the indicator too". That explanation has been <b>retracted</b> — simultaneous rallies do not pool their force; each fights separately, so adding rallies does not change the verdict for any single battle.')+"</p>"+
+       "<p>"+L("<b>지표를 믿지 마세요.</b> 이건 밴드표 12점에 맞춘 곡선이고, 시트가 1차 자료입니다.","<b>Do not trust the indicator here.</b> It is a curve fitted to 12 points; the sheet is the primary source.")+"</p>"+
        "</div>":"")+
     "</div>";}
   // 2) 참고 지표 (경험 적합 · 근거 약함)
-  o+='<div class="callout '+cls+'"><h3>'+head+' <span class="tag t-warn">참고 지표 · 근거 약함</span></h3>'+
-   "<p>"+enLbl+" <b>"+e.map(v=>v.toFixed(0)).join("/")+"</b> · 내 "+(def?"수비":"랠리")+" <b>"+mine.map(v=>v.toFixed(0)).join("/")+"</b>"+
+  o+='<div class="callout '+cls+'"><h3>'+head+' <span class="tag t-warn">'+L("참고 지표 · 근거 약함","indicator · weak evidence")+'</span></h3>'+
+   "<p>"+enLbl+" <b>"+e.map(v=>v.toFixed(0)).join("/")+"</b> · "+(def?L("내 수비","my garrison"):L("내 랠리","my rally"))+" <b>"+mine.map(v=>v.toFixed(0)).join("/")+"</b>"+
      "</p>"+
-   '<table class="hgrid"><thead><tr><th>채널</th><th>값</th><th>밴드 임계</th><th>판정</th></tr></thead><tbody>'+
+   '<table class="hgrid"><thead><tr><th>'+L("채널","Channel")+'</th><th>'+L("값","Value")+'</th><th>'+L("밴드 임계","Ban threshold")+'</th><th>'+L("판정","Verdict")+'</th></tr></thead><tbody>'+
    mv.keys.map(k=>{const v=mv.c[k],st=v>=TH[k]?"🚫":v>=THW[k]?"⚠️":"✅";
-     return "<tr><td>"+({P:"대보병 화력",T:"상성 열세",B:"후열 노출"}[k])+"</td><td class=\"ratio\">"+v.toFixed(0)+
-       "</td><td>"+TH[k]+' <span class="cap">(가능 '+FEAS[k][0]+"~"+FEAS[k][1]+" · 근거 "+SUP[k]+"건)</span></td><td>"+st+"</td></tr>";}).join("")+
+     return "<tr><td>"+CH_NAME[k]+"</td><td class=\"ratio\">"+v.toFixed(0)+
+       "</td><td>"+TH[k]+' <span class="cap">'+L("(가능 ","(feasible ")+FEAS[k][0]+"~"+FEAS[k][1]+L(" · 근거 "," · support ")+SUP[k]+L("건)",")")+"</span></td><td>"+st+"</td></tr>";}).join("")+
    "</tbody></table>"+
    (mv.ban.concat(mv.warn).length?mv.ban.concat(mv.warn).map(k=>'<p class="cap">'+CH_TXT[k](mv.c,e,mine)+" <b>→ "+CH_FIX[k]+"</b></p>").join(""):
-     '<p class="cap">세 채널 모두 임계값 아래입니다. 이 상대에게 쓸 만한 병비입니다.</p>')+
-   (mv.lvl==="ban"&&!def?'<p class="cap">🔁 <b>랠리를 여러 개 보내도 이 판정은 바뀌지 않습니다.</b> 동시 랠리는 화력이 합쳐지는 게 아니라 <b>각 랠리가 남은 개리슨과 따로 전투</b>합니다(1번 랠리 → 살아남은 개리슨이 2번 랠리와 전투 …). 멀티랠리는 편성을 고쳐주는 게 아니라 <b>소모전으로 개리슨을 깎는 것</b>입니다.</p>':"")+
-   (def?'<p class="note"><b>수비는 돌파 채널을 뺍니다.</b> 제한 시간 안에 격파할 의무가 없어 "못 녹인다"가 패배 조건이 아닙니다. 그래서 같은 60/40이라도 랠리로는 밴드가 되고 수비로는 정석이 됩니다.</p>':"")+
-   '<div class="callout co-warn"><h3>⚠️ 이건 메커니즘 모델이 아닙니다</h3>'+
-    "<p>세 지표는 밴드표 12점(카운터 7·밴드 5)을 <b>자유 파라미터 3개로 재현하도록 맞춘 곡선 적합</b>입니다. 게임 물리에서 유도한 값이 아닙니다.</p>"+
-    "<p>실제 병종 스탯(공격·방어·체력·치명타)과 상성 규칙으로 전투를 시뮬레이션하면 <b>밴드표를 6/12, 즉 우연 수준밖에 못 맞춥니다.</b> 밴드표의 내용은 스탯 표에서 유도되지 않습니다 — 영웅 SkillMod(2~5배)와 실전 경험이 지배하기 때문으로 보입니다.</p>"+
-    "<p><b>표에 있는 상황이면 시트를 보세요.</b> 이 지표는 표에 없는 비율을 만났을 때의 참고용입니다. 가능 구간 <b>대보병 41~50 · 상성 31~40 · 후열 21~30</b>의 중앙값을 썼고, 후열은 밴드 4건이 지지(견고)·나머지 둘은 각 1건(취약)입니다.</p>"+
+     '<p class="cap">'+L("세 채널 모두 임계값 아래입니다. 이 상대에게 쓸 만한 병비입니다.","All channels sit below threshold. This is a workable ratio against that defense.")+'</p>')+
+   (mv.lvl==="ban"&&!def?'<p class="cap">'+L("🔁 <b>랠리를 여러 개 보내도 이 판정은 바뀌지 않습니다.</b> 동시 랠리는 화력이 합쳐지는 게 아니라 <b>각 랠리가 남은 개리슨과 따로 전투</b>합니다(1번 랠리 → 살아남은 개리슨이 2번 랠리와 전투 …). 멀티랠리는 편성을 고쳐주는 게 아니라 <b>소모전으로 개리슨을 깎는 것</b>입니다.","🔁 <b>Sending more rallies does not change this verdict.</b> Simultaneous rallies do not pool their force — <b>each fights the surviving garrison separately</b> (rally 1, then whatever survives fights rally 2, and so on). Multi-rally does not fix a comp; it <b>grinds the garrison down by attrition</b>.")+"</p>":"")+
+   (def?'<p class="note">'+L('<b>수비는 돌파 채널을 뺍니다.</b> 제한 시간 안에 격파할 의무가 없어 "못 녹인다"가 패배 조건이 아닙니다. 그래서 같은 60/40이라도 랠리로는 밴드가 되고 수비로는 정석이 됩니다.','<b>Defense drops the anti-infantry channel.</b> A garrison is under no obligation to kill anything inside a timer, so "cannot melt them" is not a loss condition. That is why the same 60/40 is a ban as a rally and the standard as a garrison.')+"</p>":"")+
+   '<div class="callout co-warn"><h3>'+L("⚠️ 이건 메커니즘 모델이 아닙니다","⚠️ This is not a mechanics model")+'</h3>'+
+    "<p>"+L("세 지표는 밴드표 12점(카운터 7·밴드 5)을 <b>자유 파라미터 3개로 재현하도록 맞춘 곡선 적합</b>입니다. 게임 물리에서 유도한 값이 아닙니다.","The three channels are a <b>curve fit</b>: 12 labelled points (7 counters, 5 bans) reproduced with 3 free parameters. They are not derived from game physics.")+"</p>"+
+    "<p>"+L("실제 병종 스탯(공격·방어·체력·치명타)과 상성 규칙으로 전투를 시뮬레이션하면 <b>밴드표를 6/12, 즉 우연 수준밖에 못 맞춥니다.</b> 밴드표의 내용은 스탯 표에서 유도되지 않습니다 — 영웅 SkillMod(2~5배)와 실전 경험이 지배하기 때문으로 보입니다.","Simulating combat from the real troop stats (attack, defense, health, lethality) and the counter rules reproduces the ban table only <b>6 times out of 12 — chance level.</b> The table's content is not derivable from the stat sheet; hero SkillMod (2-5×) and practical experience appear to dominate.")+"</p>"+
+    "<p>"+L("<b>표에 있는 상황이면 시트를 보세요.</b> 이 지표는 표에 없는 비율을 만났을 때의 참고용입니다. 가능 구간 <b>대보병 41~50 · 상성 31~40 · 후열 21~30</b>의 중앙값을 썼고, 후열은 밴드 4건이 지지(견고)·나머지 둘은 각 1건(취약)입니다.","<b>If the situation is in the table, read the sheet.</b> This indicator is for ratios the table does not cover. The values are midpoints of the feasible ranges <b>anti-infantry 41-50 · counter deficit 31-40 · back-line 21-30</b>; the back-line channel rests on 4 bans (robust), the other two on 1 each (fragile).")+"</p>"+
     "</div>"+
    "</div>";
   o+="</div>";}
@@ -675,10 +750,10 @@ function render(d){
 // 2자리 표기(60/40 등)를 손으로 3칸에 옮기다 틀리는 사고가 잦다.
 // 예: "60/40"을 보60·궁40으로 잘못 넣으면 창병 기본값 4가 남아 58/4/38이 된다.
 const PRESETS=[
- ["60/40","보60·창40",60,40,0],["70/30","보70·창30",70,30,0],["70/10/20","완전방어 Gen7~",70,10,20],
- ["50/50","보50·궁50",50,0,50],["49/49","보49·창2·궁49",49,2,49],["48/4/48","보48·창4·궁48",48,4,48],
- ["40/60","초방어 보40·궁60",40,0,60],["50/20/30","하이브리드",50,20,30],["40/20/40","하이브리드",40,20,40],
- ["40/40/20","창병 카운터",40,40,20],["30/20/50","궁병 속결",30,20,50],["60/30/10","방어",60,30,10]];
+ ["60/40",L("보60·창40","60 inf · 40 lancer"),60,40,0],["70/30",L("보70·창30","70 inf · 30 lancer"),70,30,0],["70/10/20",L("완전방어 Gen7~","full defense, Gen7+"),70,10,20],
+ ["50/50",L("보50·궁50","50 inf · 50 mar"),50,0,50],["49/49",L("보49·창2·궁49","49 inf · 2 lan · 49 mar"),49,2,49],["48/4/48",L("보48·창4·궁48","48 inf · 4 lan · 48 mar"),48,4,48],
+ ["40/60",L("초방어 보40·궁60","ultra-defense 40 inf · 60 mar"),40,0,60],["50/20/30",L("하이브리드","hybrid"),50,20,30],["40/20/40",L("하이브리드","hybrid"),40,20,40],
+ ["40/40/20",L("창병 카운터","lancer counter"),40,40,20],["30/20/50",L("궁병 속결","marksman rush"),30,20,50],["60/30/10",L("방어","defense"),60,30,10]];
 function mountPresets(boxId,ids){
  const box=document.getElementById(boxId);
  box.innerHTML=PRESETS.map((p,i)=>'<button type="button" class="chip" data-i="'+i+'" title="'+p[1]+'">'+p[0]+"</button>").join("");
@@ -693,31 +768,41 @@ function showSum(sumId,ids){
  if(t===0){el.textContent="";return;}
  if(t===100){el.textContent="";return;}
  const n=v.map(x=>(x/t*100).toFixed(0)).join("/");
- el.innerHTML="⚠️ 입력 합이 <b>"+t+"</b>입니다 → <b>"+n+"</b> 로 정규화해서 계산합니다. 의도한 비율이 맞는지 확인하세요.";
+ el.innerHTML=L("⚠️ 입력 합이 <b>"+t+"</b>입니다 → <b>"+n+"</b> 로 정규화해서 계산합니다. 의도한 비율이 맞는지 확인하세요.","⚠️ Your entries add to <b>"+t+"</b> → normalised to <b>"+n+"</b> for the calculation. Check that this is the ratio you meant.");
+}
+// ── 셀렉트 재구성 (언어 전환 시 재호출) ──
+function rebuildSelects(){
+ const keep={hInf:0,hLan:0,hMar:0,gcap:0};
+ Object.keys(keep).forEach(id=>{keep[id]=document.getElementById(id).value;});
+ const mk=(sel,cls)=>{const el=document.getElementById(sel);
+  el.innerHTML='<option value="">'+S("pick")+"</option>"+HEROES.filter(h=>h.cls===cls)
+   .sort((a,b)=>a.gen-b.gen||HN(a).localeCompare(HN(b)))
+   .map(h=>'<option value="'+h.id+'">'+HN(h)+" ("+(h.gen?"Gen"+h.gen:L("에픽","Epic"))+")</option>").join("");};
+ mk("hInf","infantry");mk("hLan","lancer");mk("hMar","marksman");
+ document.getElementById("gcap").innerHTML='<option value="99">'+L("전체","All")+"</option>"+
+  [1,2,3,4,5,6,7,8,9,10,11,12,13].map(g=>'<option value="'+g+'">'+(LANG==="en"?"Gen "+g+" and below":"Gen "+g+" 이하")+"</option>").join("");
+ Object.keys(keep).forEach(id=>{if(keep[id])document.getElementById(id).value=keep[id];});
+ mountPresets("rPre",["r1","r2","r3"]); mountPresets("ePre",["e1","e2","e3"]);
+ showSum("rSum",["r1","r2","r3"]); showSum("eSum",["e1","e2","e3"]);
 }
 // ── init ──
 (function(){
- const mk=(sel,cls)=>{const el=document.getElementById(sel);
-  el.innerHTML='<option value="">— 선택 —</option>'+HEROES.filter(h=>h.cls===cls)
-   .sort((a,b)=>a.gen-b.gen||a.kr.localeCompare(b.kr))
-   .map(h=>'<option value="'+h.id+'">'+h.kr+" ("+(h.gen?"Gen"+h.gen:"에픽")+")</option>").join("");};
- mk("hInf","infantry");mk("hLan","lancer");mk("hMar","marksman");
- document.getElementById("gcap").innerHTML='<option value="99">전체</option>'+
-  [1,2,3,4,5,6,7,8,9,10,11,12,13].map(g=>'<option value="'+g+'">Gen '+g+' 이하</option>').join("");
+ rebuildSelects();
  document.getElementById("gcap").value="4";
  document.getElementById("hInf").value="jeronimo";
  document.getElementById("hLan").value="mia";
  document.getElementById("hMar").value="alonso";
- const seg=(a,b)=>{document.getElementById(a).classList.add("on");document.getElementById(b).classList.remove("on");calc();};
+ const seg=(a,b)=>{document.getElementById(a).classList.add("on");document.getElementById(b).classList.remove("on");};
  const eLab=()=>{const d=document.getElementById("mDef").classList.contains("on");
-  document.getElementById("eLab").textContent=d?"들어오는 랠리 병비 (선택)":"상대 방어 병비 (선택)";
-};
- document.getElementById("mAtk").onclick=()=>{seg("mAtk","mDef");eLab();};
- document.getElementById("mDef").onclick=()=>{seg("mDef","mAtk");eLab();};
- mountPresets("rPre",["r1","r2","r3"]); mountPresets("ePre",["e1","e2","e3"]);
+  document.getElementById("eLab").innerHTML=d?S("lbEnD"):S("lbEnA");};
+ document.getElementById("mAtk").onclick=()=>{seg("mAtk","mDef");eLab();calc();};
+ document.getElementById("mDef").onclick=()=>{seg("mDef","mAtk");eLab();calc();};
+ document.getElementById("lgKo").onclick=()=>setLang("ko");
+ document.getElementById("lgEn").onclick=()=>setLang("en");
  const sums=()=>{showSum("rSum",["r1","r2","r3"]);showSum("eSum",["e1","e2","e3"]);};
  ["hInf","hLan","hMar","wInf","wLan","wMar","r1","r2","r3","e1","e2","e3","gcap"].forEach(id=>{
   const el=document.getElementById(id);const f=()=>{sums();calc();};el.addEventListener("change",f);el.addEventListener("input",f);});
+ applyStatic();
  sums();
  calc();
 })();

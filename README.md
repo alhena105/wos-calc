@@ -13,6 +13,15 @@
 
 `index.html` 하나로 동작합니다. 서버가 필요 없고 파일을 열어도 됩니다.
 
+## 언어 / Language
+
+한국어·영어를 모두 지원합니다. 우측 상단 토글로 전환하고, 브라우저 언어를 자동 감지하며, `?lang=ko` / `?lang=en` 으로 고정할 수 있습니다.
+
+- 한국어: https://alhena105.github.io/wos-calc/?lang=ko
+- English: https://alhena105.github.io/wos-calc/?lang=en
+
+Korean and English are both supported. Use the toggle at the top right; the page also auto-detects your browser language, and `?lang=` pins it. Hero names, skill descriptions, verdicts and every caveat are translated.
+
 ## 데이터
 
 영웅 45명(Gen 1~13 + 에픽 조이너)의 원정 3스킬과 전용무기 정보를 내장했습니다.
