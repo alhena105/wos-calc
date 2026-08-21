@@ -89,9 +89,23 @@ for (const c of CASES) {
   ok(t.includes(c.expect), "판정 " + c.name + " → \"" + c.expect + "\"",
      "상대 " + c.en.join("/") + " 내 " + c.mine.join("/"));
 }
-// 시트 블록이 참고 지표보다 위에 있어야 한다
-const html = await ko.innerHTML("#out");
-ok(html.indexOf("시트") < html.indexOf("참고 지표"), "시트 블록이 참고 지표보다 위");
+// 걷어낸 3채널 지표가 화면에 되살아나지 않았는지
+{
+  const t = await outText(ko);
+  ok(!/참고 지표|대보병 화력|밴드 임계/.test(t), "3채널 지표 흔적 없음",
+     (t.match(/참고 지표|대보병 화력|밴드 임계/g) || []).join(","));
+}
+
+// 수비는 가이드에 대응표가 없다 → 판정하지 않는다고 말해야 한다
+await ko.click("#mDef");
+await ko.waitForTimeout(80);
+{
+  const t = await outText(ko);
+  ok(/자료 없음/.test(t), "수성 모드는 판정하지 않는다고 밝힌다");
+  ok(!/금지 편성|추천 카운터/.test(t), "수성 모드에서 랠리 전용 판정을 내지 않는다");
+}
+await ko.click("#mAtk");
+await ko.waitForTimeout(80);
 
 // ── 3. 입력 보조 ───────────────────────────────────────────────────────
 section("프리셋 · 합계 경고");

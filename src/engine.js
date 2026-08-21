@@ -54,62 +54,14 @@ const COUNTERS=i18nFill([],function(){return[
 const BAND_TOL=6;   // 내 병비가 금지 비율과 이 거리 안이면 밴드
 const ROW_TOL=10;   // 상대 비율이 이 거리 밖이면 밴드 판정을 내리지 않는다
 
-// ── 밴드 3채널 지표 (밴드표 경험 적합 · 메커니즘 유도 아님) ────────────
-// ⚠️ 2026-08-19 정정. 이 세 지표는 원래 "궁병만이 상대 보병을 지운다 /
-//    창병이 상대 궁병을 일방적으로 잡는다"는 전제로 만들었는데, 그 전제는
-//    게임 메커니즘과 다르다. [[병종 스탯 시스템 가이드]] 실측:
-//      · 병종 상성은 T1 스킬의 공격 데미지 +10% 보너스일 뿐이다
-//        (보→창 +10% · 창→사 +10% · 사→보 +10%). 전용 타겟팅이 아니라
-//        모든 병종이 모든 병종을 때린다. 궁병이 없어도 보병을 잡는다.
-//      · 창병의 후열 침투는 T7 Ambusher "20% 확률로 보병 뒤 사수 직격"이다.
-//        100%가 아니라 20%.
-//    따라서 아래 임계값은 게임 물리에서 유도한 값이 아니라, 가이드 표에서
-//    좌표로 비교 가능한 점을 3개 자유 파라미터로 재현하도록 맞춘 곡선 적합이다.
-//    표 12항목(카운터 7·밴드 5) → 벡터가 있는 11점 → 멀티랠리 전제 2건을 뺀 9점.
-//    실제 병종 스탯으로 전투를 시뮬레이션하면 밴드표를 6/12(우연 수준)밖에
-//    못 맞춘다 — 즉 밴드표의 내용은 스탯 표에서 유도되지 않는다.
-//    → 시트 표를 1순위로 보고, 이 지표는 표에 없는 상황의 참고로만 쓸 것.
-// 가능 구간  t_P 41~50 · t_T 31~40 · t_B 21~30   → 중앙값 채택
-// ※ 가이드가 '멀티랠리 전제'라고 명시한 카운터 2건은 적합에서 제외했다.
-const TH ={P:46,T:36,B:26};   // 밴드
-const THW={P:41,T:31,B:21};   // 주의 = 가능 구간 하단
-const FEAS={P:[41,50],T:[31,40],B:[21,30]}; // 제약을 만족하는 임계값의 전체 가능 구간
-// 근거 강도. 두 가지를 섞어 쓰다 B만 다른 기준으로 세어져 있었다(2026-08-22 정정).
-//  pin = 이 채널의 임계값 상한을 실제로 묶은 밴드 수 — "임계값이 무엇으로 정해졌나"
-//  hit = 이 채널이 임계 이상으로 관여한 밴드 수 — "이 채널이 몇 건을 설명하나"
-// 가이드 표의 밴드 5건 기준: 세 임계값 모두 단 한 건이 상한을 묶는다.
-const SUP ={P:{pin:1,hit:1},T:{pin:1,hit:3},B:{pin:1,hit:3}};
-// ⚠️ 2026-08-20 정정. 이전 판에는 동시 랠리 수 N이 인자로 있었고, 내 화력이 N배로
-//    들어가고 상대 창병이 N개 랠리로 분산돼 랠리당 L/N만 상대한다고 계산했다.
-//    그 모델은 철회했다 — 동시 랠리는 화력이 합쳐지지 않는다. 각 랠리가 살아남은
-//    개리슨과 따로 순차 전투한다(1번 랠리 → 살아남은 개리슨이 2번 랠리와 전투 …).
-//    그래서 랠리 수는 한 전투의 판정에 들어오지 않는다. 되살리지 말 것.
-//    (test/unit.mjs 가 "랠리 수는 판정에 영향을 주지 않는다"로 감시한다)
-function channels(en,mine){
- const I=en[0],L=en[1],M=en[2], l=mine[1], m=mine[2];
- return {
-  P: Math.max(0,I-m),                 // 못 지우는 상대 보병 → 시간 내 돌파 실패
-  T: Math.max(0,M-l)+Math.min(L,m),   // 미제거 상대 궁병 + 내 궁병을 때리는 상대 창병
-  B: Math.min(m,L)                    // 상대 창병에게 잡히는 내 궁병
- };
-}
-const CH_TXT={
- P:function(c,en,mine){return L(
-   "<b>대보병 화력 부족 "+c.P.toFixed(0)+"</b> — 상대 보병 "+en[0].toFixed(0)+"%에 비해 내 궁병이 "+mine[2].toFixed(0)+"%로 적습니다. 궁병은 보병 상대 <b>+10% 보너스</b>(T1 원거리 사격)를 받는 유일한 병종이라, 보병 위주 방어를 상대할 때 효율이 가장 좋습니다. <span class=\"cap\">※ 궁병이 없어도 보병·창병이 상대 보병을 때립니다. 이 지표는 '못 잡는다'가 아니라 '효율이 나쁘다'입니다.</span>",
-   "<b>Anti-infantry shortfall "+c.P.toFixed(0)+"</b> — they field "+en[0].toFixed(0)+"% infantry but you only bring "+mine[2].toFixed(0)+"% marksmen. Marksmen are the only class with a <b>+10% bonus vs infantry</b> (T1 Ranged Strike), so they are the most efficient answer to an infantry-heavy defense. <span class=\"cap\">Note: you still kill infantry without marksmen — infantry and lancers hit them too. This reads as 'inefficient', not 'impossible'.</span>");},
- T:function(c,en,mine){return L(
-   "<b>상성 열세 "+c.T.toFixed(0)+"</b> — 내 창병이 못 받아내는 상대 궁병 "+Math.max(0,en[2]-mine[1]).toFixed(0)+"% + 내 궁병에 상성이 붙는 상대 창병 "+Math.min(en[1],mine[2]).toFixed(0)+"%. 상성 보너스가 상대 쪽으로 기우는 양입니다.",
-   "<b>Counter deficit "+c.T.toFixed(0)+"</b> — "+Math.max(0,en[2]-mine[1]).toFixed(0)+"% of their marksmen your lancers do not cover, plus "+Math.min(en[1],mine[2]).toFixed(0)+"% of their lancers that have your marksmen in range. This is how far the counter bonus tilts their way.");},
- B:function(c,en,mine){return L(
-   "<b>후열 노출 "+c.B.toFixed(0)+"</b> — 내 궁병 "+mine[2].toFixed(0)+"%가 상대 창병 "+en[1].toFixed(0)+"%의 상성 대상입니다(창→사 +10%, 그리고 T7 Ambusher가 <b>20% 확률</b>로 전열을 우회해 직격). 사수는 방어·체력이 가장 낮아 맞으면 손실이 큽니다.",
-   "<b>Back-line exposure "+c.B.toFixed(0)+"</b> — your "+mine[2].toFixed(0)+"% marksmen are the counter target of their "+en[1].toFixed(0)+"% lancers (lancer→marksman +10%, and T7 Ambusher bypasses the front line on a <b>20% chance</b>). Marksmen have the lowest defense and health, so those hits cost the most.");}
-};
-const CH_FIX=i18nFill({},function(){return{
- P:L("궁병 비중을 올리면 상대 보병에 +10% 상성이 붙습니다.","Raise your marksman share to pick up the +10% counter against their infantry."),
- T:L("창병을 늘려 상대 궁병에 상성을 걸거나, 내 궁병을 줄여 상대 창병의 상성 대상을 줄이세요.","Add lancers to counter their marksmen, or cut your marksmen so their lancers have fewer targets."),
- B:L("궁병 비중을 낮추거나 보병을 늘려 전열을 두껍게 하세요.","Lower your marksman share, or add infantry to thicken the front line.")
-};});
-const CH_NAME=i18nFill({},function(){return{P:L("대보병 화력","Anti-infantry"),T:L("상성 열세","Counter deficit"),B:L("후열 노출","Back-line exposure")};});
+// ⚠️ 2026-08-22. 여기 있던 3채널 지표(P/T/B · TH/THW/FEAS/SUP · channels ·
+//    CH_TXT/CH_FIX/CH_NAME · modelVerdict)는 걷어냈다. 세 임계값이 각각 밴드
+//    단 한 건에 묶여 있어 🚫/⚠️ 판정을 낼 근거가 없었다. 화면 스스로 "이건
+//    메커니즘 모델이 아닙니다 · 지표를 믿지 마세요"라고 적고 있었는데, 그렇게까지
+//    단서를 달아야 하는 판정은 안 내는 게 맞다.
+//    이제 이 계산기는 가이드 카운터표만 근거로 판정한다. 되살리려면 근거부터 —
+//    밴드표에 점이 더 붙어서 임계값을 한 건이 아니라 여러 건이 묶어야 한다.
+
 // 실제 메커니즘 (병종 스탯 시스템 가이드) — 화면 하단 참고용
 const MECH=i18nFill({},function(){return{
  rps:[[L("보병 → 창병","Infantry → Lancer"),"T1 Master Brawler",L("공격 데미지 +10%","Attack damage +10%")],
@@ -123,11 +75,18 @@ const MECH=i18nFill({},function(){return{
        [L("사수","Marksman"),L("후열","Back"),"14","10","10","15"]]
 };});
 const dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2]);
-function modelVerdict(en,mine,mode){
- const keys=mode==="defender"?["T","B"]:["P","T","B"];
- const c=channels(en,mine);
- const ban=keys.filter(k=>c[k]>=TH[k]), warn=keys.filter(k=>c[k]>=THW[k]&&c[k]<TH[k]);
- return {c:c,keys:keys,ban:ban,warn:warn,lvl:ban.length?"ban":warn.length?"warn":"ok",mode:mode};
+// 시트 판정 — 이 계산기의 유일한 판정 근거다. DOM 을 안 만지는 순수 함수라
+// test/unit.mjs 가 가이드 표 11점을 그대로 먹여 검사한다.
+// 표는 "금지 목록"이지 "승인 목록"이 아니다. 금지에 없다고 통과가 아니라
+// 표가 그 비율을 언급조차 안 한 것일 수 있다 → 4상태로 구분한다.
+function sheetVerdict(en,mine){
+ const best=COUNTERS.map(c=>({c,d:dist(en,c.m)})).sort((a,b)=>a.d-b.d)[0];
+ const exact=best.d<=ROW_TOL;
+ const banned=exact?best.c.ban.map(b=>({b,d:dist(mine,b.v)})).filter(x=>x.d<BAND_TOL)
+   .sort((a,b)=>a.d-b.d).map(x=>x.b)[0]:null;
+ const isCtr=exact&&best.c.cv.some(v=>dist(mine,v)<BAND_TOL);
+ return {rule:best.c,banned,exact,d:best.d,
+   verdict:!exact?"noRow":banned?"ban":isCtr?"counter":"silent"};
 }
 
 
@@ -185,19 +144,8 @@ function calc(){
  if(ev[0]+ev[1]+ev[2]>0){
    const en=norm(...ev),ea=[en.inf,en.lan,en.mar];
    const mine=[r.inf,r.lan,r.mar];
-   const mv=modelVerdict(ea,mine,mode);
-   if(mode==="defender"){
-     ctr={mode,en:ea,mv};
-   }else{
-     const best=COUNTERS.map(c=>({c,d:dist(ea,c.m)})).sort((a,b)=>a.d-b.d)[0];
-     const exact=best.d<=ROW_TOL;
-     const banned=exact?best.c.ban.map(b=>({b,d:dist(mine,b.v)})).filter(x=>x.d<BAND_TOL).sort((a,b)=>a.d-b.d).map(x=>x.b)[0]:null;
-     // 표는 "금지 목록"이지 "승인 목록"이 아니다. 금지에 없다고 통과가 아니라
-     // 표가 그 비율을 언급조차 안 한 것일 수 있다 → 3상태로 구분한다.
-     const isCtr=exact&&best.c.cv.some(v=>dist(mine,v)<BAND_TOL);
-     const verdict=!exact?"noRow":banned?"ban":isCtr?"counter":"silent";
-     ctr={mode,en:ea,rule:best.c,banned,exact,d:best.d,mv,verdict};
-   }
+   // 가이드 카운터표는 랠리(공격) 전용이다. 수비는 대응표가 없어 판정하지 않는다.
+   ctr=mode==="defender"?{mode,en:ea}:Object.assign({mode,en:ea},sheetVerdict(ea,mine));
  }
  render({mode,leaders,picks,r,buck,src,cls,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap});
 }
