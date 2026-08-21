@@ -79,6 +79,25 @@ const dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2]);
 // test/unit.mjs 가 가이드 표 11점을 그대로 먹여 검사한다.
 // 표는 "금지 목록"이지 "승인 목록"이 아니다. 금지에 없다고 통과가 아니라
 // 표가 그 비율을 언급조차 안 한 것일 수 있다 → 4상태로 구분한다.
+// 수비 판정 — 같은 표를 반대 방향으로 읽는다. 새 가정은 없다.
+// 표의 왼쪽 열이 "상대 방어"이므로, 수비할 때는 행을 고르는 키가 내 개리슨 비율이고
+// 비교 대상이 들어오는 랠리다.
+//   들어오는 랠리가 내 행의 금지 목록에 있으면 → 상대가 밴드 편성으로 온 것 (유리)
+//   내 행의 추천 카운터에 있으면            → 정석 카운터가 온 것 (위험)
+// 금지를 먼저 본다. 두 목록은 서로 다른 비율이라 겹치지 않지만, 겹친다면
+// "표가 그 비율로는 못 깬다고 못박은 쪽"이 더 강한 진술이다.
+// ⚠️ 추천 카운터에 멀티랠리 전제가 붙은 행이 있다(60/40 · 60/30/10).
+//    단일 랠리 하나가 그 비율로 왔다고 곧바로 지는 게 아니다 — 라벨의 전제를 같이 보여줄 것.
+function garrisonVerdict(mine,inc){
+ const best=COUNTERS.map(c=>({c,d:dist(mine,c.m)})).sort((a,b)=>a.d-b.d)[0];
+ const exact=best.d<=ROW_TOL;
+ const near=(list,get)=>exact?list.map(x=>({x,d:dist(inc,get(x))})).filter(y=>y.d<BAND_TOL)
+   .sort((a,b)=>a.d-b.d).map(y=>y.x)[0]:null;
+ const banned=near(best.c.ban,b=>b.v);
+ const threat=near(best.c.cv,v=>v);
+ return {rule:best.c,banned,threat,exact,d:best.d,
+   verdict:!exact?"noRow":banned?"favorable":threat?"threat":"silent"};
+}
 function sheetVerdict(en,mine){
  const best=COUNTERS.map(c=>({c,d:dist(en,c.m)})).sort((a,b)=>a.d-b.d)[0];
  const exact=best.d<=ROW_TOL;
@@ -144,8 +163,9 @@ function calc(){
  if(ev[0]+ev[1]+ev[2]>0){
    const en=norm(...ev),ea=[en.inf,en.lan,en.mar];
    const mine=[r.inf,r.lan,r.mar];
-   // 가이드 카운터표는 랠리(공격) 전용이다. 수비는 대응표가 없어 판정하지 않는다.
-   ctr=mode==="defender"?{mode,en:ea}:Object.assign({mode,en:ea},sheetVerdict(ea,mine));
+   // 같은 표를 랠리는 상대 방어로, 수비는 내 개리슨으로 찾아 읽는다.
+   ctr=Object.assign({mode,en:ea},
+     mode==="defender"?garrisonVerdict(mine,ea):sheetVerdict(ea,mine));
  }
  render({mode,leaders,picks,r,buck,src,cls,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap});
 }

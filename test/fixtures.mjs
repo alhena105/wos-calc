@@ -45,6 +45,24 @@ export const QUIET_POINTS = [
    why:"어느 행과도 ROW_TOL 안에 들지 않는 상대 비율"},
 ];
 
+// 수비 판정 정답지 — 같은 표를 반대로 읽는다.
+// 행을 고르는 키가 내 개리슨(= 표의 "상대 방어" 열)이고, 비교 대상이 들어오는 랠리다.
+//   들어오는 랠리가 그 행의 추천 카운터  → threat    (정석 카운터가 왔다)
+//   그 행의 금지 목록                    → favorable (상대가 밴드 편성으로 왔다)
+export const GARRISON_POINTS = SHEET_POINTS.map(p => ({
+  row: p.row, mine: p.en, incoming: p.mine, label: p.label,
+  want: p.want === "counter" ? "threat" : "favorable",
+  premise: p.premise,
+}));
+
+// 표가 침묵하는 자리 (수비 방향)
+export const GARRISON_QUIET = [
+  {mine:[60,40, 0], incoming:[40,40,20], want:"silent",
+   why:"60/40 행에 있지만 추천에도 금지에도 없는 랠리"},
+  {mine:[34,33,33], incoming:[40,20,40], want:"noRow",
+   why:"어느 행과도 ROW_TOL 안에 들지 않는 내 개리슨"},
+];
+
 // 코드의 COUNTERS 시트 행에서 센 값이 가이드 표와 맞는지 교차 검증한다.
 // labels 는 가이드의 카운터 칸 항목 수(7), counters 는 그중 벡터가 있는 것(6).
 export const EXPECTED_COUNTS = {rows:5, labels:7, counters:6, bans:5, total:11};

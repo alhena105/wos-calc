@@ -7,7 +7,7 @@ import {readFileSync} from "node:fs";
 import {fileURLToPath} from "node:url";
 import {dirname, join} from "node:path";
 import vm from "node:vm";
-import {SHEET_POINTS, QUIET_POINTS, EXPECTED_COUNTS} from "./fixtures.mjs";
+import {SHEET_POINTS, QUIET_POINTS, GARRISON_POINTS, GARRISON_QUIET, EXPECTED_COUNTS} from "./fixtures.mjs";
 import {PARTS, bundle} from "../build.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -41,7 +41,7 @@ function note(t) { console.log("   " + t); }
 
 // ── 로더 ───────────────────────────────────────────────────────────────
 const EXPORTS = "LANG,L,HN,CN,STR,HEROES,SLOTS,ORDER,byId,wpct,norm,tgtRatio,DW,dmgShare," +
-  "NA_SHARE,tgtName,tgtStat,COUNTERS,BAND_TOL,ROW_TOL,MECH,dist,sheetVerdict";
+  "NA_SHARE,tgtName,tgtStat,COUNTERS,BAND_TOL,ROW_TOL,MECH,dist,sheetVerdict,garrisonVerdict";
 function load(lang) {
   const code = src("i18n.js") + src("data.js") + src("engine.js") +
     "\n;globalThis.__api={" + EXPORTS + "};\n";
@@ -162,6 +162,28 @@ for (const p of SHEET_POINTS.filter(x => x.premise)) {
   const row = E.COUNTERS.find(c => c.lbl === p.row);
   ok(row.c.some(label => /멀티랠리|랠리|rall/i.test(label)),
      p.row + " 행의 카운터 라벨에 멀티랠리 전제가 남아 있다", row.c.join(" / "));
+}
+
+// 수비는 같은 표를 반대로 읽는다 — 행 키가 내 개리슨, 비교 대상이 들어오는 랠리
+section("수비 판정 (garrisonVerdict)");
+for (const p of GARRISON_POINTS) {
+  const r = E.garrisonVerdict(n3(p.mine), n3(p.incoming));
+  ok(r.verdict === p.want, "내 개리슨 " + p.row + " vs 들어온 " + p.label + " → " + p.want,
+     "결과=" + r.verdict + (r.rule ? " (" + r.rule.lbl + " 행)" : ""));
+}
+for (const p of GARRISON_QUIET) {
+  const r = E.garrisonVerdict(n3(p.mine), n3(p.incoming));
+  ok(r.verdict === p.want, "내 개리슨 " + p.mine.join("/") + " vs 들어온 " + p.incoming.join("/") + " → " + p.want,
+     "결과=" + r.verdict + " · " + p.why);
+}
+// 방향을 뒤집었을 뿐 같은 행을 봐야 한다
+{
+  const a = E.sheetVerdict(n3([60, 40, 0]), n3([40, 20, 40]));
+  const b = E.garrisonVerdict(n3([60, 40, 0]), n3([40, 20, 40]));
+  ok(a.rule.lbl === b.rule.lbl, "같은 조합이면 랠리·수비가 같은 행을 본다",
+     a.rule.lbl + " vs " + b.rule.lbl);
+  ok(a.verdict === "counter" && b.verdict === "threat",
+     "랠리에서 추천 카운터인 편성은 수비에서 위협이다", a.verdict + " / " + b.verdict);
 }
 
 // ── 5. 허용 오차 · 수비 정책 ───────────────────────────────────────────

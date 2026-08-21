@@ -96,15 +96,22 @@ for (const c of CASES) {
      (t.match(/참고 지표|대보병 화력|밴드 임계/g) || []).join(","));
 }
 
-// 수비는 가이드에 대응표가 없다 → 판정하지 않는다고 말해야 한다
+// 수비는 같은 표를 반대로 읽는다 — 내 개리슨이 행 키, 들어오는 랠리가 비교 대상
 await ko.click("#mDef");
-await ko.waitForTimeout(80);
+await setRatio(ko, "r", [60, 40, 0]);      // 내 개리슨 60/40
+await setRatio(ko, "e", [40, 20, 40]);     // 정석 카운터가 들어온다
+ok(/정석 카운터가 왔습니다/.test(await outText(ko)), "수비: 추천 카운터가 오면 위협으로 표시");
+await setRatio(ko, "e", [50, 0, 50]);      // 밴드 편성이 들어온다
+ok(/금지 편성으로 왔습니다/.test(await outText(ko)), "수비: 밴드 편성이 오면 유리로 표시");
+await setRatio(ko, "e", [40, 40, 20]);     // 표가 언급하지 않는 편성
 {
   const t = await outText(ko);
-  ok(/자료 없음/.test(t), "수성 모드는 판정하지 않는다고 밝힌다");
-  ok(!/금지 편성|추천 카운터/.test(t), "수성 모드에서 랠리 전용 판정을 내지 않는다");
+  ok(/표에 없음/.test(t), "수비: 표가 침묵하면 판단 유보");
+  ok(!/안전/.test(t), "수비: 침묵을 안전으로 렌더링하지 않는다");
 }
 await ko.click("#mAtk");
+await setRatio(ko, "r", [40, 20, 40]);
+await setRatio(ko, "e", [60, 40, 0]);
 await ko.waitForTimeout(80);
 
 // ── 3. 입력 보조 ───────────────────────────────────────────────────────

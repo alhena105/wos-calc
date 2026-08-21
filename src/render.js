@@ -98,12 +98,31 @@ function render(d){
   const e=ctr.en,mine=[r.inf,r.lan,r.mar],def=ctr.mode==="defender";
   const enLbl=def?L("들어오는 랠리","Incoming rally"):L("상대 방어","Their defense");
   o+='<h2>⑥ '+(def?L("들어오는 랠리 · 수비","Incoming rally · garrison"):L("상대 카운터 · 랠리 밴드 판정","Counter table · rally ban check"))+'</h2><div class="panel">';
-  // 수비는 가이드에 대응표가 없다. 없는 근거로 판정을 지어내지 않는다.
+  // 수비도 같은 표다 — 행을 고르는 키가 내 개리슨 비율이고, 비교 대상이 들어오는 랠리다.
   if(def){
-   o+='<div class="callout co-tip"><h3>'+L("➖ 수비는 판정하지 않습니다 — 자료 없음","➖ No verdict for garrison — no data")+'</h3>'+
-    "<p>"+enLbl+" <b>"+e.map(v=>v.toFixed(0)).join("/")+"</b> · "+L("내 수비","my garrison")+" <b>"+mine.map(v=>v.toFixed(0)).join("/")+"</b></p>"+
-    "<p>"+L("가이드 카운터표는 <b>랠리(공격) 전용</b>입니다. 수비 병비에 대응하는 표가 없어서 이 계산기는 수비 판정을 내리지 않습니다.","The guide's counter table is <b>rally-only</b>. There is no table for garrison ratios, so this calculator does not rule on defense.")+"</p>"+
-    '<p class="cap">'+L("①~⑤(칸 진단 · 위젯 · 병종 전용 스킬 · 조이너)는 수비에서도 그대로 유효합니다. 위젯은 <b>수비용</b>만 발동한다는 점만 다릅니다.","Sections ①-⑤ (slots, widgets, class-locked skills, joiners) still apply on defense. The only difference is that only <b>defender-side</b> widgets fire.")+"</p></div>";
+   const V=ctr.verdict;
+   const box={favorable:["co-ok",L("✅ 시트 표: 상대가 금지 편성으로 왔습니다","✅ Sheet: they came with a banned comp")],
+              threat:["co-warn",L("🚨 시트 표: 정석 카운터가 왔습니다","🚨 Sheet: this is the textbook counter")],
+              silent:["co-tip",L("➖ 시트 표: 언급 없음 — 판단 유보","➖ Sheet: not mentioned — no verdict")],
+              noRow:["co-tip",L("➖ 시트 표: 내 개리슨과 맞는 행 없음 — 판단 유보","➖ Sheet: no row matches my garrison — no verdict")]}[V];
+   o+='<div class="callout '+box[0]+'"><h3>'+box[1]+' <span class="tag t-ok">'+L("시트","sheet")+'</span></h3>'+
+    "<p>"+L("판정 대상 — 내 개리슨 ","Evaluated — my garrison ")+"<b>"+mine.map(v=>v.toFixed(0)).join("/")+"</b> · "+
+      L("들어오는 랠리","incoming rally")+" <b>"+e.map(v=>v.toFixed(0)).join("/")+'</b> <span class="cap">'+L("(보/창/궁, 정규화 후)","(inf/lan/mar, after normalising)")+"</span></p>"+
+    (ctr.exact?"<p>"+L("내 개리슨은 가이드 카운터표 <b>","My garrison matches the guide's <b>")+esc(ctr.rule.lbl)+L("</b> 행입니다.","</b> row.")+"</p>":
+      '<p class="note">'+L("가이드 카운터표에 내 개리슨 비율과 맞는 행이 없습니다(가장 가까운 행 ","The guide's table has no row for my garrison ratio (nearest: ")+esc(ctr.rule.lbl)+").</p>")+
+    (V==="favorable"?"<p>"+L("들어오는 <b>","The incoming <b>")+esc(ctr.banned.l)+L("</b>은 이 개리슨에게 <b>금지</b>로 적힌 비율입니다 — 표대로면 상대가 불리합니다.","</b> is listed as <b>banned</b> against this garrison — by the table, they are the ones in trouble.")+"</p>":"")+
+    (V==="threat"?"<p>"+L("들어오는 편성이 이 행의 <b>추천 카운터</b>입니다. 표가 이 개리슨을 깨는 정답으로 지목한 비율입니다.","The incoming comp is this row's <b>recommended counter</b> — the ratio the table names as the answer to this garrison.")+"</p>":"")+
+    (V==="silent"?'<div class="callout co-warn"><h3>'+L('⚠️ "안전"이 아니라 "표에 없음"입니다','⚠️ This is "not in the table", not "safe"')+'</h3>'+
+       "<p>"+L("들어오는 <b>","The incoming <b>")+e.map(v=>v.toFixed(0)).join("/")+L("</b>은 이 행의 <b>추천 카운터에도, 금지 목록에도</b> 없습니다. 표가 이 조합을 다루지 않았다는 뜻이지 막아낸다는 뜻이 아닙니다.","</b> appears in neither the recommended counters nor the ban list for this row. The table does not cover this matchup — that is not the same as holding.")+"</p></div>":"")+
+    "<p><b>"+L("이 개리슨을 깨는 편성:","Comps that break this garrison:")+"</b> "+(ctr.rule.c.length?ctr.rule.c.map(c=>'<span class="pill">'+esc(c)+"</span>").join(""):'<span class="cap">'+L("표에 없음","none listed")+"</span>")+"</p>"+
+    '<p class="cap">'+esc(ctr.rule.why)+"</p>"+
+    (ctr.rule.ban.length?'<p class="cap">'+L("🚫 이 개리슨에게 밴드인 편성(상대가 이걸로 오면 유리): ","🚫 Comps banned against this garrison (good news if they bring one): ")+ctr.rule.ban.map(b=>{
+      const near=dist(e,b.v)<BAND_TOL;
+      return (near?"<b>":"")+esc(b.l)+" ("+b.v.join("/")+")"+(near?L(" ← 지금 들어온 편성</b>"," ← what just came</b>"):"");}).join(" · ")+"</p>":
+      '<p class="cap">'+L("🚫 이 개리슨에게 금지로 적힌 비율은 없습니다.","🚫 The guide lists no banned ratio against this garrison.")+"</p>")+
+    (ctr.rule.src==="theory"?'<p class="note">'+L("이 행은 가이드 원본 카운터표에 없는 <b>이론 확장</b>입니다.","This row is a <b>theoretical extension</b> not present in the guide's original table.")+"</p>":"")+
+    '<p class="note">'+L("표는 <b>랠리 한 개</b>를 기준으로 적혀 있지 않습니다 — 추천 카운터에 <b>멀티랠리 전제</b>가 붙은 행이 있습니다(위 라벨 확인). 정석 카운터가 하나 왔다고 곧바로 지는 건 아니고, 그 비율로 <b>여러 개</b> 들어올 때가 표가 말하는 상황입니다.","The table is not written per single rally — some rows premise their counter on <b>multiple rallies</b> (see the label above). One textbook-counter rally arriving does not mean you lose; the table is describing several of them.")+"</p>"+
+    "</div>";
   }else{
    // 가이드 카운터표 룩업 (랠리 전용 · 1차 자료) — ban / counter / silent / noRow
    const V=ctr.verdict;
