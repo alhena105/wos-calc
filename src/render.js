@@ -121,6 +121,7 @@ function render(d){
       return (near?"<b>":"")+esc(b.l)+" ("+b.v.join("/")+")"+(near?L(" ← 지금 들어온 편성</b>"," ← what just came</b>"):"");}).join(" · ")+"</p>":
       '<p class="cap">'+L("🚫 이 개리슨에게 금지로 적힌 비율은 없습니다.","🚫 The guide lists no banned ratio against this garrison.")+"</p>")+
     (ctr.rule.src==="theory"?'<p class="note">'+L("이 행은 가이드 원본 카운터표에 없는 <b>이론 확장</b>입니다.","This row is a <b>theoretical extension</b> not present in the guide's original table.")+"</p>":"")+
+    '<p class="note">'+L("아래 설명문은 가이드 원문이라 <b>공격자 시점</b>으로 쓰여 있습니다 — 내 개리슨을 깨는 쪽에서 본 문장입니다. 내가 칠 때의 판정을 보려면 ⚔️ 공성 모드로 바꾸세요. 그러면 행을 고르는 키가 <b>상대 방어</b>가 됩니다.","The explanation below is quoted from the guide, so it is written from the <b>attacker's</b> point of view — it describes breaking your garrison. To see the verdict for your own attacks, switch to ⚔️ Rally mode: the row is then chosen by <b>their defense</b>.")+"</p>"+
     '<p class="note">'+L("표는 <b>랠리 한 개</b>를 기준으로 적혀 있지 않습니다 — 추천 카운터에 <b>멀티랠리 전제</b>가 붙은 행이 있습니다(위 라벨 확인). 정석 카운터가 하나 왔다고 곧바로 지는 건 아니고, 그 비율로 <b>여러 개</b> 들어올 때가 표가 말하는 상황입니다.","The table is not written per single rally — some rows premise their counter on <b>multiple rallies</b> (see the label above). One textbook-counter rally arriving does not mean you lose; the table is describing several of them.")+"</p>"+
     "</div>";
   }else{
