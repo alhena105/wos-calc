@@ -13,6 +13,21 @@ var LANG=(function(){
  }catch(e){return "ko";}
 })();
 function L(ko,en){return LANG==="en"?en:ko;}
+
+/* i18nFill(빈표, 만들기) — 언어에 따라 내용이 달라지는 표를 만든다.
+   최상위에서 const X={...L()...} 로 두면 로드 시점 언어로 굳는다. ?lang=en 직행은
+   멀쩡해도 한국어로 열고 English 를 누른 경로에서 한글이 그대로 남는다.
+   그래서 표는 여기에 등록해두고 setLang() 이 다시 채운다.
+   객체(배열)는 그대로 두고 내용만 갈아끼우므로 이미 붙잡아둔 참조도 같이 갱신된다. */
+var I18N_TABLES=[];
+function i18nFill(target,build){
+ function apply(){
+  var v=build();
+  if(Array.isArray(target)){target.length=0;Array.prototype.push.apply(target,v);}
+  else{Object.keys(target).forEach(function(k){delete target[k];});Object.assign(target,v);}
+ }
+ apply(); I18N_TABLES.push(apply); return target;
+}
 function HN(h){return LANG==="en"?(h.en||h.kr):h.kr;}
 var CLSN={infantry:["보병","Infantry"],lancer:["창병","Lancer"],marksman:["궁병","Marksman"]};
 function CN(c){return L(CLSN[c][0],CLSN[c][1]);}
@@ -63,5 +78,6 @@ function setLang(l){
  if(l===LANG)return;
  LANG=l;
  try{var u=new URL(location.href); u.searchParams.set("lang",l); history.replaceState(null,"",u);}catch(e){}
+ I18N_TABLES.forEach(function(f){f();});   // 굳은 표를 새 언어로 다시 채운다
  applyStatic(); rebuildSelects(); calc();
 }

@@ -17,15 +17,8 @@ const src = p => readFileSync(join(ROOT, "src", p), "utf8");
 // KNOWN_DEFECTS: 아직 고치지 않은 결함. 실패로 세지 않되 매번 크게 찍는다.
 // 고치면 이 목록에서 지운다 — 목록에 있는데 통과하면 그것도 알려준다.
 const KNOWN_DEFECTS = {
-  "랠리 수는 판정에 영향을 주지 않는다":
-    "channels() 에 철회된 멀티랠리 화력 합산 모델(N)이 남아 있다",
-  "L() 로 안 감싼 한글 리터럴 없음":
-    "engine.js 의 '병종 비중 부족 → 사망' 이 영어 모드에서도 한글로 나온다",
-  "언어를 토글하면 SLOTS.A.n 가 바뀐다": "최상위 const 에서 L() 이 한 번만 평가돼 굳는다",
-  "언어를 토글하면 tgtName.infantry 가 바뀐다": "위와 같음",
-  "언어를 토글하면 CH_NAME.P 가 바뀐다": "위와 같음",
-  "언어를 토글하면 CH_FIX.P 가 바뀐다": "위와 같음",
-  "언어를 토글하면 MECH.rps[0][0] 가 바뀐다": "위와 같음",
+  // 비어 있는 게 정상이다. 결함을 새로 발견했다고 여기 넣지 말 것 —
+  // 이미 파악·기록해두고 "지금은 안 고친다"고 정한 것만 담는 자리다.
 };
 let pass = 0, fail = 0, known = 0;
 const fails = [], stale = [];
@@ -205,18 +198,20 @@ ok(E.CN("infantry") === "보병" && EN.CN("infantry") === "Infantry", "CN() 이 
 // 언어 토글 후에도 갱신되는가.
 // ?lang=en 으로 처음부터 열면 멀쩡하다 — 한국어로 열고 English 를 누른 경로만 문제다.
 // 그래서 문맥 두 개를 비교하면 안 되고, 한 문맥 안에서 언어를 바꿔봐야 한다.
-// 언어 토글 후에도 갱신되는가.
-// ?lang=en 으로 처음부터 열면 멀쩡하다 — 한국어로 열고 English 를 누른 경로만 문제다.
-// 그래서 문맥 두 개를 비교하면 안 되고, 한 문맥 안에서 언어를 바꿔봐야 한다.
-const PROBES = ["SLOTS.A.n", "tgtName.infantry", "CH_NAME.P", "CH_FIX.P", "MECH.rps[0][0]"];
-const beforeToggle = PROBES.map(p => run(CTX_KO, p));
+// L() 을 값으로 굳히는 표 전부. 하나라도 빠지면 그 표만 한글로 남는다
+// (실제로 COUNTERS 를 빠뜨렸다가 브라우저에서 잡혔다).
+const I18N_TABLES_EXPECTED = ["SLOTS", "tgtName", "CH_NAME", "CH_FIX", "MECH", "COUNTERS"];
 // setLang() 이 하는 일 중 DOM 을 안 만지는 부분만 재현한다
-run(CTX_KO, "LANG='en'; if(typeof I18N_TABLES!=='undefined')I18N_TABLES.forEach(function(f){f();});");
-const afterToggle = PROBES.map(p => run(CTX_KO, p));
+run(CTX_KO, "LANG='en'; I18N_TABLES.forEach(function(f){f();});");
 ok(run(CTX_KO, "CN('infantry')") === "Infantry", "토글 후 CN() 은 영어를 낸다");
-PROBES.forEach((p, i) =>
-  ok(beforeToggle[i] !== afterToggle[i], "언어를 토글하면 " + p + " 가 바뀐다",
-     "여전히 " + String(afterToggle[i]).slice(0, 24)));
+for (const t of I18N_TABLES_EXPECTED) {
+  const dump = run(CTX_KO, "JSON.stringify(" + t + ")");
+  const left = [...new Set(dump.match(/[가-힣][가-힣 ·]*/g) || [])].slice(0, 3);
+  ok(!/[가-힣]/.test(dump), "언어를 토글하면 " + t + " 에 한글이 남지 않는다", left.join(" | "));
+}
+ok(run(CTX_KO, "I18N_TABLES.length") >= I18N_TABLES_EXPECTED.length,
+   "i18nFill 로 등록된 표가 기대 개수 이상",
+   run(CTX_KO, "I18N_TABLES.length") + "개");
 // 이후 검사가 오염되지 않게 되돌린다
 run(CTX_KO, "LANG='ko'; if(typeof I18N_TABLES!=='undefined')I18N_TABLES.forEach(function(f){f();});");
 

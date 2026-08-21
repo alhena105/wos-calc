@@ -1,10 +1,10 @@
-const SLOTS={
+const SLOTS=i18nFill({},function(){return{
  A:{n:L("피해량 증가","Damage bonus"),k:"dmg"},An:{n:L("일반공격 피해","Normal-attack damage"),k:"dmg"},B:{n:L("공격력 증가","Attack bonus"),k:"dmg"},
  E:{n:L("파괴력 증가","Lethality bonus"),k:"dmg"},F:{n:L("적 방어력 감소","Enemy defense down"),k:"dmg"},G:{n:L("적 받는 피해 증가","Enemy damage taken up"),k:"dmg"},
  CRIT:{n:L("치명률","Crit rate"),k:"dmg"},
  C:{n:L("체력 증가","Health bonus"),k:"sur"},D:{n:L("받는 피해 감소","Damage taken down"),k:"sur"},DEF:{n:L("방어력 증가","Defense bonus"),k:"sur"},
  H:{n:L("적 공격력 감소","Enemy attack down"),k:"sur"},I:{n:L("적 파괴력 감소","Enemy lethality down"),k:"sur"},J:{n:L("적 피해량 감소","Enemy damage down"),k:"sur"},
- DODGE:{n:L("회피","Dodge"),k:"sur"}};
+ DODGE:{n:L("회피","Dodge"),k:"sur"}};});
 const ORDER=["A","An","B","E","F","G","CRIT","C","D","DEF","H","I","J","DODGE"];
 const byId=Object.fromEntries(HEROES.map(h=>[h.id,h]));
 const wpct=l=>l<2?0:5+(Math.floor(l/2)-1)*2.5;
@@ -19,14 +19,14 @@ function dmgShare(t,r){
    t==="inf+mar"?r.inf*DW.infantry+r.mar:t==="mar+lan"?r.mar+r.lan:tot;
  return p/tot;}
 const NA_SHARE=.8; // 일반공격이 총딜에서 차지하는 비중 가정
-const tgtName={infantry:L("보병","infantry"),lancer:L("창병","lancers"),marksman:L("궁병","marksmen"),"inf+mar":L("보병+궁병","infantry+marksmen"),"mar+lan":L("궁병+창병","marksmen+lancers")};
+const tgtName=i18nFill({},function(){return{infantry:L("보병","infantry"),lancer:L("창병","lancers"),marksman:L("궁병","marksmen"),"inf+mar":L("보병+궁병","infantry+marksmen"),"mar+lan":L("궁병+창병","marksmen+lancers")};});
 function tgtStat(t,r){const v=tgtRatio(t,r);return v<5?["dead",L("사망","dead"),v]:v<20?["weak",L("약함","weak"),v]:["ok",L("정상","ok"),v];}
 
 // 비율은 [보병,창병,궁병]. 2자리 약칭 해석 규칙:
 //  60/40 = 보60·창40 (궁0)   70/30 = 보70·창30 (궁0)
 //  50/50 = 보50·궁50 (창0)   49/49 = 보49·궁49 (창2)   40/60 = 보40·궁60 (창0)
 //  단, "40/60 초방어를 깨는 50/50"만은 보50·창50 (창병으로 상대 궁60 저격)
-const COUNTERS=[
+const COUNTERS=i18nFill([],function(){return[
  {m:[50,20,30],lbl:"50/20/30",src:"sheet",cv:[[40,40,20],[30,20,50]],
   c:["40/40/20","30/20/50"],
   ban:[{v:[60,40,0],l:"60/40"}],
@@ -48,7 +48,7 @@ const COUNTERS=[
   why:L("단일 랠리는 실패한다. 최소 2~3랠리 필요.","A single rally fails. You need at least 2-3.")},
  {m:[40,10,50],lbl:L("40/10/50 (준공격)","40/10/50 (semi-offensive)"),src:"theory",cv:[[40,40,20],[50,40,10]],
   c:["40/40/20","50/40/10"],ban:[],
-  why:L("상대 창병이 10뿐이라 내 후열이 안전하다. 창40으로 상대 주력(궁50)을 지운다. ※ 가이드 카운터표에 없는 확장 항목(이론).","With only 10 lancers on their side your back line is safe. 40 lancers erase their main damage (50 marksmen). Note: an extension not present in the guide's counter table (theory).")}];
+  why:L("상대 창병이 10뿐이라 내 후열이 안전하다. 창40으로 상대 주력(궁50)을 지운다. ※ 가이드 카운터표에 없는 확장 항목(이론).","With only 10 lancers on their side your back line is safe. 40 lancers erase their main damage (50 marksmen). Note: an extension not present in the guide's counter table (theory).")}];});
 const BAND_TOL=6;   // 내 병비가 금지 비율과 이 거리 안이면 밴드
 const ROW_TOL=10;   // 상대 비율이 이 거리 밖이면 밴드 판정을 내리지 않는다
 
@@ -72,15 +72,18 @@ const TH ={P:46,T:36,B:26};   // 밴드
 const THW={P:41,T:31,B:21};   // 주의 = 가능 구간 하단
 const FEAS={P:[41,50],T:[31,40],B:[21,30]}; // 제약을 만족하는 임계값의 전체 가능 구간
 const SUP ={P:1,T:1,B:4};     // 각 채널을 지지하는 밴드 사례 수 (근거 강도)
-// N = 동시 랠리 수. 내 화력은 N배로 들어가고, 상대 창병은 N개 랠리로 분산돼
-// 랠리당 L/N만 상대한다. N=1이 단일 랠리(가이드 밴드표의 암묵적 기준).
-function channels(en,mine,N){
- N=Math.max(1,N||1);
+// ⚠️ 2026-08-20 정정. 이전 판에는 동시 랠리 수 N이 인자로 있었고, 내 화력이 N배로
+//    들어가고 상대 창병이 N개 랠리로 분산돼 랠리당 L/N만 상대한다고 계산했다.
+//    그 모델은 철회했다 — 동시 랠리는 화력이 합쳐지지 않는다. 각 랠리가 살아남은
+//    개리슨과 따로 순차 전투한다(1번 랠리 → 살아남은 개리슨이 2번 랠리와 전투 …).
+//    그래서 랠리 수는 한 전투의 판정에 들어오지 않는다. 되살리지 말 것.
+//    (test/unit.mjs 가 "랠리 수는 판정에 영향을 주지 않는다"로 감시한다)
+function channels(en,mine){
  const I=en[0],L=en[1],M=en[2], l=mine[1], m=mine[2];
  return {
-  P: Math.max(0,I-N*m),                     // 못 지우는 상대 보병 → 시간 내 돌파 실패
-  T: Math.max(0,M-N*l)+Math.min(L/N,m),     // 미제거 상대 궁병 + 내 궁병을 때리는 상대 창병
-  B: Math.min(m,L/N)                        // 상대 창병에게 잡히는 내 궁병
+  P: Math.max(0,I-m),                 // 못 지우는 상대 보병 → 시간 내 돌파 실패
+  T: Math.max(0,M-l)+Math.min(L,m),   // 미제거 상대 궁병 + 내 궁병을 때리는 상대 창병
+  B: Math.min(m,L)                    // 상대 창병에게 잡히는 내 궁병
  };
 }
 const CH_TXT={
@@ -94,14 +97,14 @@ const CH_TXT={
    "<b>후열 노출 "+c.B.toFixed(0)+"</b> — 내 궁병 "+mine[2].toFixed(0)+"%가 상대 창병 "+en[1].toFixed(0)+"%의 상성 대상입니다(창→사 +10%, 그리고 T7 Ambusher가 <b>20% 확률</b>로 전열을 우회해 직격). 사수는 방어·체력이 가장 낮아 맞으면 손실이 큽니다.",
    "<b>Back-line exposure "+c.B.toFixed(0)+"</b> — your "+mine[2].toFixed(0)+"% marksmen are the counter target of their "+en[1].toFixed(0)+"% lancers (lancer→marksman +10%, and T7 Ambusher bypasses the front line on a <b>20% chance</b>). Marksmen have the lowest defense and health, so those hits cost the most.");}
 };
-const CH_FIX={
+const CH_FIX=i18nFill({},function(){return{
  P:L("궁병 비중을 올리면 상대 보병에 +10% 상성이 붙습니다.","Raise your marksman share to pick up the +10% counter against their infantry."),
  T:L("창병을 늘려 상대 궁병에 상성을 걸거나, 내 궁병을 줄여 상대 창병의 상성 대상을 줄이세요.","Add lancers to counter their marksmen, or cut your marksmen so their lancers have fewer targets."),
  B:L("궁병 비중을 낮추거나 보병을 늘려 전열을 두껍게 하세요.","Lower your marksman share, or add infantry to thicken the front line.")
-};
-const CH_NAME={P:L("대보병 화력","Anti-infantry"),T:L("상성 열세","Counter deficit"),B:L("후열 노출","Back-line exposure")};
+};});
+const CH_NAME=i18nFill({},function(){return{P:L("대보병 화력","Anti-infantry"),T:L("상성 열세","Counter deficit"),B:L("후열 노출","Back-line exposure")};});
 // 실제 메커니즘 (병종 스탯 시스템 가이드) — 화면 하단 참고용
-const MECH={
+const MECH=i18nFill({},function(){return{
  rps:[[L("보병 → 창병","Infantry → Lancer"),"T1 Master Brawler",L("공격 데미지 +10%","Attack damage +10%")],
       [L("창병 → 사수","Lancer → Marksman"),"T1 Charge",L("공격 데미지 +10%","Attack damage +10%")],
       [L("사수 → 보병","Marksman → Infantry"),"T1 Ranged Strike",L("공격 데미지 +10%","Attack damage +10%")]],
@@ -111,7 +114,7 @@ const MECH={
  stat:[[L("보병","Infantry"),L("전열","Front"),"10","13","15","10"],
        [L("창병","Lancer"),L("중열","Middle"),"13","11","11","14"],
        [L("사수","Marksman"),L("후열","Back"),"14","10","10","15"]]
-};
+};});
 const dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2]);
 function modelVerdict(en,mine,mode){
  const keys=mode==="defender"?["T","B"]:["P","T","B"];
@@ -156,7 +159,7 @@ function calc(){
    const e=h.exp[0];if(!e||e.slot==="ECO")return null;
    let mul=1,detail=[],cond=null;
    if(e.slot==="X"){const[st,lbl,v]=tgtStat(e.tgt,r);cond=st+"|"+tgtName[e.tgt]+" "+v.toFixed(0)+"% ("+lbl+")";
-     if(st==="dead")return{h,e,mul:1,detail:["병종 비중 부족 → 사망"],cond,dup:lid.has(h.id)};
+     if(st==="dead")return{h,e,mul:1,detail:[L("병종 비중 부족 → 사망","class share too low → dead")],cond,dup:lid.has(h.id)};
      const sh=e.k==="sur"?tgtRatio(e.tgt,r)/100:dmgShare(e.tgt,r);
      mul=1+e.v*sh;detail.push(L((e.k==="sur"?"병력":"딜")+" 지분 "+(sh*100).toFixed(0)+"% 환산",(e.k==="sur"?"headcount":"damage")+" share "+(sh*100).toFixed(0)+"%"));
    }else if(e.slot==="An"){

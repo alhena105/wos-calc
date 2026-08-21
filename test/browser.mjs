@@ -34,10 +34,7 @@ function execPath() {
 
 // ── 미니 러너 ──────────────────────────────────────────────────────────
 const KNOWN_DEFECTS = {
-  "영어로 열면 결과에 한글이 없다":
-    "engine.js 의 '병종 비중 부족 → 사망' 이 L() 로 안 감싸여 있다",
-  "한국어로 열고 English 를 눌러도 결과에 한글이 없다":
-    "SLOTS·tgtName·CH_NAME·CH_FIX·statKr 이 최상위 const 라 로드 시점 언어로 굳는다",
+  // 비어 있는 게 정상이다. unit.mjs 의 같은 이름 주석 참고.
 };
 let pass = 0, fail = 0, known = 0;
 const fails = [], stale = [];
