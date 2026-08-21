@@ -77,6 +77,8 @@ SkillMod 칸 포화 · 위젯 발동 · 병종 전용 스킬 사망 · 조이너
 ```
 build.mjs          src/* 를 순서대로 이어붙여 index.html 생성 (번들러 없음, 순수 연결)
 .gitattributes     작업 트리를 LF 로 고정 — 안 그러면 core.autocrlf 가 산출물 바이트를 바꿔 --check 가 깨진다
+.gitignore         .omc/ (OMC 세션 상태) · node_modules/ · package-lock.json
+                   ※ index.html 은 빌드 산출물이지만 Pages 가 서빙하므로 무시하지 않는다
 index.html         빌드 산출물. 직접 편집 금지 — 항상 src 를 고치고 다시 빌드
 src/
   part1.html       마크업 + CSS + <script> 여는 태그
@@ -85,9 +87,9 @@ src/
   engine.js        계산 로직 + calc() (DOM 읽기)
   render.js        출력 HTML 생성 + 프리셋/합계 경고 + init IIFE + </script></body></html>
 test/
-  fixtures.mjs     가이드 카운터표 12점 — 이 프로젝트의 정답지
-  unit.mjs         빌드 최신 · 스키마 · 카운터표 무결성 · 시트 재현 · 임계값 · i18n (브라우저 불필요)
-  browser.mjs      Playwright 로 4상태 판정 · 블록 순서 · 프리셋 · 한글 잔존 · pageerror 검사
+  fixtures.mjs     가이드 카운터표 — 이 프로젝트의 정답지 (랠리 11점 + 그것을 뒤집은 수비 11점)
+  unit.mjs         빌드 최신 · 번들 파싱 · 스키마 · 카운터표 무결성 · 랠리/수비 판정 · i18n (브라우저 불필요)
+  browser.mjs      Playwright 로 랠리·수비 4상태 · 프리셋 · 합계 경고 · 한글 잔존 · pageerror 검사
 ```
 
 **조립 순서가 곧 의존 순서다: `part1 → i18n → data → engine → render`.**
