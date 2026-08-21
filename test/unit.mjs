@@ -116,6 +116,7 @@ for (const c of E.COUNTERS) {
 ok(badVec.length === 0, "모든 비율 벡터의 합이 100", badVec.join(" | "));
 const counted = {
   rows: sheetRows.length,
+  labels: sheetRows.reduce((a, c) => a + c.c.length, 0),
   counters: sheetRows.reduce((a, c) => a + c.cv.length, 0),
   bans: sheetRows.reduce((a, c) => a + c.ban.length, 0),
 };
@@ -123,7 +124,15 @@ counted.total = counted.counters + counted.bans;
 ok(JSON.stringify(counted) === JSON.stringify(EXPECTED_COUNTS),
    "시트 행에서 센 점 수가 픽스처와 일치",
    "코드 " + JSON.stringify(counted) + " vs 픽스처 " + JSON.stringify(EXPECTED_COUNTS));
-ok(SHEET_POINTS.length === EXPECTED_COUNTS.total, "픽스처 12점", String(SHEET_POINTS.length));
+ok(SHEET_POINTS.length === EXPECTED_COUNTS.total, "픽스처가 좌표로 검사 가능한 11점", String(SHEET_POINTS.length));
+// 49/49 를 금지 목록에 따로 적지 않아도 50/50 이 허용 오차 안에서 같이 잡아야 한다
+{
+  const mine = [49, 2, 49];   // 합이 100이라 정규화 불필요
+  const row = E.COUNTERS.find(c => c.lbl === "70/30");
+  ok(row.ban.some(b => E.dist(mine, b.v) < E.BAND_TOL),
+     "70/30 상대 49/49 는 50/50 항목이 허용 오차로 잡는다",
+     "거리 " + E.dist(mine, row.ban[0].v).toFixed(2));
+}
 
 // ── 4. 시트 12점 재현 ──────────────────────────────────────────────────
 section("3채널 지표 vs 시트 정답지");
@@ -163,6 +172,23 @@ for (const k of ["P", "T", "B"]) {
   ok(E.THW[k] === lo, "THW." + k + " 는 가능 구간 하단", E.THW[k] + " vs " + lo);
 }
 ok(E.BAND_TOL === 6 && E.ROW_TOL === 10, "허용 오차 고정", E.BAND_TOL + "/" + E.ROW_TOL);
+// SUP 은 두 가지를 따로 센다. 섞어 쓰다 B 만 다른 기준으로 세어져 있었다.
+{
+  const pin = {P: 0, T: 0, B: 0}, hit = {P: 0, T: 0, B: 0};
+  const banPts = SHEET_POINTS.filter(p => p.want === "ban");
+  for (const p of banPts) {
+    const c = E.channels(n3(p.en), n3(p.mine));
+    const cand = ["P", "T", "B"].filter(k => c[k] >= E.THW[k]);   // 하한 때문에 발동 가능한 채널
+    cand.forEach(k => hit[k]++);
+    if (cand.length === 1) pin[cand[0]]++;
+  }
+  for (const k of ["P", "T", "B"]) {
+    ok(E.SUP[k].pin === pin[k], "SUP." + k + ".pin 이 임계값을 묶은 밴드 수와 일치",
+       E.SUP[k].pin + " vs " + pin[k]);
+    ok(E.SUP[k].hit === hit[k], "SUP." + k + ".hit 이 관여한 밴드 수와 일치",
+       E.SUP[k].hit + " vs " + hit[k]);
+  }
+}
 ok(JSON.stringify(E.modelVerdict([60, 40, 0], [40, 20, 40], "defender").keys) === JSON.stringify(["T", "B"]),
    "수비 모드는 T·B 만 본다");
 ok(JSON.stringify(E.modelVerdict([60, 40, 0], [40, 20, 40], "rally").keys) === JSON.stringify(["P", "T", "B"]),

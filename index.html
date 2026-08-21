@@ -452,7 +452,9 @@ const COUNTERS=i18nFill([],function(){return[
   why:L("60/40은 만능 방어라 단일 랠리로는 못 깬다. 궁병을 절반 넣는 50/50·49/49는 상대 창40에 후열이 먼저 지워지고, 보60이 오래 버텨 역전당한다. 동시 타격이 정석이고 브래들리·카롤·불카누스가 영웅 카운터.","60/40 is the all-purpose defense and a single rally will not break it. Comps that are half marksmen (50/50, 49/49) lose their back line to those 40 lancers while 60 infantry stall long enough to turn it around. Simultaneous strikes are the standard answer; Bradley, Karol and Vulcanus are the hero counters.")},
  {m:[70,30,0],lbl:"70/30",src:"sheet",cv:[],
   c:[L("멀티랠리로 물량 압박","Multi-rally pressure")],
-  ban:[{v:[50,0,50],l:"50/50"},{v:[49,2,49],l:"49/49"}],
+  // 가이드 카운터표의 70/30 행 금지는 50/50 하나뿐이다. 49/49 를 따로 적지
+  // 않아도 거리 2.45 라 BAND_TOL(6) 안에서 같이 잡힌다.
+  ban:[{v:[50,0,50],l:"50/50"}],
   why:L("특정 비율 카운터가 없다. 60/40과 같은 이유로 궁병 절반 편성은 금지.","No specific ratio counters it. Half-marksman comps are banned for the same reason as against 60/40.")},
  {m:[40,0,60],lbl:L("40/60 (초방어)","40/60 (ultra-defense)"),src:"sheet",cv:[[50,50,0],[60,40,0]],
   c:[L("50/50/0 (보50·창50)","50/50/0 (50 inf · 50 lancer)"),"60/40"],
@@ -486,7 +488,11 @@ const ROW_TOL=10;   // 상대 비율이 이 거리 밖이면 밴드 판정을 �
 const TH ={P:46,T:36,B:26};   // 밴드
 const THW={P:41,T:31,B:21};   // 주의 = 가능 구간 하단
 const FEAS={P:[41,50],T:[31,40],B:[21,30]}; // 제약을 만족하는 임계값의 전체 가능 구간
-const SUP ={P:1,T:1,B:4};     // 각 채널을 지지하는 밴드 사례 수 (근거 강도)
+// 근거 강도. 두 가지를 섞어 쓰다 B만 다른 기준으로 세어져 있었다(2026-08-22 정정).
+//  pin = 이 채널의 임계값 상한을 실제로 묶은 밴드 수 — "임계값이 무엇으로 정해졌나"
+//  hit = 이 채널이 임계 이상으로 관여한 밴드 수 — "이 채널이 몇 건을 설명하나"
+// 가이드 표의 밴드 5건 기준: 세 임계값 모두 단 한 건이 상한을 묶는다.
+const SUP ={P:{pin:1,hit:1},T:{pin:1,hit:3},B:{pin:1,hit:3}};
 // ⚠️ 2026-08-20 정정. 이전 판에는 동시 랠리 수 N이 인자로 있었고, 내 화력이 N배로
 //    들어가고 상대 창병이 N개 랠리로 분산돼 랠리당 L/N만 상대한다고 계산했다.
 //    그 모델은 철회했다 — 동시 랠리는 화력이 합쳐지지 않는다. 각 랠리가 살아남은
@@ -749,16 +755,16 @@ function render(d){
    '<table class="hgrid"><thead><tr><th>'+L("채널","Channel")+'</th><th>'+L("값","Value")+'</th><th>'+L("밴드 임계","Ban threshold")+'</th><th>'+L("판정","Verdict")+'</th></tr></thead><tbody>'+
    mv.keys.map(k=>{const v=mv.c[k],st=v>=TH[k]?"🚫":v>=THW[k]?"⚠️":"✅";
      return "<tr><td>"+CH_NAME[k]+"</td><td class=\"ratio\">"+v.toFixed(0)+
-       "</td><td>"+TH[k]+' <span class="cap">'+L("(가능 ","(feasible ")+FEAS[k][0]+"~"+FEAS[k][1]+L(" · 근거 "," · support ")+SUP[k]+L("건)",")")+"</span></td><td>"+st+"</td></tr>";}).join("")+
+       "</td><td>"+TH[k]+' <span class="cap">'+L("(가능 ","(feasible ")+FEAS[k][0]+"~"+FEAS[k][1]+L(" · 임계 결정 "," · pinned by ")+SUP[k].pin+L("건 · 관여 "," · appears in ")+SUP[k].hit+L("건)",")")+"</span></td><td>"+st+"</td></tr>";}).join("")+
    "</tbody></table>"+
    (mv.ban.concat(mv.warn).length?mv.ban.concat(mv.warn).map(k=>'<p class="cap">'+CH_TXT[k](mv.c,e,mine)+" <b>→ "+CH_FIX[k]+"</b></p>").join(""):
      '<p class="cap">'+L("세 채널 모두 임계값 아래입니다. 이 상대에게 쓸 만한 병비입니다.","All channels sit below threshold. This is a workable ratio against that defense.")+'</p>')+
    (mv.lvl==="ban"&&!def?'<p class="cap">'+L("🔁 <b>랠리를 여러 개 보내도 이 판정은 바뀌지 않습니다.</b> 동시 랠리는 화력이 합쳐지는 게 아니라 <b>각 랠리가 남은 개리슨과 따로 전투</b>합니다(1번 랠리 → 살아남은 개리슨이 2번 랠리와 전투 …). 멀티랠리는 편성을 고쳐주는 게 아니라 <b>소모전으로 개리슨을 깎는 것</b>입니다.","🔁 <b>Sending more rallies does not change this verdict.</b> Simultaneous rallies do not pool their force — <b>each fights the surviving garrison separately</b> (rally 1, then whatever survives fights rally 2, and so on). Multi-rally does not fix a comp; it <b>grinds the garrison down by attrition</b>.")+"</p>":"")+
    (def?'<p class="note">'+L('<b>수비는 돌파 채널을 뺍니다.</b> 제한 시간 안에 격파할 의무가 없어 "못 녹인다"가 패배 조건이 아닙니다. 그래서 같은 60/40이라도 랠리로는 밴드가 되고 수비로는 정석이 됩니다.','<b>Defense drops the anti-infantry channel.</b> A garrison is under no obligation to kill anything inside a timer, so "cannot melt them" is not a loss condition. That is why the same 60/40 is a ban as a rally and the standard as a garrison.')+"</p>":"")+
    '<div class="callout co-warn"><h3>'+L("⚠️ 이건 메커니즘 모델이 아닙니다","⚠️ This is not a mechanics model")+'</h3>'+
-    "<p>"+L("세 지표는 밴드표 12점(카운터 7·밴드 5)을 <b>자유 파라미터 3개로 재현하도록 맞춘 곡선 적합</b>입니다. 게임 물리에서 유도한 값이 아닙니다.","The three channels are a <b>curve fit</b>: 12 labelled points (7 counters, 5 bans) reproduced with 3 free parameters. They are not derived from game physics.")+"</p>"+
+    "<p>"+L("세 지표는 가이드 카운터표를 <b>자유 파라미터 3개로 재현하도록 맞춘 곡선 적합</b>입니다. 게임 물리에서 유도한 값이 아닙니다. 표는 12항목(카운터 7·밴드 5)이고, 그중 좌표로 비교할 수 있는 11점(70/30 행의 카운터는 비율이 아니라 \"멀티랠리\"라는 서술입니다), 다시 멀티랠리를 전제한 카운터 2건을 뺀 <b>9점</b>에 맞췄습니다.","The three channels are a <b>curve fit</b> with 3 free parameters, not something derived from game physics. The guide's table has 12 entries (7 counters, 5 bans); 11 of them are comparable as ratios (the 70/30 row's counter is the tactic \"multi-rally\", not a ratio), and the fit used the <b>9</b> that remain after dropping the two counters the guide premises on multi-rally.")+"</p>"+
     "<p>"+L("실제 병종 스탯(공격·방어·체력·치명타)과 상성 규칙으로 전투를 시뮬레이션하면 <b>밴드표를 6/12, 즉 우연 수준밖에 못 맞춥니다.</b> 밴드표의 내용은 스탯 표에서 유도되지 않습니다 — 영웅 SkillMod(2~5배)와 실전 경험이 지배하기 때문으로 보입니다.","Simulating combat from the real troop stats (attack, defense, health, lethality) and the counter rules reproduces the ban table only <b>6 times out of 12 — chance level.</b> The table's content is not derivable from the stat sheet; hero SkillMod (2-5×) and practical experience appear to dominate.")+"</p>"+
-    "<p>"+L("<b>표에 있는 상황이면 시트를 보세요.</b> 이 지표는 표에 없는 비율을 만났을 때의 참고용입니다. 가능 구간 <b>대보병 41~50 · 상성 31~40 · 후열 21~30</b>의 중앙값을 썼고, 후열은 밴드 4건이 지지(견고)·나머지 둘은 각 1건(취약)입니다.","<b>If the situation is in the table, read the sheet.</b> This indicator is for ratios the table does not cover. The values are midpoints of the feasible ranges <b>anti-infantry 41-50 · counter deficit 31-40 · back-line 21-30</b>; the back-line channel rests on 4 bans (robust), the other two on 1 each (fragile).")+"</p>"+
+    "<p>"+L("<b>표에 있는 상황이면 시트를 보세요.</b> 이 지표는 표에 없는 비율을 만났을 때의 참고용입니다. 가능 구간 <b>대보병 41~50 · 상성 31~40 · 후열 21~30</b>의 중앙값을 썼습니다. 세 임계값은 <b>각각 밴드 단 한 건</b>이 상한을 묶고 있습니다(임계 결정 1건) — 셋 다 취약하다는 뜻입니다. 관여 건수(대보병 1·상성 3·후열 3)는 그 채널이 몇 건을 설명하는지일 뿐 임계값의 근거가 아닙니다.","<b>If the situation is in the table, read the sheet.</b> This indicator is for ratios the table does not cover. The values are midpoints of the feasible ranges <b>anti-infantry 41-50 · counter deficit 31-40 · back-line 21-30</b>. Each threshold is pinned by <b>exactly one ban</b> — all three are fragile. The \"appears in\" counts (anti-infantry 1, counter deficit 3, back-line 3) say how many bans a channel helps explain, which is not the same as evidence for its threshold.")+"</p>"+
     "</div>"+
    "</div>";
   o+="</div>";}

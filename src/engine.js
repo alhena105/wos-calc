@@ -37,7 +37,9 @@ const COUNTERS=i18nFill([],function(){return[
   why:L("60/40은 만능 방어라 단일 랠리로는 못 깬다. 궁병을 절반 넣는 50/50·49/49는 상대 창40에 후열이 먼저 지워지고, 보60이 오래 버텨 역전당한다. 동시 타격이 정석이고 브래들리·카롤·불카누스가 영웅 카운터.","60/40 is the all-purpose defense and a single rally will not break it. Comps that are half marksmen (50/50, 49/49) lose their back line to those 40 lancers while 60 infantry stall long enough to turn it around. Simultaneous strikes are the standard answer; Bradley, Karol and Vulcanus are the hero counters.")},
  {m:[70,30,0],lbl:"70/30",src:"sheet",cv:[],
   c:[L("멀티랠리로 물량 압박","Multi-rally pressure")],
-  ban:[{v:[50,0,50],l:"50/50"},{v:[49,2,49],l:"49/49"}],
+  // 가이드 카운터표의 70/30 행 금지는 50/50 하나뿐이다. 49/49 를 따로 적지
+  // 않아도 거리 2.45 라 BAND_TOL(6) 안에서 같이 잡힌다.
+  ban:[{v:[50,0,50],l:"50/50"}],
   why:L("특정 비율 카운터가 없다. 60/40과 같은 이유로 궁병 절반 편성은 금지.","No specific ratio counters it. Half-marksman comps are banned for the same reason as against 60/40.")},
  {m:[40,0,60],lbl:L("40/60 (초방어)","40/60 (ultra-defense)"),src:"sheet",cv:[[50,50,0],[60,40,0]],
   c:[L("50/50/0 (보50·창50)","50/50/0 (50 inf · 50 lancer)"),"60/40"],
@@ -71,7 +73,11 @@ const ROW_TOL=10;   // 상대 비율이 이 거리 밖이면 밴드 판정을 �
 const TH ={P:46,T:36,B:26};   // 밴드
 const THW={P:41,T:31,B:21};   // 주의 = 가능 구간 하단
 const FEAS={P:[41,50],T:[31,40],B:[21,30]}; // 제약을 만족하는 임계값의 전체 가능 구간
-const SUP ={P:1,T:1,B:4};     // 각 채널을 지지하는 밴드 사례 수 (근거 강도)
+// 근거 강도. 두 가지를 섞어 쓰다 B만 다른 기준으로 세어져 있었다(2026-08-22 정정).
+//  pin = 이 채널의 임계값 상한을 실제로 묶은 밴드 수 — "임계값이 무엇으로 정해졌나"
+//  hit = 이 채널이 임계 이상으로 관여한 밴드 수 — "이 채널이 몇 건을 설명하나"
+// 가이드 표의 밴드 5건 기준: 세 임계값 모두 단 한 건이 상한을 묶는다.
+const SUP ={P:{pin:1,hit:1},T:{pin:1,hit:3},B:{pin:1,hit:3}};
 // ⚠️ 2026-08-20 정정. 이전 판에는 동시 랠리 수 N이 인자로 있었고, 내 화력이 N배로
 //    들어가고 상대 창병이 N개 랠리로 분산돼 랠리당 L/N만 상대한다고 계산했다.
 //    그 모델은 철회했다 — 동시 랠리는 화력이 합쳐지지 않는다. 각 랠리가 살아남은

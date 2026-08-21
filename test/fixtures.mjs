@@ -1,4 +1,8 @@
-// 가이드 카운터표 12점 — 이 프로젝트의 정답지.
+// 가이드 카운터표(wos-counter-formation.html ① 카운터 편성표)를 그대로 옮긴 정답지.
+//
+// 가이드의 표는 카운터 칸 7항목 · 금지 칸 5항목 = 12항목이다. 그중 70/30 행의
+// 카운터 "멀티랠리"는 비율이 아니라 전술 서술이라 비교할 벡터가 없다.
+// 그래서 좌표로 검사할 수 있는 점은 카운터 6 + 금지 5 = 11점이 된다.
 // 로직을 바꿔도 이건 그대로 통과해야 한다. 통과 못 하면 로직이 틀린 것이지
 // 픽스처가 틀린 게 아니다. 픽스처를 고치려면 시트 원본이 바뀌었을 때만이다.
 //
@@ -24,7 +28,6 @@ export const SHEET_POINTS = [
   {row:"60/40",    en:[60,40, 0], mine:[49, 2,49], label:"49/49",    want:"ban", fit:true},
   // 상대 70/30
   {row:"70/30",    en:[70,30, 0], mine:[50, 0,50], label:"50/50",    want:"ban", fit:true},
-  {row:"70/30",    en:[70,30, 0], mine:[49, 2,49], label:"49/49",    want:"ban", fit:true},
   // 상대 40/60 (초방어)
   {row:"40/60",    en:[40, 0,60], mine:[50,50, 0], label:"50/50/0 (보50·창50)", want:"ok",  fit:true},
   {row:"40/60",    en:[40, 0,60], mine:[60,40, 0], label:"60/40",    want:"ok",  fit:true},
@@ -46,4 +49,6 @@ export const FIT_POINTS = SHEET_POINTS.filter(p => p.fit);
 export const UNEXPLAINED = SHEET_POINTS.filter(p => !p.fit);
 
 // 시트 카운터표를 옮긴 COUNTERS 행이 픽스처와 같은 점 집합인지 교차 검증하기 위한 값
-export const EXPECTED_COUNTS = {rows:5, counters:6, bans:6, total:12};
+// 코드의 COUNTERS 시트 행에서 센 값이 가이드 표와 맞는지 교차 검증한다.
+// labels 는 가이드의 카운터 칸 항목 수(7), counters 는 그중 벡터가 있는 것(6).
+export const EXPECTED_COUNTS = {rows:5, labels:7, counters:6, bans:5, total:11};
