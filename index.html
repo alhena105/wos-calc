@@ -478,8 +478,9 @@ const ROW_TOL=10;   // 상대 비율이 이 거리 밖이면 밴드 판정을 �
 //        모든 병종이 모든 병종을 때린다. 궁병이 없어도 보병을 잡는다.
 //      · 창병의 후열 침투는 T7 Ambusher "20% 확률로 보병 뒤 사수 직격"이다.
 //        100%가 아니라 20%.
-//    따라서 아래 임계값은 게임 물리에서 유도한 값이 아니라, 밴드표 12점을
-//    3개 자유 파라미터로 재현하도록 맞춘 곡선 적합(curve fit)이다.
+//    따라서 아래 임계값은 게임 물리에서 유도한 값이 아니라, 가이드 표에서
+//    좌표로 비교 가능한 점을 3개 자유 파라미터로 재현하도록 맞춘 곡선 적합이다.
+//    표 12항목(카운터 7·밴드 5) → 벡터가 있는 11점 → 멀티랠리 전제 2건을 뺀 9점.
 //    실제 병종 스탯으로 전투를 시뮬레이션하면 밴드표를 6/12(우연 수준)밖에
 //    못 맞춘다 — 즉 밴드표의 내용은 스탯 표에서 유도되지 않는다.
 //    → 시트 표를 1순위로 보고, 이 지표는 표에 없는 상황의 참고로만 쓸 것.
@@ -745,7 +746,7 @@ function render(d){
     ((V==="counter"&&mv.lvl==="ban")?'<div class="callout co-warn"><h3>'+L("⚖️ 지표와 시트가 엇갈립니다 — 시트를 따르세요","⚖️ The indicator disagrees with the sheet — follow the sheet")+'</h3>'+
        "<p>"+L("참고 지표는 밴드라고 보지만 <b>시트는 이 편성을 추천 카운터로 명시</b>합니다. 이 불일치는 <b>설명되지 않은 상태</b>입니다.","The indicator calls this a ban, but <b>the sheet explicitly lists it as a recommended counter</b>. This disagreement is <b>unexplained</b>.")+"</p>"+
        "<p>"+L('이전 버전은 "시트가 멀티랠리를 전제하니 랠리를 늘리면 지표도 통과한다"고 설명했지만, 그 설명은 <b>철회했습니다</b> — 동시 랠리는 화력이 합쳐지는 게 아니라 각 랠리가 따로 전투하므로 랠리 수를 늘려도 한 전투의 판정은 그대로입니다.','An earlier version explained it as "the sheet assumes multi-rally, so more rallies would clear the indicator too". That explanation has been <b>retracted</b> — simultaneous rallies do not pool their force; each fights separately, so adding rallies does not change the verdict for any single battle.')+"</p>"+
-       "<p>"+L("<b>지표를 믿지 마세요.</b> 이건 밴드표 12점에 맞춘 곡선이고, 시트가 1차 자료입니다.","<b>Do not trust the indicator here.</b> It is a curve fitted to 12 points; the sheet is the primary source.")+"</p>"+
+       "<p>"+L("<b>지표를 믿지 마세요.</b> 이건 가이드 표의 9점에 맞춘 곡선이고, 시트가 1차 자료입니다.","<b>Do not trust the indicator here.</b> It is a curve fitted to 9 points from the guide's table; the sheet is the primary source.")+"</p>"+
        "</div>":"")+
     "</div>";}
   // 2) 참고 지표 (경험 적합 · 근거 약함)

@@ -128,7 +128,7 @@ function render(d){
     ((V==="counter"&&mv.lvl==="ban")?'<div class="callout co-warn"><h3>'+L("⚖️ 지표와 시트가 엇갈립니다 — 시트를 따르세요","⚖️ The indicator disagrees with the sheet — follow the sheet")+'</h3>'+
        "<p>"+L("참고 지표는 밴드라고 보지만 <b>시트는 이 편성을 추천 카운터로 명시</b>합니다. 이 불일치는 <b>설명되지 않은 상태</b>입니다.","The indicator calls this a ban, but <b>the sheet explicitly lists it as a recommended counter</b>. This disagreement is <b>unexplained</b>.")+"</p>"+
        "<p>"+L('이전 버전은 "시트가 멀티랠리를 전제하니 랠리를 늘리면 지표도 통과한다"고 설명했지만, 그 설명은 <b>철회했습니다</b> — 동시 랠리는 화력이 합쳐지는 게 아니라 각 랠리가 따로 전투하므로 랠리 수를 늘려도 한 전투의 판정은 그대로입니다.','An earlier version explained it as "the sheet assumes multi-rally, so more rallies would clear the indicator too". That explanation has been <b>retracted</b> — simultaneous rallies do not pool their force; each fights separately, so adding rallies does not change the verdict for any single battle.')+"</p>"+
-       "<p>"+L("<b>지표를 믿지 마세요.</b> 이건 밴드표 12점에 맞춘 곡선이고, 시트가 1차 자료입니다.","<b>Do not trust the indicator here.</b> It is a curve fitted to 12 points; the sheet is the primary source.")+"</p>"+
+       "<p>"+L("<b>지표를 믿지 마세요.</b> 이건 가이드 표의 9점에 맞춘 곡선이고, 시트가 1차 자료입니다.","<b>Do not trust the indicator here.</b> It is a curve fitted to 9 points from the guide's table; the sheet is the primary source.")+"</p>"+
        "</div>":"")+
     "</div>";}
   // 2) 참고 지표 (경험 적합 · 근거 약함)
