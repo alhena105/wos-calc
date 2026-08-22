@@ -124,7 +124,12 @@ function calc(){
  ORDER.forEach(s=>{buck[s]=1;src[s]=[];});
  leaders.forEach(({hero})=>hero.exp.forEach(e=>{
    if(e.slot==="ECO")return;
-   if(e.slot==="X"){const[st,lbl,v]=tgtStat(e.tgt,r);cls.push({hero,e,st,lbl,v});return;}
+   // X 는 칸(buck)에 안 들어가고 병종 전용 판정으로 빠진다.
+   // 한 스킬이 두 병종에 다르게 걸리면(예: 보병 받피↓ + 창병 딜↑) also 로 둘 다 단다.
+   if(e.slot==="X"){const[st,lbl,v]=tgtStat(e.tgt,r);cls.push({hero,e,st,lbl,v});
+     if(e.also&&e.also.slot==="X"){const[st2,lbl2,v2]=tgtStat(e.also.tgt,r);
+       cls.push({hero,e:Object.assign({},e,e.also),st:st2,lbl:lbl2,v:v2});}
+     return;}
    const add=(sl,val)=>{if(buck[sl]===undefined)return;buck[sl]+=val;src[sl].push(HN(hero)+" "+e.n+" +"+(val*100).toFixed(0)+"%");};
    add(e.slot,e.v); if(e.also)add(e.also.slot,e.also.v);
  }));
@@ -145,8 +150,12 @@ function calc(){
    let mul=1,detail=[],cond=null;
    if(e.slot==="X"){const[st,lbl,v]=tgtStat(e.tgt,r);cond=st+"|"+tgtName[e.tgt]+" "+v.toFixed(0)+"% ("+lbl+")";
      if(st==="dead")return{h,e,mul:1,detail:[L("병종 비중 부족 → 사망","class share too low → dead")],cond,dup:lid.has(h.id)};
-     const sh=e.k==="sur"?tgtRatio(e.tgt,r)/100:dmgShare(e.tgt,r);
-     mul=1+e.v*sh;detail.push(L((e.k==="sur"?"병력":"딜")+" 지분 "+(sh*100).toFixed(0)+"% 환산",(e.k==="sur"?"headcount":"damage")+" share "+(sh*100).toFixed(0)+"%"));
+     // 한 스킬이 두 병종에 걸리면 각각 지분을 곱한다 — 서로 다른 축이라 곱연산이다
+     const part=x=>{const sh=x.k==="sur"?tgtRatio(x.tgt,r)/100:dmgShare(x.tgt,r);
+       detail.push(L(tgtName[x.tgt]+" "+(x.k==="sur"?"병력":"딜")+" 지분 "+(sh*100).toFixed(0)+"% 환산",
+                     tgtName[x.tgt]+" "+(x.k==="sur"?"headcount":"damage")+" share "+(sh*100).toFixed(0)+"%"));
+       return 1+x.v*sh;};
+     mul=part(e); if(e.also&&e.also.slot==="X")mul*=part(e.also);
    }else if(e.slot==="An"){
      mul=1+e.v*NA_SHARE;detail.push(L("일반공격 비중 "+(NA_SHARE*100)+"% 가정","assumes normal attacks are "+(NA_SHARE*100)+"% of damage"));
    }else{

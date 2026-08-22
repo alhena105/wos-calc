@@ -106,6 +106,9 @@ for (const h of E.HEROES) {
     if (e.k && !["dmg", "sur"].includes(e.k)) errs.push(h.id + "/" + e.n + ": k=" + e.k);
     if (e.also && (!SLOTKEYS.has(e.also.slot) || typeof e.also.v !== "number"))
       errs.push(h.id + "/" + e.n + ": also 형식 이상");
+    // X 에 붙는 also 는 그 자체가 병종 한정이라 tgt/k 가 있어야 한다
+    if (e.also && e.also.slot === "X" && (!e.also.tgt || !e.also.k))
+      errs.push(h.id + "/" + e.n + ": also X 인데 tgt/k 누락");
     if (typeof e.v !== "number") errs.push(h.id + "/" + e.n + ": v 없음");
   }
 }
@@ -339,6 +342,30 @@ section("렌더");
   tog.render(); tog.setLang("en");
   const togLeft = [...new Set((tog.text().match(/[가-힣][가-힣 ·]*/g) || []))].slice(0, 3);
   ok(!/[가-힣]/.test(tog.text()), "한국어로 열고 English 를 눌러도 한글이 없다", togLeft.join(" | "));
+}
+
+// ── 8.5 X 슬롯 규칙 ────────────────────────────────────────────────────
+// 확률·주기형은 일반 칸과 같은 잣대(기대값)로 환산한다. 예전에는 X 만 원값이
+// 섞여 있어서 5턴마다 250% 짜리가 상시 250% 처럼 계산됐다.
+section("X 슬롯");
+{
+  const X = E.HEROES.flatMap(h => h.exp.filter(e => e.slot === "X").map(e => ({h, e})));
+  ok(X.length > 30, "X 스킬 표본", String(X.length));
+  // 100% 를 넘는 X 는 대부분 환산을 빠뜨린 것이다. 진짜 예외는 여기 근거와 함께 적는다.
+  const BIG_OK = {
+    "Dreamcatcher": "표식 대상 한정이지만 주기·확률이 없는 상시 효과 (창병 +150%)",
+    "Rampant": "10회 감쇠 평균 0.535 를 이미 반영한 값 (보병 200%×0.535)",
+  };
+  const tooBig = X.filter(({e}) => e.v > 1.01 && !BIG_OK[e.n]).map(({h, e}) => h.id + "/" + e.n + "=" + e.v);
+  ok(tooBig.length === 0, "환산을 빠뜨린 X 가 없다 (100% 초과는 예외 목록만)", tooBig.join(", "));
+  const staleBig = Object.keys(BIG_OK).filter(n => !X.some(({e}) => e.n === n && e.v > 1.01));
+  ok(staleBig.length === 0, "예외 목록에 남은 사라진 항목 없음", staleBig.join(", "));
+  // 두 병종에 걸리는 스킬은 also 로 담는다 — 조이너 배율이 두 지분을 모두 반영해야 한다
+  const dual = X.filter(({e}) => e.also && e.also.slot === "X");
+  ok(dual.length >= 4, "두 병종 스킬이 also 로 등록돼 있다", String(dual.length));
+  for (const {h, e} of dual)
+    ok(e.tgt !== e.also.tgt || e.k !== e.also.k,
+       h.id + "/" + e.n + " 의 also 가 본체와 다른 대상·축", e.tgt + "/" + e.k);
 }
 
 // ── 9. 영웅 초상 ───────────────────────────────────────────────────────
