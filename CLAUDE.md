@@ -88,7 +88,8 @@ src/
   render.js        출력 HTML 생성 + 프리셋/합계 경고 + init IIFE + </script></body></html>
 test/
   fixtures.mjs     가이드 카운터표 — 이 프로젝트의 정답지 (랠리 11점 + 그것을 뒤집은 수비 11점)
-  unit.mjs         빌드 최신 · 번들 파싱 · 스키마 · 카운터표 무결성 · 랠리/수비 판정 · i18n (브라우저 불필요)
+  dom.mjs          최소 DOM 스텁 — 브라우저 없이 render.js 까지 돌려 결과 HTML 을 받는다
+  unit.mjs         빌드 최신 · 스키마 · 카운터표 무결성 · 랠리/수비 판정 · 렌더 · i18n (브라우저 불필요)
   browser.mjs      Playwright 로 랠리·수비 4상태 · 프리셋 · 합계 경고 · 한글 잔존 · pageerror 검사
 ```
 
@@ -118,6 +119,11 @@ Playwright 는 저장소 의존성이 아니다 — 필요할 때 `npm i -D play
 여기 이름이 올라 있으면 실패로 세지 않고 `🔧 알려진 결함` 으로 찍는다. 고치면 목록에서 지운다 —
 목록에 있는데 통과하면 `✨ 고쳐진 것 같습니다` 로 알려주므로 지우는 걸 잊지 않는다.
 **새 결함을 발견했다고 KNOWN_DEFECTS 에 넣지 말 것.** 이건 이미 파악·기록된 것만 담는 자리다.
+
+`dom.mjs` 는 `getElementById` · `value` · `innerHTML` · `classList` 정도만 흉내내는 스텁이다.
+덕분에 `unit.mjs` 가 **렌더 결과 HTML 과 문단 순서**까지 본다 — 문자열이 있는지만 보면
+"아래 설명문은…" 이 가리키는 문단이 위에 있어도 통과해버린다(실제로 그렇게 배포된 적 있다).
+레이아웃·CSS·클릭 전파는 스텁으로 못 보므로 그건 `browser.mjs` 몫이다.
 
 `fixtures.mjs` 는 성격이 다르다. 결함 목록이 아니라 **가이드 표를 그대로 옮긴 정답지**다.
 `SHEET_POINTS` 11점(판정이 `counter`/`ban` 이어야 하는 자리)과 `QUIET_POINTS`(표가 침묵하는

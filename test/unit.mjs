@@ -1,14 +1,16 @@
 // 브라우저 없이 도는 검사. 커밋 전에 항상 돌린다.
 //   node test/unit.mjs
 //
-// src/i18n.js + data.js + engine.js 를 vm 컨텍스트에 그대로 실행해서 검사한다.
-// render.js 는 최상위 init IIFE 가 document 를 만지므로 실행하지 않고 텍스트로만 훑는다.
+// src/*.js 를 vm 컨텍스트에 그대로 실행해서 검사한다. render.js 는 최상위 init IIFE 가
+// document 를 만지므로 test/dom.mjs 의 최소 DOM 스텁을 물려서 돌린다 — 그래야
+// "화면에 무엇이 어떤 순서로 나오는가"까지 브라우저 없이 검사할 수 있다.
 import {readFileSync} from "node:fs";
 import {fileURLToPath} from "node:url";
 import {dirname, join} from "node:path";
 import vm from "node:vm";
 import {SHEET_POINTS, QUIET_POINTS, GARRISON_POINTS, GARRISON_QUIET, EXPECTED_COUNTS} from "./fixtures.mjs";
 import {PARTS, bundle} from "../build.mjs";
+import {boot} from "./dom.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const src = p => readFileSync(join(ROOT, "src", p), "utf8");
@@ -282,6 +284,61 @@ function scanHangul(file) {
 }
 const hard = scanHangul("engine.js").concat(scanHangul("render.js"));
 ok(hard.length === 0, "L() 로 안 감싼 한글 리터럴 없음", hard.join(" | "));
+
+// ── 8. 렌더 (최소 DOM 스텁) ────────────────────────────────────────────
+// 브라우저 없이 render.js 까지 실제로 돌려서 "무엇이 어떤 순서로 나오는가"를 본다.
+// 문자열 존재 검사만으로는 안 잡히는 것들이 여기서 걸린다 — 빈 화면, 문단 순서.
+section("렌더");
+{
+  const rally = boot("ko").mine([40, 20, 40]).enemy([60, 40, 0]);
+  const html = rally.render();
+  ok(html.length > 500, "랠리 렌더 결과가 비어 있지 않다", html.length + "자");
+  const heads = (html.match(/<h2>[^<]*/g) || []).map(h => h.slice(4, 5));
+  ok(["①", "②", "③", "⑤", "⑥"].every(n => heads.includes(n)),
+     "섹션 ①②③⑤⑥ 이 모두 렌더된다", heads.join(","));
+
+  // 4상태가 화면 문구까지 도달하는가
+  const say = (mine, en) => boot("ko").mine(mine).enemy(en).text();
+  ok(/금지 편성/.test(say([50, 0, 50], [60, 40, 0])), "랠리 ban 문구");
+  ok(/추천 카운터/.test(say([60, 40, 0], [40, 0, 60])), "랠리 counter 문구");
+  ok(/표에 없음/.test(say([40, 40, 20], [60, 40, 0])), "랠리 silent 문구");
+  ok(/해당 행 없음/.test(say([40, 20, 40], [34, 33, 33])), "랠리 noRow 문구");
+
+  const dsay = (mine, inc) => boot("ko").mode("defender").mine(mine).enemy(inc).text();
+  ok(/정석 카운터가 왔습니다/.test(dsay([60, 40, 0], [40, 20, 40])), "수비 threat 문구");
+  ok(/금지 편성으로 왔습니다/.test(dsay([60, 40, 0], [50, 0, 50])), "수비 favorable 문구");
+  ok(/표에 없음/.test(dsay([60, 40, 0], [40, 40, 20])), "수비 silent 문구");
+  ok(/맞는 행 없음/.test(dsay([34, 33, 33], [40, 20, 40])), "수비 noRow 문구");
+
+  // 침묵을 통과로 렌더하지 않는다 (이 프로젝트의 정정 이력 3번).
+  // 문구에 "안전"이라는 낱말 자체는 나온다 — "'안전'이 아니라 '표에 없음'입니다" 로.
+  // 그러니 낱말 유무가 아니라 그 경고가 붙어 있는지를 본다.
+  {
+    const t = dsay([60, 40, 0], [40, 40, 20]);
+    ok(/"안전"이 아니라 "표에 없음"입니다/.test(t),
+       "수비 silent 에 '안전이 아니다' 경고가 붙는다", t.slice(0, 80));
+    ok(!/막아낼 수 있|안전합니다|문제 없습니다/.test(t),
+       "수비 silent 을 안전하다고 말하지 않는다");
+  }
+
+  // 문단 순서 — "아래 설명문은 …" 이 가리키는 인용문이 실제로 아래 있어야 한다.
+  // 텍스트 존재 검사만 하다가 순서가 뒤집힌 채 배포된 적이 있다.
+  const ps = boot("ko").mode("defender").mine([60, 40, 0]).enemy([40, 20, 40]).paras();
+  const iNote = ps.findIndex(t => /아래 설명문은/.test(t));
+  const iWhy = ps.findIndex(t => /만능 방어라 단일 랠리로는 못 깬다/.test(t));
+  ok(iNote >= 0 && iWhy === iNote + 1, "수비: 시점 안내가 가이드 인용문 바로 위",
+     "안내 " + iNote + " · 인용문 " + iWhy);
+  ok(!/아래 설명문은/.test(rally.text()), "랠리에는 시점 안내가 나오지 않는다");
+
+  // 언어: ?lang=en 직행과 토글 경로 둘 다 한글이 남으면 안 된다
+  const en = boot("en").mode("defender").mine([60, 40, 0]).enemy([40, 20, 40]);
+  const enLeft = [...new Set((en.text().match(/[가-힣][가-힣 ·]*/g) || []))].slice(0, 3);
+  ok(!/[가-힣]/.test(en.text()), "?lang=en 렌더에 한글이 없다", enLeft.join(" | "));
+  const tog = boot("ko").mode("defender").mine([60, 40, 0]).enemy([40, 20, 40]);
+  tog.render(); tog.setLang("en");
+  const togLeft = [...new Set((tog.text().match(/[가-힣][가-힣 ·]*/g) || []))].slice(0, 3);
+  ok(!/[가-힣]/.test(tog.text()), "한국어로 열고 English 를 눌러도 한글이 없다", togLeft.join(" | "));
+}
 
 // ── 결과 ───────────────────────────────────────────────────────────────
 console.log("\n" + "=".repeat(62));
