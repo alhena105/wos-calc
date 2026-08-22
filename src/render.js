@@ -1,4 +1,7 @@
 const esc=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+// 영웅 초상. 파일이 없거나 오프라인이면 스스로 사라진다 — 계산 결과에는 영향이 없다.
+const hpic=(h,cls)=>'<img class="hpic'+(cls?" "+cls:"")+'" loading="lazy" alt="" src="img/heroes/'+
+ encodeURIComponent(h.id)+'.webp" onerror="this.remove()">';
 const sTag=s=>'<span class="slot s-'+(["A","B","E","F","G","C","D"].includes(s)?s:"X")+'">'+s+'</span>';
 const statKr=i18nFill({},function(){return{Attack:L("공격력","Attack"),Defense:L("방어력","Defense"),Lethality:L("파괴력","Lethality"),Health:L("체력","Health")};});
 
@@ -16,7 +19,7 @@ function render(d){
       return'<div'+(st==="dead"?' style="opacity:.45"':"")+">"+sTag("X")+esc(L(e.t,e.te||e.t))+
         '<span class="tag t-'+(st==="dead"?"bad":st==="weak"?"warn":"ok")+'">'+tgtName[e.tgt]+" "+tgtRatio(e.tgt,r).toFixed(0)+"%</span></div>";}
     return"<div>"+sTag(e.slot)+esc(L(e.t,e.te||e.t))+(e.also?" "+sTag(e.also.slot):"")+"</div>";}).join("");
-  o+='<tr><td class="b">'+c+'</td><td class="b">'+esc(HN(p.hero))+'<div class="note">'+(LANG==="en"?"":esc(p.hero.en)+" · ")+"Gen "+p.hero.gen+"</div></td><td>"+sk+"</td><td>Lv."+p.wl+"</td></tr>";});
+  o+='<tr><td class="b">'+c+'</td><td class="b"><span class="hrow">'+hpic(p.hero,"lg")+"<span>"+esc(HN(p.hero))+"</span></span>"+'<div class="note">'+(LANG==="en"?"":esc(p.hero.en)+" · ")+"Gen "+p.hero.gen+"</div></td><td>"+sk+"</td><td>Lv."+p.wl+"</td></tr>";});
  o+="</tbody></table></div>";
 
  // 칸 진단
@@ -77,7 +80,7 @@ function render(d){
  o+='<h2>'+L("⑤ 조이너 한계 배율 순위","⑤ Joiner marginal multiplier ranking")+' <span>'+L("S1만 기여 · 상위 4명만 채택","only S1 counts · top 4 are taken")+(gcap<99?(LANG==="en"?' · Gen '+gcap+' and below':' · Gen '+gcap+' 이하'):'')+'</span></h2><div class="panel"><table><thead><tr><th>#</th><th>'+L("조이너","Joiner")+'</th><th>'+L("S1 스킬","S1 skill")+'</th><th>'+L("칸","Slot")+'</th><th>'+L("계산","Working")+'</th><th>'+L("배율","Multiplier")+'</th></tr></thead><tbody>';
  rank.slice(0,14).forEach((x,i)=>{
   const dmg=x.e.slot!=="X"&&SLOTS[x.e.slot]&&SLOTS[x.e.slot].k==="dmg";
-  o+="<tr"+(i<4&&!x.dup?' class="hi"':x.mul<=1.001?' class="dead"':"")+"><td>"+(i+1)+'</td><td class="b">'+esc(HN(x.h))+
+  o+="<tr"+(i<4&&!x.dup?' class="hi"':x.mul<=1.001?' class="dead"':"")+"><td>"+(i+1)+'</td><td class="b"><span class="hrow">'+hpic(x.h)+"<span>"+esc(HN(x.h))+"</span></span>"+
    (x.dup?'<span class="tag t-bad">'+L("리더 중복","already a leader")+'</span>':"")+(x.h.s?'<span class="tag t-ok">'+L("시트","sheet")+'</span>':'<span class="tag t-warn">'+L("이론","theory")+'</span>')+
    '</td><td class="cap">'+esc(L(x.e.t,x.e.te||x.e.t))+"</td><td>"+(x.e.slot==="X"?sTag("X"):sTag(x.e.slot)+(x.e.also?sTag(x.e.also.slot):""))+
    (x.cond?'<div class="note">'+x.cond.split("|")[1]+"</div>":"")+'</td><td class="note">'+x.detail.map(esc).join("<br>")+
@@ -85,12 +88,12 @@ function render(d){
  o+="</tbody></table>";
  const top=rank.filter(x=>!x.dup&&x.mul>1.001).slice(0,4);
  const tSheet=rank.filter(x=>!x.dup&&x.mul>1.001&&x.h.s).slice(0,4);
- o+='<div class="callout co-key" id="rec"><h3>'+L("⭐ 추천 조이너 4명","⭐ Recommended four joiners")+'</h3><p><b>'+top.map(x=>esc(HN(x.h))).join(" · ")+
+ o+='<div class="callout co-key" id="rec"><h3>'+L("⭐ 추천 조이너 4명","⭐ Recommended four joiners")+'</h3><p><b>'+top.map(x=>hpic(x.h,"sm")+esc(HN(x.h))).join(" · ")+
   '</b></p><p class="cap">'+L("딜 배율 ×","Damage multiplier ×")+top.filter(x=>x.e.slot!=="X"&&SLOTS[x.e.slot]&&SLOTS[x.e.slot].k==="dmg").reduce((a,x)=>a*x.mul,1).toFixed(3)+
   L(" · 리더와 겹치는 영웅은 자동 제외했습니다."," · heroes already used as leaders are excluded automatically.")+"</p>"+
   (rank.filter(x=>x.dup).length?'<p class="cap">'+L("🚫 리더 중복 금지: ","🚫 Cannot double as joiners: ")+rank.filter(x=>x.dup).map(x=>esc(HN(x.h))).join(" · ")+"</p>":"")+"</div>"+
   (top.map(x=>x.h.id).join()!==tSheet.map(x=>x.h.id).join()?
-   '<div class="callout co-tip"><h3>'+L("📋 Ton 시트 등재 영웅만","📋 Sheet-listed heroes only")+'</h3><p><b>'+tSheet.map(x=>esc(HN(x.h))).join(" · ")+
+   '<div class="callout co-tip"><h3>'+L("📋 Ton 시트 등재 영웅만","📋 Sheet-listed heroes only")+'</h3><p><b>'+tSheet.map(x=>hpic(x.h,"sm")+esc(HN(x.h))).join(" · ")+
    '</b></p><p class="cap">'+L('위 계산 순위에 <span class="tag t-warn">이론</span> 배지가 붙은 영웅은 실전 시트 조이너 명단에 없습니다. 대개 <b>투자 문턱</b> 때문입니다 — 전설이라 만렙 보유자가 적거나, 그 영웅을 만렙 찍은 사람은 이미 리더로 쓰고 있어 조이너로 못 뺍니다. 실전에서는 시트 쪽을 우선하세요.','Heroes tagged <span class="tag t-warn">theory</span> above are not on the sheet’s practical joiner list, usually because of the <b>investment threshold</b> — legendaries few players max, or whose owners already run them as leaders and cannot spare them as joiners. In practice, prefer the sheet.')+'</p></div>':"")+"</div>";
 
  // 카운터 · 밴드 — 근거는 가이드 카운터표 하나뿐이다

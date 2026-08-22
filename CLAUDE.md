@@ -80,6 +80,8 @@ build.mjs          src/* 를 순서대로 이어붙여 index.html 생성 (번들
 .gitignore         .omc/ (OMC 세션 상태) · node_modules/ · package-lock.json
                    ※ index.html 은 빌드 산출물이지만 Pages 가 서빙하므로 무시하지 않는다
 index.html         빌드 산출물. 직접 편집 금지 — 항상 src 를 고치고 다시 빌드
+img/heroes/*.webp  영웅 초상 45장 (96px, 장당 ~4KB, 합계 181KB). 파일명이 곧 영웅 id 다
+img/ids.json       영웅 id → wosheroes 게임 ID. 초상을 다시 받을 때만 쓴다
 src/
   part1.html       마크업 + CSS + <script> 여는 태그
   i18n.js          LANG 결정, L(ko,en), HN(hero), STR(정적 마크업 대응표)
@@ -112,6 +114,26 @@ node test/browser.mjs   # Playwright 필요. 없으면 실패가 아니라 건�
 `test/browser.mjs` 는 리눅스 CI에서 `/opt/pw-browsers/chromium-*` 를 자동 탐색한다.
 다른 환경이면 `PW_CHROME=/path/to/chrome node test/browser.mjs`.
 Playwright 는 저장소 의존성이 아니다 — 필요할 때 `npm i -D playwright` 로 넣는다.
+
+### 영웅 초상
+
+`img/heroes/<영웅 id>.webp` 를 상대 경로로 부른다. `data.js` 에 URL 을 두지 않는다 —
+**파일명이 곧 매핑**이라 영웅을 추가하면 같은 이름의 파일만 넣으면 된다.
+못 불러오면 `onerror="this.remove()"` 로 조용히 사라진다. 그림이 없어도 계산은 그대로다.
+
+다시 받아야 할 때(새 세대 추가 등):
+
+1. 슬러그는 `en` 을 소문자화하고 공백을 `-` 로 바꾼 것이다 (`Seo-yoon`→`seo-yoon`,
+   `Lumak Bokan`→`lumak-bokan`). 45명 전원 이 규칙으로 맞는다.
+2. `https://wosheroes.com/heroes/<슬러그>` 에서 **`class="hero-portrait-img"` 가 붙은
+   `hero_fullpic_<게임ID>`** 를 집는다. 페이지 첫 이미지를 그냥 긁으면 관련 영웅 것이
+   섞인다 — 실제로 한 번 그렇게 잘못 받았다.
+3. 초상은 `https://wosheroes.com/icons/hero_headpic_<게임ID>.png` (128px PNG, ~33KB).
+   96px webp(q82)로 줄이면 장당 4KB 다.
+4. 받은 뒤 원본과 대조할 때는 **알파를 같은 배경에 합성한 뒤** 비교할 것.
+   `convert("RGB")` 로 알파를 버리면 투명 영역 때문에 멀쩡한 그림도 다르게 나온다.
+
+`unit.mjs` 가 45장 존재·잉여 파일 없음·총용량·렌더된 경로가 실제 파일과 맞는지 검사한다.
 
 ### 테스트가 결함을 다루는 방식
 

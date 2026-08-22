@@ -11,6 +11,7 @@ import vm from "node:vm";
 import {SHEET_POINTS, QUIET_POINTS, GARRISON_POINTS, GARRISON_QUIET, EXPECTED_COUNTS} from "./fixtures.mjs";
 import {PARTS, bundle} from "../build.mjs";
 import {boot} from "./dom.mjs";
+import {existsSync, readdirSync, statSync} from "node:fs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const src = p => readFileSync(join(ROOT, "src", p), "utf8");
@@ -338,6 +339,30 @@ section("렌더");
   tog.render(); tog.setLang("en");
   const togLeft = [...new Set((tog.text().match(/[가-힣][가-힣 ·]*/g) || []))].slice(0, 3);
   ok(!/[가-힣]/.test(tog.text()), "한국어로 열고 English 를 눌러도 한글이 없다", togLeft.join(" | "));
+}
+
+// ── 9. 영웅 초상 ───────────────────────────────────────────────────────
+// img/heroes/<영웅 id>.webp. 파일명이 곧 매핑이라 data.js 에 URL 을 두지 않는다.
+section("영웅 초상");
+{
+  const dir = join(ROOT, "img", "heroes");
+  const files = existsSync(dir) ? readdirSync(dir) : [];
+  const have = new Set(files.filter(f => f.endsWith(".webp")).map(f => f.slice(0, -5)));
+  const missing = E.HEROES.filter(h => !have.has(h.id)).map(h => h.id);
+  ok(missing.length === 0, "영웅 45명 초상이 모두 있다", missing.join(","));
+  const extra = [...have].filter(id => !E.HEROES.some(h => h.id === id));
+  ok(extra.length === 0, "쓰이지 않는 초상 파일이 없다", extra.join(","));
+  const total = files.reduce((a, f) => a + statSync(join(dir, f)).size, 0);
+  ok(total < 600 * 1024, "초상 전체 용량이 600KB 미만", Math.round(total / 1024) + "KB");
+  note("초상 " + have.size + "장 · " + Math.round(total / 1024) + "KB");
+
+  // 렌더에 실제로 박히는가 — 경로가 틀리면 화면에서만 조용히 깨진다
+  const html = boot("ko").mine([40, 20, 40]).enemy([60, 40, 0]).render();
+  const srcs = [...html.matchAll(/<img class="hpic[^"]*"[^>]*src="([^"]+)"/g)].map(m => m[1]);
+  ok(srcs.length >= 4, "리더·조이너 자리에 초상이 렌더된다", srcs.length + "개");
+  const bad = srcs.filter(u => !existsSync(join(ROOT, decodeURIComponent(u))));
+  ok(bad.length === 0, "렌더된 초상 경로가 실제 파일과 맞는다", bad.slice(0, 3).join(","));
+  ok(/onerror="this.remove\(\)"/.test(html), "초상이 깨지면 스스로 사라진다");
 }
 
 // ── 결과 ───────────────────────────────────────────────────────────────
