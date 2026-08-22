@@ -80,12 +80,12 @@ build.mjs          src/* 를 순서대로 이어붙여 index.html 생성 (번들
 .gitignore         .omc/ (OMC 세션 상태) · node_modules/ · package-lock.json
                    ※ index.html 은 빌드 산출물이지만 Pages 가 서빙하므로 무시하지 않는다
 index.html         빌드 산출물. 직접 편집 금지 — 항상 src 를 고치고 다시 빌드
-img/heroes/*.webp  영웅 초상 45장 (96px, 장당 ~4KB, 합계 181KB). 파일명이 곧 영웅 id 다
-img/ids.json       영웅 id → wosheroes 게임 ID. 초상을 다시 받을 때만 쓴다
+img/heroes/*.webp  영웅 초상 61장 (128px, 장당 ~4KB, 합계 233KB). 파일명이 곧 영웅 id 다
+img/ids.json       영웅 id → wosheroes 게임 ID (스킬 데이터 재수집용 참고)
 src/
   part1.html       마크업 + CSS + <script> 여는 태그
   i18n.js          LANG 결정, L(ko,en), HN(hero), STR(정적 마크업 대응표)
-  data.js          영웅 45명 데이터베이스
+  data.js          영웅 61명 데이터베이스 (에픽 9 + Gen 1~17)
   engine.js        계산 로직 + calc() (DOM 읽기)
   render.js        출력 HTML 생성 + 프리셋/합계 경고 + init IIFE + </script></body></html>
 test/
@@ -176,6 +176,20 @@ Playwright 는 저장소 의존성이 아니다 — 필요할 때 `npm i -D play
        te:"50% chance: enemy damage taken +50%"}],
  w:{side:"rally", stat:"Attack", name:"Rally of Fate"}}   // 전용무기 원정스킬
 ```
+
+**영웅은 61명이다** — 에픽 9 + Gen 1~17 각 3명(병종당 1명). 2026-08-22 에 Gen 14~17 열둘과
+에픽 둘(지나·료우키), Gen 13 둘(플로라·기젤라)을 보강했다. Rare 4명(Charlie·Cloris·Eugene·Smith)은
+원정스킬이 채굴·벌목뿐이라 **일부러 뺐다** — 리더도 조이너도 못 되는 영웅이다.
+
+데이터 출처는 <https://wosheroes.com/heroes/<슬러그>> 다(슬러그 = `en` 을 소문자화 + 공백→`-`).
+페이지의 **Expedition Skills**(`Expedition` / `Expedition+`)와 **Exclusive Expedition**(전용무기
+원정스킬 — 여기서 `side`/`stat` 이 나온다)을 읽으면 스키마가 그대로 채워진다.
+기존 45명을 이 방식으로 재수집해 대조했더니 스킬명 135개·무기 38개가 전부 일치했다
+(flint 의 무기 스킬명 `Dragon's Breath`→`Dragonbreath` 한 건만 정정).
+
+**한글명은 <https://www.whiteoutsurvival.wiki/ko/heroes/> 표기로 통일한다.** 영문 페이지와
+한글 페이지의 카드 이미지 파일명이 같아서 짝지을 수 있다. 위키에 없는 넷(료우키·에이든·버사·
+엘리노어)은 사용자가 정해준 이름이다.
 
 - `s:1` = **Ton 시트 등재 영웅**(20명). UI에서 `시트` 배지가 붙고 별도 목록으로도 보여준다.
   세대 분포는 `{에픽 6, G1 3, G2 2, G3 2, G4 2, G5 1, G6 2, G8 2}` — **Gen 9~13 등재는 0명**이다.
@@ -279,5 +293,8 @@ md5sum /tmp/live.html index.html
   화면에 거의 안 나온다 — "class share too low → dead" 문구를 못 봤다고 버그가 아니다.
 - 수비 판정은 표를 뒤집어 읽은 것이라, 랠리 쪽이 다루지 않는 조합은 수비 쪽도 못 다룬다.
 - 표가 다루지 않는 비율(`silent`/`noRow`)에는 아무 대안도 못 준다. 지표를 없앤 대가다.
-- 영웅 데이터는 Gen1~13. 새 세대가 나오면 `data.js` 에 추가하고 `#gcap`(서버 최대 세대) 옵션 범위도 늘려야 한다.
+- 영웅 데이터는 Gen 1~17. 새 세대가 나오면 `data.js` 에 추가하고 `#gcap`(서버 최대 세대) 옵션 범위도 늘려야 한다.
+- Gen 14~17 열둘은 slot 배정에 **판단이 들어간 자리**가 있다 — 주기·확률형의 기대값 환산과,
+  한 스킬이 두 병종에 다르게 걸리는 경우(예: 보병 받피↓ + 창병 딜↑)를 어느 쪽으로 잡을지.
+  스킬 원문은 `t`/`te` 에 양쪽 다 적어뒀으니 이견이 있으면 그것부터 볼 것.
 - `s:1` 시트 등재 표시는 2026-08 시점 기준. 시트가 갱신되면 다시 맞춰야 한다.

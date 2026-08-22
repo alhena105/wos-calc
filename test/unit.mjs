@@ -85,12 +85,12 @@ const STATS = new Set(["Attack", "Defense", "Lethality", "Health"]);
 const ids = E.HEROES.map(h => h.id);
 ok(new Set(ids).size === ids.length, "id 중복 없음",
    ids.filter((x, i) => ids.indexOf(x) !== i).join(","));
-ok(E.HEROES.length === 45, "영웅 45명", "실제 " + E.HEROES.length);
+ok(E.HEROES.length === 61, "영웅 61명", "실제 " + E.HEROES.length);
 
 const errs = [];
 for (const h of E.HEROES) {
   if (!CLS.has(h.cls)) errs.push(h.id + ": cls=" + h.cls);
-  if (!(h.gen >= 0 && h.gen <= 13)) errs.push(h.id + ": gen=" + h.gen);
+  if (!(h.gen >= 0 && h.gen <= 17)) errs.push(h.id + ": gen=" + h.gen);
   if (!h.kr || !h.en) errs.push(h.id + ": kr/en 누락");
   if (h.rar === "epic") {
     if (h.exp.length !== 2) errs.push(h.id + ": 에픽인데 원정스킬 " + h.exp.length + "개");
@@ -349,7 +349,7 @@ section("영웅 초상");
   const files = existsSync(dir) ? readdirSync(dir) : [];
   const have = new Set(files.filter(f => f.endsWith(".webp")).map(f => f.slice(0, -5)));
   const missing = E.HEROES.filter(h => !have.has(h.id)).map(h => h.id);
-  ok(missing.length === 0, "영웅 45명 초상이 모두 있다", missing.join(","));
+  ok(missing.length === 0, "영웅 전원 초상이 있다", missing.join(","));
   const extra = [...have].filter(id => !E.HEROES.some(h => h.id === id));
   ok(extra.length === 0, "쓰이지 않는 초상 파일이 없다", extra.join(","));
   const total = files.reduce((a, f) => a + statSync(join(dir, f)).size, 0);
@@ -384,7 +384,8 @@ section("초상 픽커");
     ok(idsIn.includes(""), cls + " 픽커에 선택 해제 버튼이 있다");
     picked.push(...heroes);
   }
-  ok(new Set(picked).size === 45, "45명이 정확히 한 번씩 픽커에 들어간다", String(new Set(picked).size));
+  ok(new Set(picked).size === E.HEROES.length, "영웅 전원이 정확히 한 번씩 픽커에 들어간다",
+     String(new Set(picked).size) + "/" + E.HEROES.length);
   ok(/<img class="hpic"/.test(a.el("gInf").innerHTML), "픽커 버튼에 초상이 들어간다");
   ok(/제로니모/.test(a.el("sInf").innerHTML), "요약에 현재 리더가 표시된다", a.el("sInf").innerHTML.slice(0, 60));
 

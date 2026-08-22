@@ -200,12 +200,22 @@ function syncPicker(selId,sumId,gridId){
  if(grid)[].forEach.call(grid.querySelectorAll(".pk"),b=>{
    b.setAttribute("aria-pressed",String(b.dataset.id===(h?h.id:"")));});
 }
+// 팝오버라서 바깥을 눌렀을 때·Esc 에 닫히는 건 직접 붙여야 한다(<details> 기본 동작 아님)
+let outsideBound=false;
+function closeOnOutside(){
+ if(outsideBound)return; outsideBound=true;
+ const shut=e=>PICKERS.forEach(p=>{const d=document.getElementById(p[1]);
+   if(d&&d.open&&!(e&&e.target&&d.contains(e.target)))d.open=false;});
+ document.addEventListener("click",shut);
+ document.addEventListener("keydown",e=>{if(e.key==="Escape")shut(null);});
+}
 function mountPicker(selId,detId,sumId,gridId,cls){
  const grid=document.getElementById(gridId); if(!grid)return;
  grid.innerHTML='<button type="button" class="pk none" data-id="">'+S("pick")+"</button>"+
   HEROES.filter(h=>h.cls===cls).sort((a,b)=>a.gen-b.gen||HN(a).localeCompare(HN(b)))
    .map(h=>'<button type="button" class="pk" data-id="'+h.id+'" title="'+esc(HN(h))+'">'+
-     hpic(h)+"<b>"+esc(HN(h))+"</b><i>"+genLbl(h)+"</i></button>").join("");
+     hpic(h)+"<b>"+esc(HN(h))+"</b><i>"+genLbl(h)+
+     (h.s?'<span class="tag t-ok">'+L("시트","sheet")+"</span>":"")+"</i></button>").join("");
  grid.onclick=e=>{const b=e.target.closest(".pk"); if(!b)return;
   const sel=document.getElementById(selId);
   sel.value=b.dataset.id;
@@ -225,9 +235,10 @@ function rebuildSelects(){
    .map(h=>'<option value="'+h.id+'">'+HN(h)+" ("+(h.gen?"Gen"+h.gen:L("에픽","Epic"))+")</option>").join("");};
  mk("hInf","infantry");mk("hLan","lancer");mk("hMar","marksman");
  document.getElementById("gcap").innerHTML='<option value="99">'+L("전체","All")+"</option>"+
-  [1,2,3,4,5,6,7,8,9,10,11,12,13].map(g=>'<option value="'+g+'">'+(LANG==="en"?"Gen "+g+" and below":"Gen "+g+" 이하")+"</option>").join("");
+  [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17].map(g=>'<option value="'+g+'">'+(LANG==="en"?"Gen "+g+" and below":"Gen "+g+" 이하")+"</option>").join("");
  Object.keys(keep).forEach(id=>{if(keep[id])document.getElementById(id).value=keep[id];});
  PICKERS.forEach(p=>mountPicker(p[0],p[1],p[2],p[3],p[4]));
+ closeOnOutside();
  mountPresets("rPre",["r1","r2","r3"]); mountPresets("ePre",["e1","e2","e3"]);
  showSum("rSum",["r1","r2","r3"]); showSum("eSum",["e1","e2","e3"]);
 }

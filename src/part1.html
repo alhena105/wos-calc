@@ -48,7 +48,7 @@ tr.dead td{opacity:.5}
 .hrow{display:flex;align-items:center;gap:0}
 /* 초상 픽커 — 상태는 숨은 <select> 가 들고 있고, 이건 그 위에 얹은 화면일 뿐이다.
    <details> 를 쓰는 이유: 열고 닫기·키보드·모바일이 브라우저 기본 동작으로 해결된다. */
-.pick{min-width:0}
+.pick{min-width:0;position:relative}
 .pick>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;
  padding:5px 10px 5px 6px;border:1px solid var(--line);border-radius:10px;background:var(--card2);
  color:var(--ink);font-size:13px;min-height:38px}
@@ -57,17 +57,26 @@ tr.dead td{opacity:.5}
 .pick[open]>summary{border-color:var(--accent)}
 .pick[open]>summary::after{content:"▴"}
 .pick>summary .cap{font-size:11px}
-.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(74px,1fr));gap:5px;margin-top:6px;
- max-height:296px;overflow:auto;padding:7px;border:1px solid var(--line);border-radius:10px;background:var(--card)}
-.pk{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 2px;border:1px solid transparent;
- border-radius:9px;background:none;color:var(--ink);font:inherit;cursor:pointer;text-align:center}
-.pk:hover{background:var(--card2)}
-.pk:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
-.pk[aria-pressed="true"]{border-color:var(--accent);background:#16233c}
-.pk .hpic{margin:0}
-.pk b{font-size:11px;font-weight:600;line-height:1.15;word-break:keep-all}
-.pk i{font-size:9.5px;font-style:normal;color:var(--muted)}
-.pk.none{justify-content:center;color:var(--sub);font-size:11px}
+/* 격자는 팝오버로 띄운다. 흐름에 두면 리더 칸 폭(2열)에 갇히고, 열 때마다
+   옆의 전무 입력이 아래로 밀린다. */
+.pgrid{position:absolute;z-index:30;top:calc(100% + 6px);left:0;width:min(560px,calc(100vw - 40px));
+ display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px;
+ max-height:400px;overflow:auto;padding:9px;border:1px solid var(--line);border-radius:12px;
+ background:var(--card);box-shadow:0 14px 36px rgba(0,0,0,.55)}
+.pick.right .pgrid{left:auto;right:0}
+@media(max-width:720px){.pgrid{width:calc(100vw - 32px);left:0;right:auto}
+ .pick.right .pgrid{left:0;right:auto}}
+.pk{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 6px 9px;border:1px solid var(--line);
+ border-radius:12px;background:var(--card2);color:var(--ink);font:inherit;cursor:pointer;text-align:center;
+ min-height:124px;justify-content:flex-start;transition:border-color .12s,background .12s,transform .12s}
+.pk:hover{background:#243052;border-color:#3d4c72;transform:translateY(-1px)}
+.pk:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.pk[aria-pressed="true"]{border-color:var(--accent);background:#16233c;box-shadow:0 0 0 1px var(--accent) inset}
+.pk .hpic{width:64px;height:64px;border-radius:12px;margin:0}
+.pk b{font-size:12.5px;font-weight:700;line-height:1.2;word-break:keep-all}
+.pk i{font-size:10.5px;font-style:normal;color:var(--muted);display:flex;gap:4px;align-items:center;justify-content:center}
+.pk .t-ok{margin:0;padding:0 5px;font-size:9.5px}
+.pk.none{min-height:124px;justify-content:center;color:var(--sub);font-size:12px;border-style:dashed}
 .slot{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:21px;padding:0 7px;border-radius:6px;font-size:11px;font-weight:800;margin-right:6px}
 .s-A{background:#3a2a0e;color:#ffd45e;border:1px solid #6b571b}
 .s-B{background:#122544;color:#5b9dff;border:1px solid #25467c}
@@ -111,7 +120,7 @@ footer a{color:var(--accent);text-decoration:none}
   <div class="grid">
     <div><label id="lbInf"></label><div class="row2"><details class="pick" id="pInf"><summary id="sInf"></summary><div class="pgrid" id="gInf"></div></details><input id="wInf" type="number" min="0" max="10" value="10" title="전무 레벨"></div><select id="hInf" hidden></select></div>
     <div><label id="lbLan"></label><div class="row2"><details class="pick" id="pLan"><summary id="sLan"></summary><div class="pgrid" id="gLan"></div></details><input id="wLan" type="number" min="0" max="10" value="10" title="전무 레벨"></div><select id="hLan" hidden></select></div>
-    <div><label id="lbMar"></label><div class="row2"><details class="pick" id="pMar"><summary id="sMar"></summary><div class="pgrid" id="gMar"></div></details><input id="wMar" type="number" min="0" max="10" value="10" title="전무 레벨"></div><select id="hMar" hidden></select></div>
+    <div><label id="lbMar"></label><div class="row2"><details class="pick right" id="pMar"><summary id="sMar"></summary><div class="pgrid" id="gMar"></div></details><input id="wMar" type="number" min="0" max="10" value="10" title="전무 레벨"></div><select id="hMar" hidden></select></div>
   </div>
   <div style="margin-top:14px" class="grid">
     <div><label id="lbMine"></label><div class="ratio3"><input id="r1" type="number" value="48" placeholder="보"><input id="r2" type="number" value="4" placeholder="창"><input id="r3" type="number" value="48" placeholder="궁"></div><div id="rPre"></div><div id="rSum" class="sumwarn"></div></div>

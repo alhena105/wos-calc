@@ -28,7 +28,8 @@ function makeEl(id) {
       toggle: (c, on) => (on === undefined ? (set.has(c) ? set.delete(c) : set.add(c))
                                            : on ? set.add(c) : set.delete(c)),
     },
-    addEventListener() {}, dispatchEvent() {}, appendChild() {},
+    addEventListener() {}, dispatchEvent() {}, appendChild() {}, contains: () => false,
+    open: false,
     querySelector: () => null, querySelectorAll: () => [],
     scrollIntoView() {},
   };
@@ -43,6 +44,7 @@ export function boot(lang = "ko") {
   };
   const document = {
     title: "",
+    addEventListener() {},
     documentElement: {lang: ""},
     getElementById: el,
     createElement: () => makeEl("new"),
