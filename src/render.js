@@ -182,6 +182,39 @@ function showSum(sumId,ids){
  const n=v.map(x=>(x/t*100).toFixed(0)).join("/");
  el.innerHTML=L("⚠️ 입력 합이 <b>"+t+"</b>입니다 → <b>"+n+"</b> 로 정규화해서 계산합니다. 의도한 비율이 맞는지 확인하세요.","⚠️ Your entries add to <b>"+t+"</b> → normalised to <b>"+n+"</b> for the calculation. Check that this is the ratio you meant.");
 }
+
+// ── 초상 픽커 ──────────────────────────────────────────────────────────
+// 진짜 상태는 여전히 숨은 <select id="hInf|hLan|hMar"> 가 들고 있다.
+// calc() 도 테스트도 그 value 만 읽으므로, 이 위젯은 화면일 뿐이고 판정 로직과 무관하다.
+// <details> 를 쓰면 열고 닫기·Esc·키보드 포커스가 브라우저 기본 동작으로 해결된다.
+const PICKERS=[["hInf","pInf","sInf","gInf","infantry"],
+               ["hLan","pLan","sLan","gLan","lancer"],
+               ["hMar","pMar","sMar","gMar","marksman"]];
+const genLbl=h=>h.gen?"G"+h.gen:L("에픽","Epic");
+function syncPicker(selId,sumId,gridId){
+ const h=byId[document.getElementById(selId).value];
+ document.getElementById(sumId).innerHTML=h
+   ? hpic(h)+"<span>"+esc(HN(h))+'</span><span class="cap">'+genLbl(h)+(h.s?" · "+L("시트","sheet"):"")+"</span>"
+   : '<span class="cap">'+S("pick")+"</span>";
+ const grid=document.getElementById(gridId);
+ if(grid)[].forEach.call(grid.querySelectorAll(".pk"),b=>{
+   b.setAttribute("aria-pressed",String(b.dataset.id===(h?h.id:"")));});
+}
+function mountPicker(selId,detId,sumId,gridId,cls){
+ const grid=document.getElementById(gridId); if(!grid)return;
+ grid.innerHTML='<button type="button" class="pk none" data-id="">'+S("pick")+"</button>"+
+  HEROES.filter(h=>h.cls===cls).sort((a,b)=>a.gen-b.gen||HN(a).localeCompare(HN(b)))
+   .map(h=>'<button type="button" class="pk" data-id="'+h.id+'" title="'+esc(HN(h))+'">'+
+     hpic(h)+"<b>"+esc(HN(h))+"</b><i>"+genLbl(h)+"</i></button>").join("");
+ grid.onclick=e=>{const b=e.target.closest(".pk"); if(!b)return;
+  const sel=document.getElementById(selId);
+  sel.value=b.dataset.id;
+  document.getElementById(detId).open=false;
+  syncPicker(selId,sumId,gridId);
+  sel.dispatchEvent(new Event("change",{bubbles:true}));};
+ syncPicker(selId,sumId,gridId);
+}
+
 // ── 셀렉트 재구성 (언어 전환 시 재호출) ──
 function rebuildSelects(){
  const keep={hInf:0,hLan:0,hMar:0,gcap:0};
@@ -194,6 +227,7 @@ function rebuildSelects(){
  document.getElementById("gcap").innerHTML='<option value="99">'+L("전체","All")+"</option>"+
   [1,2,3,4,5,6,7,8,9,10,11,12,13].map(g=>'<option value="'+g+'">'+(LANG==="en"?"Gen "+g+" and below":"Gen "+g+" 이하")+"</option>").join("");
  Object.keys(keep).forEach(id=>{if(keep[id])document.getElementById(id).value=keep[id];});
+ PICKERS.forEach(p=>mountPicker(p[0],p[1],p[2],p[3],p[4]));
  mountPresets("rPre",["r1","r2","r3"]); mountPresets("ePre",["e1","e2","e3"]);
  showSum("rSum",["r1","r2","r3"]); showSum("eSum",["e1","e2","e3"]);
 }
@@ -204,6 +238,7 @@ function rebuildSelects(){
  document.getElementById("hInf").value="jeronimo";
  document.getElementById("hLan").value="mia";
  document.getElementById("hMar").value="alonso";
+ PICKERS.forEach(p=>syncPicker(p[0],p[2],p[3]));
  const seg=(a,b)=>{document.getElementById(a).classList.add("on");document.getElementById(b).classList.remove("on");};
  const eLab=()=>{const d=document.getElementById("mDef").classList.contains("on");
   document.getElementById("eLab").innerHTML=d?S("lbEnD"):S("lbEnA");};

@@ -365,6 +365,37 @@ section("영웅 초상");
   ok(/onerror="this.remove\(\)"/.test(html), "초상이 깨지면 스스로 사라진다");
 }
 
+// ── 10. 초상 픽커 ──────────────────────────────────────────────────────
+// 진짜 상태는 숨은 <select> 가 들고 있고 픽커는 화면일 뿐이다.
+// 그래도 "모든 영웅이 어딘가에서 고를 수 있는가"는 검사해야 한다.
+section("초상 픽커");
+{
+  const a = boot("ko");
+  a.render();
+  const grids = {infantry: "gInf", lancer: "gLan", marksman: "gMar"};
+  const picked = [];
+  for (const [cls, gid] of Object.entries(grids)) {
+    const html = a.el(gid).innerHTML;
+    const idsIn = [...html.matchAll(/data-id="([a-z0-9]*)"/g)].map(m => m[1]);
+    const heroes = idsIn.filter(Boolean);
+    const want = E.HEROES.filter(h => h.cls === cls).map(h => h.id);
+    ok(heroes.length === want.length && want.every(id => heroes.includes(id)),
+       cls + " 픽커에 그 병종 영웅이 모두 있다", heroes.length + "/" + want.length);
+    ok(idsIn.includes(""), cls + " 픽커에 선택 해제 버튼이 있다");
+    picked.push(...heroes);
+  }
+  ok(new Set(picked).size === 45, "45명이 정확히 한 번씩 픽커에 들어간다", String(new Set(picked).size));
+  ok(/<img class="hpic"/.test(a.el("gInf").innerHTML), "픽커 버튼에 초상이 들어간다");
+  ok(/제로니모/.test(a.el("sInf").innerHTML), "요약에 현재 리더가 표시된다", a.el("sInf").innerHTML.slice(0, 60));
+
+  // 언어를 바꾸면 픽커도 다시 만들어져야 한다
+  a.setLang("en");
+  const enHtml = ["gInf", "gLan", "gMar"].map(g => a.el(g).innerHTML).join("");
+  const left = [...new Set((enHtml.match(/[가-힣][가-힣 ·]*/g) || []))].slice(0, 3);
+  ok(!/[가-힣]/.test(enHtml), "언어를 바꾸면 픽커 이름도 영어가 된다", left.join(" | "));
+  ok(/Jeronimo/.test(a.el("sInf").innerHTML), "요약도 같이 바뀐다", a.el("sInf").innerHTML.slice(0, 60));
+}
+
 // ── 결과 ───────────────────────────────────────────────────────────────
 console.log("\n" + "=".repeat(62));
 console.log("통과 " + pass + " · 실패 " + fail + (known ? " · 알려진 결함 " + known + "건" : ""));

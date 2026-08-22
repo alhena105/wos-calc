@@ -114,6 +114,25 @@ await setRatio(ko, "r", [40, 20, 40]);
 await setRatio(ko, "e", [60, 40, 0]);
 await ko.waitForTimeout(80);
 
+// ── 2.5 초상 픽커 ──────────────────────────────────────────────────────
+section("초상 픽커");
+await ko.click("#pLan > summary");
+await ko.waitForTimeout(60);
+ok(await ko.isVisible("#gLan .pk[data-id='karol']"), "픽커를 열면 후보가 보인다");
+await ko.click("#gLan .pk[data-id='karol']");
+await ko.waitForTimeout(80);
+ok(await ko.evaluate(() => document.getElementById("hLan").value) === "karol",
+   "초상을 누르면 숨은 select 값이 바뀐다");
+ok(!(await ko.evaluate(() => document.getElementById("pLan").open)), "고르면 픽커가 닫힌다");
+ok(/카롤/.test(await outText(ko)), "고른 영웅이 결과에 반영된다");
+{
+  const broken = await ko.evaluate(() =>
+    [...document.querySelectorAll(".pgrid img.hpic")].filter(i => i.complete && i.naturalWidth === 0).length);
+  ok(broken === 0, "픽커 초상이 깨지지 않는다", broken + "개 깨짐");
+}
+await ko.click("#gLan .pk[data-id='mia']");
+await ko.waitForTimeout(60);
+
 // ── 3. 입력 보조 ───────────────────────────────────────────────────────
 section("프리셋 · 합계 경고");
 await ko.click("#rPre .chip:has-text('60/40')");

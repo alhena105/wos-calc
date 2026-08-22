@@ -115,6 +115,19 @@ node test/browser.mjs   # Playwright 필요. 없으면 실패가 아니라 건�
 다른 환경이면 `PW_CHROME=/path/to/chrome node test/browser.mjs`.
 Playwright 는 저장소 의존성이 아니다 — 필요할 때 `npm i -D playwright` 로 넣는다.
 
+### 영웅 선택 UI — 초상 픽커
+
+리더 3칸은 `<details class="pick">` 안에 그 병종 영웅을 초상 격자로 깔고, 눌러서 고른다.
+**진짜 상태는 여전히 숨은 `<select id="hInf|hLan|hMar" hidden>` 가 들고 있다** —
+`calc()` 도 테스트도 그 `value` 만 읽으므로 판정 로직은 픽커를 전혀 모른다.
+픽커는 값을 넣고 `change` 이벤트를 쏘는 화면 계층일 뿐이다. 이 분리를 깨지 말 것.
+
+`<details>` 를 쓰는 이유는 열고 닫기·키보드 포커스·모바일 동작을 브라우저가 해주기 때문이다.
+직접 만든 드롭다운으로 바꾸면 그걸 전부 다시 짜야 한다.
+
+`rebuildSelects()` 가 픽커도 다시 만든다(언어가 바뀌면 이름이 바뀌므로).
+격자 첫 칸은 **선택 해제**(`data-id=""`) 버튼이다 — 리더를 비우고 계산할 수 있어야 한다.
+
 ### 영웅 초상
 
 `img/heroes/<영웅 id>.webp` 를 상대 경로로 부른다. `data.js` 에 URL 을 두지 않는다 —
