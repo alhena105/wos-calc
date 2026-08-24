@@ -119,7 +119,7 @@ footer a{color:var(--accent);text-decoration:none}
    새 색을 만들지 않는다. 위의 CSS 변수만 쓴다. */
 /* 12조각 입력 — 병종 3줄(보→창→궁) × 슬롯 4장 카드.
    행 순서는 화면 전용이다. 엔진 타이브레이크의 GEAR_TROOP_ORDER 와 별개다. */
-.gwrap{display:grid;grid-template-columns:repeat(auto-fit,minmax(322px,1fr));gap:14px;margin-top:8px}
+.gwrap{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(322px,100%),1fr));gap:14px;margin-top:8px}
 .gsec{min-width:0}
 .gsec>h4{margin:0 0 8px;font-size:13.5px;display:flex;align-items:center;gap:8px;font-weight:700}
 .gsec>h4 .dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
@@ -168,6 +168,13 @@ input[type=range]{padding:0;accent-color:var(--accent);background:none;border:no
 .gio{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:12px}
 .gio .chip{margin:0}
 .xscroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+/* 순서표는 열이 열 개다. 긴 설명이 들어가는 '작업' 칸이 폭을 다 먹어서 조각 이름이
+   공백에서 두 줄로 접혔다(1400px 에서도 71px). 나머지 칸은 안 접고, 접혀도 되는 건
+   '작업' 칸 하나뿐이다. 넘치면 .xscroll 이 표만 가로로 굴린다. */
+#tab-gear table th,#tab-gear table td{white-space:nowrap}
+#gSteps td.work{white-space:normal;min-width:190px}
+#tab-gear table .note,#tab-gear table .cap{white-space:normal}
+.pc{white-space:nowrap}
 .xscroll>table{min-width:520px}
 textarea{width:100%;background:var(--card2);color:var(--ink);border:1px solid var(--line);
  border-radius:9px;padding:9px 10px;font-size:12px;font-family:ui-monospace,Menlo,Consolas,monospace;

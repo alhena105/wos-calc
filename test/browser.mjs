@@ -323,17 +323,28 @@ ok((await ko.textContent("#gaSum")).trim() === "", "합이 100이면 경고 없�
   ok(noName === 0, "그리드 입력과 체크박스에 aria-label 이 있다", noName + "개 누락");
 }
 
-// 모바일 폭에서 본문이 가로로 삐져나가지 않는다 (순서표는 자기 컨테이너 안에서만 스크롤)
-{
-  const over = await ko.evaluate(() => {
-    const s = document.createElement("style");
-    s.id = "pwnarrow"; s.textContent = "html{width:390px!important}";
-    document.head.appendChild(s);
-    const w = document.body.scrollWidth;
-    s.remove();
-    return w;
-  });
-  ok(over <= 400, "390px 폭에서 본문이 가로로 넘치지 않는다", over + "px");
+// 표 칸이 두 줄로 접히지 않는다.
+// 배포본에서 순서표의 '보병 헬멧' 이 공백에서 접혔다 — '작업' 칸이 폭을 다 먹어
+// 조각 칸이 1400px 화면에서도 71px 였다. 접혀도 되는 건 '작업' 칸 하나뿐이다.
+// 뱃지가 섞인 칸은 rect 가 여러 개라 줄 수 판정이 안 되므로 텍스트만 있는 칸만 본다.
+for (const w of [1400, 1024, 800, 600, 390, 320]) {
+  const r = await ko.evaluate(width => {
+    const st = document.createElement("style");
+    st.id = "pwnarrow"; st.textContent = "html{width:" + width + "px!important}";
+    document.head.appendChild(st);
+    const lines = el => { const g = document.createRange(); g.selectNodeContents(el);
+      return new Set([...g.getClientRects()].map(x => Math.round(x.top))).size; };
+    const bad = [];
+    document.querySelectorAll("#tab-gear table td, #tab-gear table th").forEach(c => {
+      if (c.children.length || !c.textContent.trim()) return;
+      if (lines(c) > 1) bad.push(c.textContent.trim().slice(0, 14));
+    });
+    const body = document.body.scrollWidth;
+    st.remove();
+    return {body, bad: [...new Set(bad)]};
+  }, w);
+  ok(r.bad.length === 0, w + "px 에서 표 칸이 두 줄로 접히지 않는다", r.bad.join(" / "));
+  ok(r.body <= w + 2, w + "px 에서 본문이 가로로 넘치지 않는다", r.body + "px");
 }
 
 // 편성 탭으로 돌아가면 밴드 판정이 그대로다

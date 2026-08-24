@@ -394,11 +394,11 @@ function gearRender(plan,input){
   o+='<p class="note">'+L("무료로 올릴 구간이 없습니다 — 모든 조각이 이미 마일스톤 직전이거나 완성입니다.",
     "Nothing to raise for free — every piece is already at a milestone edge or finished.")+"</p>";
  }else{
-  o+='<table><thead><tr><th>'+L("조각","Piece")+'</th><th>'+L("현재","Now")+'</th><th>'+L("무료로 도달","Free up to")+
+  o+='<div class="xscroll"><table><thead><tr><th>'+L("조각","Piece")+'</th><th>'+L("현재","Now")+'</th><th>'+L("무료로 도달","Free up to")+
    '</th><th>'+L("XP 상대 단가","Relative XP cost")+"</th></tr></thead><tbody>"+
-   plan.freeXp.map(function(f){return "<tr><td class=\"b\">"+esc(pieceName(f.troop,f.slot))+
+   plan.freeXp.map(function(f){return "<tr><td class=\"b pc\">"+esc(pieceName(f.troop,f.slot))+
      "</td><td>+"+f.from+'</td><td class="big">+'+f.to+"</td><td>×"+f.xpRel.toFixed(1)+"</td></tr>";}).join("")+
-   "</tbody></table>"+
+   "</tbody></table></div>"+
    '<p class="note">'+L("싼 구간부터 적었습니다. 상대 단가는 <b>금장비 곡선 근사</b>라 순서 판단에만 쓰세요 — 홍색 전용 XP 표는 원자료에 없습니다.",
      "Cheapest bands first. The relative cost approximates the gold-gear curve, so use it for ordering only — no red-gear XP table exists in the source.")+"</p>";
  }
@@ -410,7 +410,7 @@ function gearRender(plan,input){
  if(!plan.tiers.length){
   o+='<p class="note">'+L("올릴 것이 없습니다.","Nothing left to upgrade.")+"</p>";
  }else{
-  o+='<table><thead><tr><th>'+L("효율","Efficiency")+'</th><th>'+L("스텝","Steps")+'</th><th>'+
+  o+='<div class="xscroll"><table><thead><tr><th>'+L("효율","Efficiency")+'</th><th>'+L("스텝","Steps")+'</th><th>'+
    L("미스릴","Mithril")+'</th><th>'+L("쓸모","Usable")+'</th><th>'+L("누적 미스릴","Cumulative")+
    "</th></tr></thead><tbody>"+
    plan.tiers.map(function(t,i){
@@ -420,7 +420,7 @@ function gearRender(plan,input){
       (t.leftover?'<div class="tag t-bad">'+L("쓸모 0","no value")+"</div>":
        drop>=25?'<div class="tag t-bad">'+L("−"+drop+"%","−"+drop+"%")+"</div>":"")+
       "</td><td>"+t.steps+"</td><td>"+t.mithril+"</td><td>+"+Math.round(t.useful)+"%p</td><td>"+t.cumMithril+"</td></tr>";}).join("")+
-   "</tbody></table>"+
+   "</tbody></table></div>"+
    '<p class="cap">'+L("효율 = (필요 축 가중 × 원정 보너스 + 아레나 가중 × 탐험 보너스) ÷ 미스릴. 청크 효율은 각 조각 안에서 <b>단조 감소</b>하므로 효율 내림차순이 장기 로드맵으로는 옳습니다. 다만 <b>임의 예산에서 최적은 아닙니다</b> — 다음 청크가 커서 안 들어가면 미스릴이 놉니다. 그래서 예산 슬라이더는 순서를 자르지 않고 <b>그 예산 안에서 최선인 조합을 따로 풉니다</b>.",
      "Efficiency = (axis weight × expedition bonus + arena weight × exploration bonus) ÷ mithril. Chunk efficiency <b>decreases monotonically</b> within each piece, so descending efficiency is the right long-run roadmap. It is <b>not optimal at an arbitrary budget</b>, though — if the next chunk is too big, mithril sits idle. So the budget slider does not truncate the list; it <b>solves for the best combination</b> at that budget.")+"</p>";
  }
@@ -449,9 +449,9 @@ function gearRender(plan,input){
     return "<tr"+(done?' class="done"':s.leftover?' class="dead"':"")+"><td>"+(x.i+1)+
      '</td><td><input type="checkbox" class="gchk" data-k="'+k+'"'+(done?" checked":"")+
      ' aria-label="'+esc(pieceName(s.troop,s.slot)+" Lv."+s.toLevel)+" "+L("완료","done")+'"></td>'+
-     '<td class="b">'+esc(pieceName(s.troop,s.slot))+"</td>"+
+     '<td class="b pc">'+esc(pieceName(s.troop,s.slot))+"</td>"+
      "<td>"+sideName(s.side)+'<div class="note">'+gainName(s.gain)+"</div></td>"+
-     "<td>"+work+(s.tolls.length?'<div class="note">'+
+     '<td class="work">'+work+(s.tolls.length?'<div class="note">'+
        L(s.tolls.map(function(t){return "Lv."+t.level+(t.kind==="axis"?" "+gearDirName(GEAR_MS.filter(function(m){return m.level===t.level;})[0][s.side])+" · 이 병종이 안 쓰는 축":" 탐험 · 아레나 전용");}).join(" / ")+" — 미스릴만 내고 지나갑니다",
          s.tolls.map(function(t){return "Lv."+t.level+(t.kind==="axis"?" gives an axis this troop does not use":" is arena-only");}).join(" · ")+" — pure toll")+"</div>":"")+"</td>"+
      '<td class="big">+'+Math.round(s.useful)+"%p"+
