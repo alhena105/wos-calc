@@ -1090,6 +1090,46 @@ function gearTroopWeight(troop,ratios,attackWeight){
  return attackWeight*a/100+(1-attackWeight)*d/100;
 }
 
+/* 예산 안에서 최선인 조합을 정확히 고른다.
+   ⚠️ 효율 내림차순 그리디는 <b>청크 경계에서만</b> 최적이다. 임의 예산에서는 다음 청크가
+      너무 커서 안 들어가면 미스릴이 논다 — 실제로 예산 300 에서 원본 표보다 60%p 뒤졌다.
+      조각마다 "앞에서 몇 청크까지 살까"만 고르면 되므로(청크는 순서를 못 건너뛴다)
+      다중선택 배낭 문제이고, 미스릴이 전부 10 단위라 DP 로 정확히 푼다.
+   steps 는 gearPlan 이 낸 순서대로여야 한다. 반환은 고른 step 인덱스 집합. */
+function gearBudgetPick(steps,budget){
+ const by={}, order=[];
+ steps.forEach(function(s,i){
+  const k=s.troop+"/"+s.slot;
+  if(!by[k]){by[k]=[];order.push(k);}
+  by[k].push({i,m:s.mithril,v:s.useful});
+ });
+ // 조각마다 접두사 후보: 0개, 1개, … n개
+ const opts=order.map(function(k){
+  const out=[{m:0,v:0,take:[]}]; let m=0,v=0,take=[];
+  by[k].forEach(function(c){m+=c.m; v+=c.v; take=take.concat([c.i]); out.push({m,v,take:take.slice()});});
+  return out;
+ });
+ const unit=steps.reduce(function(g,s){const a=Math.abs(s.mithril),b=g;
+  let x=a,y=b; while(y){const t=x%y; x=y; y=t;} return x||b;},0)||1;
+ const cap=Math.floor(Math.max(0,budget)/unit);
+ let best=new Array(cap+1).fill(null); best[0]={v:0,take:[]};
+ opts.forEach(function(list){
+  const next=new Array(cap+1).fill(null);
+  for(let c=0;c<=cap;c++){
+   if(!best[c])continue;
+   list.forEach(function(o){
+    const nc=c+Math.round(o.m/unit); if(nc>cap)return;
+    const nv=best[c].v+o.v;
+    if(!next[nc]||nv>next[nc].v+1e-9)next[nc]={v:nv,take:best[c].take.concat(o.take)};
+   });
+  }
+  best=next;
+ });
+ let top={v:-1,take:[]};
+ best.forEach(function(x){if(x&&x.v>top.v)top=x;});
+ return {value:top.v,set:new Set(top.take)};
+}
+
 /* 업그레이드 순서 계산.
    input = {ratios:{attack,defense}, attackWeight, arenaPriority, mithrilPerWeek,
             gear:{병종:{슬롯:[마스터리, 홍색레벨]}}, axis?}
@@ -1791,6 +1831,7 @@ function gearRender(plan,input){
  // 여기서 총액으로 덮어쓰면 안 된다 — 조각 레벨을 잠깐 올렸다 내리는 사이 총액이 줄었을 때
  // 예산이 그 값에 눌러앉아, 총액이 회복돼도 스텝이 계속 감춰진다(Orca 브라우저에서 잡혔다).
  var budget=GEAR_BUDGET===null?T.mithril:Math.min(GEAR_BUDGET,T.mithril);
+ var full=budget>=T.mithril;
  var box=gEl("gBudgetBox");
  if(box)box.hidden=!plan.steps.length;
  var bud=gEl("gBudget");
@@ -1799,12 +1840,26 @@ function gearRender(plan,input){
   bud.step="10";   // 총액에 비례한 눈금은 값이 엉뚱하게 스냅된다. 미스릴은 10 단위면 충분하다.
   bud.value=String(budget);
  }
- var shown=plan.steps.filter(function(s){return s.cumMithril<=budget;});
+ // 순서대로 자르면 다음 청크가 커서 안 들어갈 때 미스릴이 논다. 예산 안에서 최선인 조합을
+ // 정확히 풀어서 고른다 — 그래서 여기 뜨는 목록은 위 순서의 앞부분이 아닐 수 있다.
+ var pick=full?null:gearBudgetPick(plan.steps,budget);
+ var shown=plan.steps.map(function(s,i){return {s:s,i:i};})
+   .filter(function(x){return full||pick.set.has(x.i);});
+ var shownM=shown.reduce(function(a,x){return a+x.s.mithril;},0);
+ var trunc=0,cut=0;
+ plan.steps.forEach(function(s){if(s.cumMithril<=budget){trunc+=s.useful;cut++;}});
  var bn=gEl("gBudgetN");
- if(bn)bn.innerHTML=L("미스릴 <b>"+budget+"</b> 안에서 실행 가능한 <b>"+shown.length+"</b>스텝 / 전체 "+
-   plan.steps.length+"스텝 · 원정 +"+(shown.length?shown[shown.length-1].cumExpedition:0)+"%p",
-   "<b>"+shown.length+"</b> of "+plan.steps.length+" steps fit in <b>"+budget+
-   "</b> mithril · expedition +"+(shown.length?shown[shown.length-1].cumExpedition:0)+"%p");
+ if(bn)bn.innerHTML=full
+  ? L("전체 "+plan.steps.length+"스텝 · 미스릴 "+T.mithril+" · 실제 쓸모 +"+Math.round(T.useful)+"%p",
+      "All "+plan.steps.length+" steps · "+T.mithril+" mithril · usable +"+Math.round(T.useful)+"%p")
+  : L("미스릴 <b>"+budget+"</b> 로 살 수 있는 <b>최선의 조합</b> — "+shown.length+"스텝 · 미스릴 "+shownM+
+      " · 실제 쓸모 <b>+"+Math.round(pick.value)+"%p</b>"+
+      (pick.value>trunc+1e-9?" <span class=\"tag t-ok\">순서대로 "+cut+"스텝만 자르는 것보다 +"+
+        Math.round(pick.value-trunc)+"%p</span>":""),
+      "<b>Best combination</b> for <b>"+budget+"</b> mithril — "+shown.length+" steps · "+shownM+
+      " mithril · usable <b>+"+Math.round(pick.value)+"%p</b>"+
+      (pick.value>trunc+1e-9?" <span class=\"tag t-ok\">+"+Math.round(pick.value-trunc)+
+        "%p over taking the first "+cut+" in order</span>":""));
 
  var doneSteps=plan.steps.filter(function(s){return GEAR_DONE[key(s)];});
  var doneM=doneSteps.reduce(function(a,s){return a+s.mithril;},0);
@@ -1879,8 +1934,8 @@ function gearRender(plan,input){
        drop>=25?'<div class="tag t-bad">'+L("−"+drop+"%","−"+drop+"%")+"</div>":"")+
       "</td><td>"+t.steps+"</td><td>"+t.mithril+"</td><td>+"+Math.round(t.useful)+"%p</td><td>"+t.cumMithril+"</td></tr>";}).join("")+
    "</tbody></table>"+
-   '<p class="cap">'+L("효율 = (필요 축 가중 × 원정 보너스 + 아레나 가중 × 탐험 보너스) ÷ 미스릴. 청크 효율은 각 조각 안에서 <b>단조 감소</b>하므로, 효율 내림차순으로 사는 것이 <b>모든 예산 지점에서</b> 최적입니다 — 휴리스틱이 아니라 교환 논증으로 증명되는 성질입니다.",
-     "Efficiency = (axis weight × expedition bonus + arena weight × exploration bonus) ÷ mithril. Chunk efficiency <b>decreases monotonically</b> within each piece, so buying in descending order of efficiency is optimal <b>at every budget point</b> — this is an exchange argument, not a heuristic.")+"</p>";
+   '<p class="cap">'+L("효율 = (필요 축 가중 × 원정 보너스 + 아레나 가중 × 탐험 보너스) ÷ 미스릴. 청크 효율은 각 조각 안에서 <b>단조 감소</b>하므로 효율 내림차순이 장기 로드맵으로는 옳습니다. 다만 <b>임의 예산에서 최적은 아닙니다</b> — 다음 청크가 커서 안 들어가면 미스릴이 놉니다. 그래서 예산 슬라이더는 순서를 자르지 않고 <b>그 예산 안에서 최선인 조합을 따로 풉니다</b>.",
+     "Efficiency = (axis weight × expedition bonus + arena weight × exploration bonus) ÷ mithril. Chunk efficiency <b>decreases monotonically</b> within each piece, so descending efficiency is the right long-run roadmap. It is <b>not optimal at an arbitrary budget</b>, though — if the next chunk is too big, mithril sits idle. So the budget slider does not truncate the list; it <b>solves for the best combination</b> at that budget.")+"</p>";
  }
  o+="</div>";
  if(top)top.innerHTML=o;
@@ -1897,13 +1952,14 @@ function gearRender(plan,input){
    '</th><th>'+L("작업","Work")+'</th><th>'+L("쓸모","Usable")+'</th><th>'+L("효율","Eff")+'</th><th>'+
    L("미스릴","Mithril")+'</th><th>'+L("누적","Cumulative")+'</th><th>'+L("마스터리 선행","Mastery first")+
    "</th></tr></thead><tbody>"+
-   shown.map(function(s,i){
-    var k=key(s), done=!!GEAR_DONE[k];
+   (function(){var cm=0;return shown.map(function(x,i){
+    var s=x.s, k=key(s), done=!!GEAR_DONE[k];
+    cm+=s.mithril;
     // 통행료를 지나는 스텝은 왜 미스릴이 더 드는지가 표기로 드러나야 한다
     var work="Lv."+s.fromLevel+" → "+
       s.tolls.map(function(t){return "Lv."+t.level+"("+(t.kind==="axis"?L("불필요","unused"):L("탐험","exploration"))+") → ";}).join("")+
       "Lv."+s.toLevel;
-    return "<tr"+(done?' class="done"':s.leftover?' class="dead"':"")+"><td>"+(i+1)+
+    return "<tr"+(done?' class="done"':s.leftover?' class="dead"':"")+"><td>"+(x.i+1)+
      '</td><td><input type="checkbox" class="gchk" data-k="'+k+'"'+(done?" checked":"")+
      ' aria-label="'+esc(pieceName(s.troop,s.slot)+" Lv."+s.toLevel)+" "+L("완료","done")+'"></td>'+
      '<td class="b">'+esc(pieceName(s.troop,s.slot))+"</td>"+
@@ -1914,14 +1970,14 @@ function gearRender(plan,input){
      '<td class="big">+'+Math.round(s.useful)+"%p"+
      (Math.round(s.useful)!==s.expedition?'<div class="note">'+L("원값 +","raw +")+s.expedition+"%p</div>":"")+
      "</td><td>"+s.eff.toFixed(3)+"</td><td>"+s.mithril+
-     "</td><td>"+s.cumMithril+"</td><td>"+(s.masteryPre?
+     "</td><td>"+cm+"</td><td>"+(s.masteryPre?
        '<span class="tag t-warn">M'+s.masteryPre.from+"→M"+s.masteryPre.to+'</span><div class="note">'+
        L("에센스 ","essence ")+s.masteryPre.essence+L(" · 신화 "," · mythic ")+s.masteryPre.mythic+"</div>":
-       '<span class="note">—</span>')+"</td></tr>";}).join("")+
+       '<span class="note">—</span>')+"</td></tr>";}).join("");})()+
    "</tbody></table></div>";
-  if(shown.length<plan.steps.length)
-   b+='<p class="note">'+L("예산을 줄여서 "+(plan.steps.length-shown.length)+"스텝을 감췄습니다. 슬라이더를 올리면 전체가 보입니다.",
-     (plan.steps.length-shown.length)+" steps hidden by the budget slider. Raise it to see them all.")+"</p>";
+  if(!full)
+   b+='<p class="note">'+L("<b>#</b> 는 전체 순서에서의 번호입니다. 예산 안에서 최선인 조합을 정확히 골랐기 때문에 <b>앞에서부터 잘라낸 목록이 아닙니다</b> — 번호가 건너뛸 수 있습니다. 슬라이더를 끝까지 올리면 전체 "+plan.steps.length+"스텝이 순서대로 보입니다.",
+     "<b>#</b> is the position in the full order. This is the <b>optimal combination</b> for the budget, not the first N of the list, so numbers may skip. Raise the slider to see all "+plan.steps.length+" steps in order.")+"</p>";
  }
  b+="</div>";
 

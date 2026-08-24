@@ -29,7 +29,7 @@ function note(t) { console.log("   " + t); }
 // ── 로더 ───────────────────────────────────────────────────────────────
 const EXPORTS = "GEAR_MS,GEAR_SLOTS,GEAR_SLOT_ORDER,GEAR_TROOPS,GEAR_TROOP_ORDER,GEAR_MASTERY," +
   "GEAR_XP_BANDS,GEAR_DEFAULTS,GEAR_CAVEATS,GEAR_WARNINGS,I18N_TABLES," +
-  "GEAR_AXIS,GEAR_AXIS_SUB,GEAR_ORDER,GEAR_ORDER_STAGES,gearAtoms,gearHull,gearMasteryCost,gearLevelCap,gearTroopWeight,gearPlan";
+  "GEAR_AXIS,GEAR_AXIS_SUB,GEAR_ORDER,GEAR_ORDER_STAGES,gearBudgetPick,gearAtoms,gearHull,gearMasteryCost,gearLevelCap,gearTroopWeight,gearPlan";
 function load(lang) {
   const code = src("i18n.js") + src("gear-data.js") + src("gear-engine.js") +
     "\n;globalThis.__api={" + EXPORTS + "};\n";
@@ -404,6 +404,77 @@ section("원본 우선순위표 대조");
      "infantry/belt,infantry/helmet,lancer/boots,lancer/gauntlet",
      "완성용으로 밀린 조각이 표의 회색 칸과 같다",
      on.leftover.pieces.map(x => x.troop + "/" + x.slot).sort().join(","));
+}
+
+// ── 6.7 예산 해 — 원본 표 순서보다 못하면 안 된다 ────────────────────────
+// 효율 내림차순으로 "앞에서 자르기"는 청크 경계에서만 최적이다. 임의 예산에서는 다음 청크가
+// 커서 안 들어가면 미스릴이 논다 — 실제로 예산 300 에서 원본 표 순서에 60%p 뒤졌다.
+// 그래서 예산 슬라이더는 다중선택 배낭을 정확히 푼다. 그 해가 표 순서보다 못하면 회귀다.
+section("예산 해 vs 원본 표 순서");
+{
+  const blank = {infantry: {}, lancer: {}, marksman: {}};
+  for (const t of Object.keys(blank)) for (const sl of G.GEAR_SLOT_ORDER) blank[t][sl] = [G.GEAR_MASTERY.max, 0];
+  const p0 = G.gearPlan(Object.assign({}, FIXTURE, {gear: blank}));
+  const RED = [20, 60, 100];
+
+  // 표 9~32 를 차례로 사는 시퀀스를 풀어, 예산별 누적 쓸모 곡선을 만든다
+  const cells = [];
+  for (const t of Object.keys(G.GEAR_ORDER)) for (const sl of G.GEAR_SLOT_ORDER)
+    G.GEAR_ORDER[t][sl].forEach((n, k) => { if (n !== null && k > 0) cells.push({n, t, sl, lv: RED[k - 1]}); });
+  cells.sort((a, b) => a.n - b.n);
+  const at = {}, curve = [{m: 0, v: 0}];
+  let cm = 0, cv = 0;
+  for (const c of cells) {
+    const side = G.GEAR_SLOTS[c.sl].side;
+    const from = at[c.t + "/" + c.sl] || 0;
+    G.GEAR_MS.filter(x => x.level > from && x.level <= c.lv).forEach(x => {
+      cm += x.mithril;
+      if (x.tier === "expedition") cv += (G.GEAR_AXIS[c.t][x[side]] || 0) * x.bonus;
+    });
+    at[c.t + "/" + c.sl] = c.lv;
+    curve.push({m: cm, v: cv});
+  }
+  const chartAt = b => curve.reduce((best, q) => q.m <= b ? Math.max(best, q.v) : best, 0);
+  ok(cells.length === 24, "표에서 푼 빨강 구매 24건", String(cells.length));
+
+  const lose = [], gain = [];
+  for (let b = 0; b <= p0.totals.mithril; b += 10) {
+    const ours = G.gearBudgetPick(p0.steps, b).value, ch = chartAt(b);
+    if (ours < ch - 1e-9) lose.push(b + "(" + ours + "<" + ch + ")");
+    if (ours > ch + 1e-9) gain.push(b);
+  }
+  ok(lose.length === 0, "10 단위 전 예산에서 우리 해가 표 순서보다 못한 곳이 없다", lose.slice(0, 5).join(" "));
+  ok(gain.length > 0, "우리 해가 표보다 나은 예산 구간이 있다", gain.length + "곳");
+
+  // 순서대로 자르기와 비교 — 정확해가 절대 뒤지지 않고, 실제로 앞서는 예산이 있다
+  const truncAt = b => p0.steps.reduce((a, s) => s.cumMithril <= b ? a + s.useful : a, 0);
+  const bad = [], better = [];
+  for (let b = 0; b <= p0.totals.mithril; b += 10) {
+    const ex = G.gearBudgetPick(p0.steps, b).value, tr = truncAt(b);
+    if (ex < tr - 1e-9) bad.push(b);
+    if (ex > tr + 1e-9) better.push(b);
+  }
+  ok(bad.length === 0, "정확해가 순서대로 자르기보다 못한 예산이 없다", bad.slice(0, 5).join(" "));
+  ok(better.length > 0, "순서대로 자르기가 손해 보는 예산이 실제로 있다", better.length + "곳");
+  // 예산 300 은 이 결함을 처음 잡은 자리다 — 회귀 표식으로 박아 둔다
+  ok(G.gearBudgetPick(p0.steps, 300).value >= 270,
+     "예산 300 에서 최소 +270%p (예전 순서 자르기는 210 이었다)",
+     String(G.gearBudgetPick(p0.steps, 300).value));
+  // 고른 조합은 조각마다 앞에서부터 연속이어야 한다 (청크는 건너뛸 수 없다)
+  {
+    const set = G.gearBudgetPick(p0.steps, 500).set;
+    const seen = {}, holes = [];
+    p0.steps.forEach((s, i) => {
+      const k = s.troop + "/" + s.slot;
+      seen[k] = seen[k] || [];
+      seen[k].push(set.has(i));
+    });
+    Object.keys(seen).forEach(k => {
+      const a = seen[k];
+      if (a.some((x, i) => !x && a.slice(i).some(Boolean))) holes.push(k);
+    });
+    ok(holes.length === 0, "고른 조합에 청크 건너뜀이 없다", holes.join(", "));
+  }
 }
 
 // ── 7. 엣지 케이스 ─────────────────────────────────────────────────────

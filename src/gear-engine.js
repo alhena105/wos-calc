@@ -78,6 +78,46 @@ function gearTroopWeight(troop,ratios,attackWeight){
  return attackWeight*a/100+(1-attackWeight)*d/100;
 }
 
+/* 예산 안에서 최선인 조합을 정확히 고른다.
+   ⚠️ 효율 내림차순 그리디는 <b>청크 경계에서만</b> 최적이다. 임의 예산에서는 다음 청크가
+      너무 커서 안 들어가면 미스릴이 논다 — 실제로 예산 300 에서 원본 표보다 60%p 뒤졌다.
+      조각마다 "앞에서 몇 청크까지 살까"만 고르면 되므로(청크는 순서를 못 건너뛴다)
+      다중선택 배낭 문제이고, 미스릴이 전부 10 단위라 DP 로 정확히 푼다.
+   steps 는 gearPlan 이 낸 순서대로여야 한다. 반환은 고른 step 인덱스 집합. */
+function gearBudgetPick(steps,budget){
+ const by={}, order=[];
+ steps.forEach(function(s,i){
+  const k=s.troop+"/"+s.slot;
+  if(!by[k]){by[k]=[];order.push(k);}
+  by[k].push({i,m:s.mithril,v:s.useful});
+ });
+ // 조각마다 접두사 후보: 0개, 1개, … n개
+ const opts=order.map(function(k){
+  const out=[{m:0,v:0,take:[]}]; let m=0,v=0,take=[];
+  by[k].forEach(function(c){m+=c.m; v+=c.v; take=take.concat([c.i]); out.push({m,v,take:take.slice()});});
+  return out;
+ });
+ const unit=steps.reduce(function(g,s){const a=Math.abs(s.mithril),b=g;
+  let x=a,y=b; while(y){const t=x%y; x=y; y=t;} return x||b;},0)||1;
+ const cap=Math.floor(Math.max(0,budget)/unit);
+ let best=new Array(cap+1).fill(null); best[0]={v:0,take:[]};
+ opts.forEach(function(list){
+  const next=new Array(cap+1).fill(null);
+  for(let c=0;c<=cap;c++){
+   if(!best[c])continue;
+   list.forEach(function(o){
+    const nc=c+Math.round(o.m/unit); if(nc>cap)return;
+    const nv=best[c].v+o.v;
+    if(!next[nc]||nv>next[nc].v+1e-9)next[nc]={v:nv,take:best[c].take.concat(o.take)};
+   });
+  }
+  best=next;
+ });
+ let top={v:-1,take:[]};
+ best.forEach(function(x){if(x&&x.v>top.v)top=x;});
+ return {value:top.v,set:new Set(top.take)};
+}
+
 /* 업그레이드 순서 계산.
    input = {ratios:{attack,defense}, attackWeight, arenaPriority, mithrilPerWeek,
             gear:{병종:{슬롯:[마스터리, 홍색레벨]}}, axis?}

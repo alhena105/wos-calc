@@ -221,7 +221,18 @@ await ko.evaluate(() => { const b = gBudget; b.value = "60"; b.dispatchEvent(new
 await ko.waitForTimeout(80);
 {
   const rows = await ko.evaluate(() => document.querySelectorAll("#gSteps tbody tr").length);
-  ok(rows === 4, "예산 60 이면 eff 2.000~1.000 구간 4행만 남는다", String(rows));
+  ok(rows === 4, "예산 60 이면 4행만 남는다", String(rows));
+  // 예산 슬라이더는 앞에서 자르는 게 아니라 그 예산 안 최선을 정확히 푼다
+  ok(/최선의 조합/.test(await ko.textContent("#gBudgetN")), "예산 안내가 '최선의 조합'이라고 말한다",
+     await ko.textContent("#gBudgetN"));
+  {
+    const cmp = await ko.evaluate(() => {
+      const p = gearPlan(gearInput()), b = 300;
+      let tr = 0; p.steps.forEach(s => { if (s.cumMithril <= b) tr += s.useful; });
+      return {exact: gearBudgetPick(p.steps, b).value, trunc: tr};
+    });
+    ok(cmp.exact >= cmp.trunc, "예산 300 에서 정확해가 순서 자르기 이상", JSON.stringify(cmp));
+  }
 }
 await ko.evaluate(() => { const b = gBudget; b.value = b.max; b.dispatchEvent(new Event("input", {bubbles: true})); });
 await ko.waitForTimeout(80);
