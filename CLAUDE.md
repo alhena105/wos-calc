@@ -77,26 +77,35 @@ SkillMod 칸 포화 · 위젯 발동 · 병종 전용 스킬 사망 · 조이너
 ```
 build.mjs          src/* 를 순서대로 이어붙여 index.html 생성 (번들러 없음, 순수 연결)
 .gitattributes     작업 트리를 LF 로 고정 — 안 그러면 core.autocrlf 가 산출물 바이트를 바꿔 --check 가 깨진다
-.gitignore         .omc/ (OMC 세션 상태) · node_modules/ · package-lock.json
+.gitignore         .omc/ (OMC 세션 상태) · node_modules/ · package.json · package-lock.json
                    ※ index.html 은 빌드 산출물이지만 Pages 가 서빙하므로 무시하지 않는다
 index.html         빌드 산출물. 직접 편집 금지 — 항상 src 를 고치고 다시 빌드
 img/heroes/*.webp  영웅 초상 61장 (128px, 장당 ~4KB, 합계 233KB). 파일명이 곧 영웅 id 다
 img/ids.json       영웅 id → wosheroes 게임 ID (스킬 데이터 재수집용 참고)
 src/
-  part1.html       마크업 + CSS + <script> 여는 태그
-  i18n.js          LANG 결정, L(ko,en), HN(hero), STR(정적 마크업 대응표)
+  part1.html       마크업 + CSS + <script> 여는 태그 · 탭 바 · #tab-comp / #tab-gear
+  i18n.js          LANG 결정, L(ko,en), HN(hero), STR(정적 마크업 대응표), i18nFill
   data.js          영웅 61명 데이터베이스 (에픽 9 + Gen 1~17)
-  engine.js        계산 로직 + calc() (DOM 읽기)
-  render.js        출력 HTML 생성 + 프리셋/합계 경고 + init IIFE + </script></body></html>
+  gear-data.js     홍색 장비 상수 — 마일스톤·슬롯·병종·마스터리·XP 구간·경고 (L() 을 쓰므로 i18n 뒤)
+  engine.js        편성 계산 로직 + calc() (DOM 읽기)
+  gear-engine.js   장비 계산 — 순수 함수만. DOM 접근도 상수 하드코딩도 없다
+  render.js        편성 출력 HTML + 프리셋/합계 경고 + init IIFE
+  gear-render.js   장비 탭 렌더 + 탭 전환 + JSON 입출력 + 닫는 script/body/html 태그
 test/
-  fixtures.mjs     가이드 카운터표 — 이 프로젝트의 정답지 (랠리 11점 + 그것을 뒤집은 수비 11점)
-  dom.mjs          최소 DOM 스텁 — 브라우저 없이 render.js 까지 돌려 결과 HTML 을 받는다
-  unit.mjs         빌드 최신 · 스키마 · 카운터표 무결성 · 랠리/수비 판정 · 렌더 · i18n (브라우저 불필요)
-  browser.mjs      Playwright 로 랠리·수비 4상태 · 프리셋 · 합계 경고 · 한글 잔존 · pageerror 검사
+  fixtures.mjs     가이드 카운터표 — 편성 쪽 정답지 (랠리 11점 + 그것을 뒤집은 수비 11점)
+  dom.mjs          최소 DOM 스텁 — 브라우저 없이 render.js·gear-render.js 까지 돌려 결과 HTML 을 받는다
+                   PARTS 는 build.mjs 에서 끌어오므로 파트가 늘면 자동으로 따라간다
+  unit.mjs         편성: 빌드 최신 · 스키마 · 카운터표 무결성 · 랠리/수비 판정 · 렌더 · i18n
+  gear-unit.mjs    장비: 청크·마스터리·순서 28스텝·무료 XP·엣지 케이스 골든 픽스처 (정답지가 이 파일 안에 있다)
+  browser.mjs      Playwright 로 랠리·수비 4상태 · 프리셋 · 장비 탭 · 딥링크 · 한글 잔존 · pageerror 검사
 ```
 
-**조립 순서가 곧 의존 순서다: `part1 → i18n → data → engine → render`.**
-`i18n` 이 `data` 보다 앞인 이유 — `engine.js` 가 최상위에서 `L()` 을 호출한다.
+**조립 순서가 곧 의존 순서다:
+`part1 → i18n → data → gear-data → engine → gear-engine → render → gear-render`.**
+`i18n` 이 앞인 이유 — `engine.js` 도 `gear-data.js` 도 최상위에서 `L()` 을 호출한다.
+`gear-render` 가 맨 뒤인 이유 — 닫는 `script`·`body`·`html` 태그를 마지막 파트가 낸다.
+※ **주석 안이라도 닫는 script 태그를 문자 그대로 쓰지 말 것.** HTML 파서는 주석을 모르고
+거기서 스크립트를 끊는다 — 실제로 그렇게 한 번 페이지가 통째로 죽었다(테스트가 잡았다).
 `build.mjs` 는 배너 한 줄도 넣지 않는다. 순수 연결이라야 "분해 전후 바이트 동일"이 검증 수단으로 남는다.
 
 단일 파일을 고집하는 이유: 서버 없이 파일로 열려야 하고, GitHub Pages에 그대로 올라가야 하며,
@@ -105,10 +114,11 @@ test/
 ### 명령
 
 ```bash
-node build.mjs          # src → index.html
-node build.mjs --check  # 산출물이 src 와 일치하는지만 확인 (쓰지 않음)
-node test/unit.mjs      # 빠름. 커밋 전 항상
-node test/browser.mjs   # Playwright 필요. 없으면 실패가 아니라 건너뛴다(exit 0)
+node build.mjs           # src → index.html
+node build.mjs --check   # 산출물이 src 와 일치하는지만 확인 (쓰지 않음)
+node test/unit.mjs       # 편성. 빠름. 커밋 전 항상
+node test/gear-unit.mjs  # 장비. 빠름. 커밋 전 항상
+node test/browser.mjs    # Playwright 필요. 없으면 실패가 아니라 건너뛴다(exit 0)
 ```
 
 `test/browser.mjs` 는 리눅스 CI에서 `/opt/pw-browsers/chromium-*` 를 자동 탐색한다.
@@ -163,6 +173,59 @@ Playwright 는 저장소 의존성이 아니다 — 필요할 때 `npm i -D play
 `fixtures.mjs` 는 성격이 다르다. 결함 목록이 아니라 **가이드 표를 그대로 옮긴 정답지**다.
 `SHEET_POINTS` 11점(판정이 `counter`/`ban` 이어야 하는 자리)과 `QUIET_POINTS`(표가 침묵하는
 자리 — `silent`/`noRow` 로 나와야 한다)로 나뉜다. 침묵을 통과로 렌더링하지 않는지가 후자의 요점이다.
+
+---
+
+## 장비 탭 (홍색 영웅장비)
+
+편성 계산기와 **탭**으로 나뉜다. `?tab=gear` 로 딥링크되고 기본은 `comp`.
+편성 쪽 마크업은 `#tab-comp` 로 감싸기만 했고 판정 로직은 손대지 않았다.
+
+### 왜 "청크" 로 자르는가 — 이 설계의 핵심
+
+능력부여 마일스톤은 다섯이다. **원정**(Lv.20·60·100)만 랠리·성 전투·개리슨에 적용되고,
+**탐험**(Lv.40·80)은 아레나 전용이라 랠리 리더에겐 기여가 **0**이다. 그런데 건너뛸 수 없다 →
+탐험은 비용이지 이득이 아니다. 그래서 **통행료**라고 부른다.
+
+```
+청크 = (지나가야 하는 탐험 마일스톤) + 그 뒤 첫 원정 마일스톤
+```
+
+**탐험만 남는 꼬리는 청크로 만들지 않는다.** 이렇게 잘라야 "Lv.40 에서 멈춤" 이라는,
+미스릴만 내고 실전 이득이 0인 선택지가 **구조적으로** 나올 수 없다.
+
+### 정렬 — 효율 내림차순 그리디
+
+`eff = (원정 보너스 + 아레나 가중 × 탐험 보너스) / 미스릴`.
+청크 효율은 **각 조각 안에서 단조 감소**하므로, 효율 내림차순 그리디가 **모든 예산 지점에서**
+누적 보너스를 최대화한다. 휴리스틱이 아니라 교환 논증으로 증명되는 성질이다.
+**다른 정렬을 창의적으로 시도하지 말 것.**
+
+동률 타이브레이크: ① 병종 가중(`공격가중×공격비율 + (1−공격가중)×수비비율`) →
+② 주 스탯 여부(슬롯 stat === 병종 mainStat) → ③ 좌우 방향(딜러는 attack, 탱커는 defense) →
+④ `GEAR_TROOP_ORDER`/`GEAR_SLOT_ORDER`/seq 고정 순서.
+구현은 조각마다 포인터를 두고 매번 후보 중 최선을 뽑는 방식이라 **seq 순서가 자동으로 지켜진다**.
+
+### 정답지는 `test/gear-unit.mjs` 안에 있다
+
+편성 쪽 `fixtures.mjs` 와 같은 성격이다 — 28스텝 전체 순서·티어 4개·무료 XP 10건·총계
+(미스릴 1560 · 원정 +1020%p · 에센스 4400 · 신화 120)·엣지 케이스 6건이 박혀 있다.
+**어긋나면 엔진이 틀린 것이지 픽스처가 틀린 게 아니다.** 이 도메인은 직관이 반복해서 틀리는 곳이라
+수치를 먼저 고정하고 엔진을 맞췄다.
+
+### 규칙
+
+- **`gear-engine.js` 에 숫자를 하드코딩하지 않는다.** 상수는 전부 `gear-data.js` 에 있고,
+  `gear-unit.mjs` 가 `0`·`1`·`100`(항등원과 % 환산) 말고 다른 숫자가 있으면 실패시킨다.
+- **`gear-engine.js` 는 DOM 을 만지지 않는다.** 입력은 `gear-render.js` 가 읽어서 넘긴다.
+- 마스터리 상한을 넘는 입력은 **경고만 하고 계산은 진행**한다 — 우리 표보다 게임 쪽이 1차 자료다.
+- `+1` 이 미돌파라는 안내를 그리드 아래에 **상시** 노출한다. 이 오해가 비용을 두 배로 틀리게 한다.
+- 경고(`GEAR_WARNINGS`)와 한계(`GEAR_CAVEATS`)는 **접지 않는다.** 브라우저 검사가 `details` 개수 0을 본다.
+- 입력칸은 `input` 만 듣는다. `change` 까지 듣게 하면 포커스가 빠지는 순간 표가 다시 그려져서
+  **"숫자를 고치고 바로 체크박스를 누르는" 첫 클릭이 삼켜진다**(실제로 그렇게 잡혔다).
+  범위를 벗어난 값 되쓰기만 `change` 에서 하고, 값이 안 바뀌면 다시 그리지 않는다.
+- `GEAR_CAVEATS`·`GEAR_WARNINGS` 는 `i18nFill()` 로 감쌌다. 첨부 원본은 최상위 `const` 였는데
+  그러면 로드 시점 언어로 굳는다(작업 규칙 3).
 
 ---
 
@@ -282,7 +345,7 @@ md5sum /tmp/live.html index.html
 ## 작업 규칙
 
 1. **`index.html` 을 직접 고치지 않는다.** `src/*` 를 고치고 `node build.mjs`.
-2. **커밋 전 `node test/unit.mjs` 를 돌린다.** 판정 로직이나 UI 문구를 건드렸으면 `test/browser.mjs` 도.
+2. **커밋 전 `node test/unit.mjs` 와 `node test/gear-unit.mjs` 를 돌린다.** 판정 로직이나 UI 문구를 건드렸으면 `test/browser.mjs` 도.
 3. **새 문자열은 반드시 `L("한글","English")`** 로 감싼다. `unit.mjs` 가 L() 밖의 한글 리터럴을 스캔한다.
    그리고 **언어에 따라 값이 달라지는 최상위 표는 반드시 `i18nFill()` 로 만든다.**
    `const X={...L()...}` 로 두면 로드 시점 언어로 굳어서, `?lang=en` 직행은 멀쩡한데
@@ -308,3 +371,8 @@ md5sum /tmp/live.html index.html
   한 스킬이 두 병종에 다르게 걸리는 경우(예: 보병 받피↓ + 창병 딜↑)를 어느 쪽으로 잡을지.
   스킬 원문은 `t`/`te` 에 양쪽 다 적어뒀으니 이견이 있으면 그것부터 볼 것.
 - `s:1` 시트 등재 표시는 2026-08 시점 기준. 시트가 갱신되면 다시 맞춰야 한다.
+- 장비: **홍색 전용 XP 표가 원자료에 없다.** `GEAR_XP_BANDS` 는 금장비 곡선 근사라 무료 구간의
+  **순서 판단에만** 쓴다. 절대량(며칠 걸리나)은 못 낸다.
+- 장비: 능력부여 보너스가 전역인지 조각 한정인지 원자료에 없다 → 상대 비교 전용이다.
+- 장비: 마일스톤별 탐험/원정 계열 구분은 게임 내 확인값이고 원자료(성장 가이드 비용표)에는
+  스탯 종류만 있다. 패치로 바뀌면 `GEAR_MS` 만 고치면 된다.
