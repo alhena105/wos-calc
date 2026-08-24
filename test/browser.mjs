@@ -219,7 +219,17 @@ await ko.click("#gSteps tbody tr:first-child .gchk");
 await ko.waitForTimeout(80);
 ok(/체크 완료/.test(await ko.textContent("#gOutTop")), "체크하면 진행률이 요약에 뜬다");
 // 마스터리 상한 경고 — 계산은 그대로 진행한다
+// 마스터리는 돌파에만 걸린다. M11 은 Lv.20 을 뚫을 수 있고 Lv.40 은 못 하므로 +39 까지 정상이다.
+// (예전에는 상한을 +20 으로 잡아 게임에서 멀쩡한 M11/+39 에 경고가 떴다.)
 await ko.fill("#gm_infantry_helmet", "11");
+await ko.fill("#gl_infantry_helmet", "39");
+await ko.waitForTimeout(80);
+ok((await ko.textContent("#gGridWarn")).trim() === "", "M11 / +39 는 경고가 없다",
+   await ko.textContent("#gGridWarn"));
+await ko.fill("#gl_infantry_helmet", "40");
+await ko.waitForTimeout(80);
+ok(/상한 \+39/.test(await ko.textContent("#gGridWarn")), "M11 / +40 은 상한 +39 초과로 경고",
+   await ko.textContent("#gGridWarn"));
 await ko.fill("#gl_infantry_helmet", "90");
 await ko.waitForTimeout(80);
 ok(/상한을 넘는/.test(await ko.textContent("#gGridWarn")), "마스터리 상한 초과 경고");

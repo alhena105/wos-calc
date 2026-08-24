@@ -161,9 +161,21 @@ section("마스터리 승급");
   ok(b.essence === 290 && b.mythic === 9, "M13→M15 = 에센스 290 · 신화 9", JSON.stringify(b));
   ok(c.essence === 130 && c.mythic === 3, "M12→M13 = 에센스 130 · 신화 3", JSON.stringify(c));
   ok(G.gearMasteryCost(15, 15).essence === 0, "같은 레벨이면 비용 0");
-  ok(G.gearLevelCap(11) === 20 && G.gearLevelCap(13) === 60 && G.gearLevelCap(15) === 100,
-     "마스터리별 레벨 상한 (M11=20 · M13=60 · M15=100)",
-     [11, 13, 15].map(G.gearLevelCap).join("/"));
+  // 마스터리는 돌파에만 걸린다. 마일스톤 사이는 XP 만 들므로 상한은 "못 여는 첫 마일스톤 −1".
+  // M11 은 Lv.20 을 돌파할 수 있고 Lv.40 은 못 하므로 +39 까지다 (+20 이 아니다).
+  const CAP = {0: 19, 10: 19, 11: 39, 12: 59, 13: 79, 14: 99, 15: 100, 20: 100};
+  const capBad = Object.keys(CAP).filter(m => G.gearLevelCap(+m) !== CAP[m])
+    .map(m => "M" + m + "→" + G.gearLevelCap(+m) + "(기대 " + CAP[m] + ")");
+  ok(capBad.length === 0, "마스터리별 레벨 상한 = 못 여는 첫 마일스톤 −1", capBad.join(" | "));
+  // 상한은 그 마스터리로 돌파 가능한 마지막 마일스톤과 반드시 맞물려야 한다
+  const mism = [];
+  for (let m = 0; m <= G.GEAR_MASTERY.max; m++) {
+    const cap = G.gearLevelCap(m);
+    const blocked = G.GEAR_MS.filter(x => x.mastery > m)[0];
+    if (blocked && cap !== blocked.level - 1) mism.push("M" + m);
+    if (!blocked && cap !== 100) mism.push("M" + m);
+  }
+  ok(mism.length === 0, "0~20 전 구간에서 상한이 마일스톤과 맞물린다", mism.join(","));
 }
 
 // ── 3. 픽스처 총계 ─────────────────────────────────────────────────────

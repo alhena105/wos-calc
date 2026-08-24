@@ -60,12 +60,14 @@ function gearMasteryCost(from,to){
  return {from,to,essence,mythic};
 }
 
-/* 현재 마스터리로 열 수 있는 홍색 레벨 상한. 게임 표기가 이걸 넘으면 경고만 띄우고
-   계산은 그대로 진행한다 — 우리 표보다 게임 쪽이 1차 자료다. */
+/* 현재 마스터리로 갈 수 있는 홍색 레벨 상한.
+   마스터리는 <b>돌파(마일스톤)</b> 에만 걸리고, 마일스톤 사이 레벨업은 XP 만 든다.
+   그래서 상한은 "마지막으로 통과한 마일스톤"이 아니라 <b>못 여는 첫 마일스톤 바로 앞</b>이다 —
+   M11 이면 Lv.20 은 돌파할 수 있고 Lv.40 은 못 하므로 <b>+39</b> 까지 간다(+20 이 아니다).
+   게임 표기가 이걸 넘으면 경고만 띄우고 계산은 그대로 진행한다 — 우리 표보다 게임이 1차 자료다. */
 function gearLevelCap(mastery){
- let cap=0;
- for(const m of GEAR_MS){if(m.mastery>mastery)return cap; cap=m.level;}
- return cap;
+ for(const m of GEAR_MS){if(m.mastery>mastery)return m.level-1;}
+ return GEAR_MS[GEAR_MS.length-1].level;
 }
 
 /* 병종 가중 — 증원 병력에는 내 장비가 적용되지 않는다(볼트). 개리슨 장비가 실제로
