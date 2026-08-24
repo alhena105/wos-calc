@@ -70,7 +70,7 @@ note("파트 " + PARTS.length + "개 → " + (bundle().split("\n").length - 1) +
 // render.js 는 최상위 init IIFE 가 document 를 만져서 실행은 못 하지만, 파싱은 해야 한다.
 // 실제로 render.js 만 괄호가 안 맞아 화면이 통째로 비었는데 테스트는 초록이었던 적이 있다.
 {
-  const js = ["i18n.js", "data.js", "engine.js", "render.js"].map(src).join("")
+  const js = PARTS.filter(p => p.endsWith(".js")).map(src).join("")
     .replace(/<\/script>[\s\S]*$/, "");
   let err = null;
   try { new vm.Script(js, {filename: "bundle.js"}); } catch (e) { err = String(e); }
@@ -286,7 +286,7 @@ function scanHangul(file) {
   }
   return hits;
 }
-const hard = scanHangul("engine.js").concat(scanHangul("render.js"));
+const hard = ["engine.js", "render.js", "gear-engine.js", "gear-render.js"].flatMap(scanHangul);
 ok(hard.length === 0, "L() 로 안 감싼 한글 리터럴 없음", hard.join(" | "));
 
 // ── 8. 렌더 (최소 DOM 스텁) ────────────────────────────────────────────

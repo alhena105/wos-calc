@@ -56,7 +56,8 @@ async function open(query) {
   page.on("pageerror", e => errors.push(String(e)));
   page.on("console", m => { if (m.type() === "error") errors.push("console: " + m.text()); });
   await page.goto(PAGE + (query || ""));
-  await page.waitForSelector("#out h2");
+  // ?tab=gear 로 열면 편성 탭이 감춰져 있으므로 "보인다"가 아니라 "붙었다"를 기다린다
+  await page.waitForSelector("#out h2", {state: "attached"});
   return page;
 }
 // 병비 세 칸을 채우고 재계산을 기다린다
@@ -70,7 +71,9 @@ const outText = page => page.textContent("#out");
 section("기본 렌더 (한국어)");
 const ko = await open();
 const koOut = await outText(ko);
-for (const sec of ["① 리더 구성", "② SkillMod 칸 진단", "③ 위젯", "④ 병종 전용", "⑤ 조이너 한계 배율"])
+// ④ 는 리더가 병종 전용·주기형 스킬을 들고 있을 때만 나온다. 기본 리더 조합엔 없으므로
+// 항상 나오는 것만 본다 (unit.mjs 의 섹션 목록과 같은 기준).
+for (const sec of ["① 리더 구성", "② SkillMod 칸 진단", "③ 위젯", "⑤ 조이너 한계 배율"])
   ok(koOut.includes(sec), "섹션 " + sec + " 렌더");
 ok(errors.length === 0, "로드 중 에러 없음", errors.join(" | "));
 
@@ -107,7 +110,10 @@ await setRatio(ko, "e", [40, 40, 20]);     // 표가 언급하지 않는 편성
 {
   const t = await outText(ko);
   ok(/표에 없음/.test(t), "수비: 표가 침묵하면 판단 유보");
-  ok(!/안전/.test(t), "수비: 침묵을 안전으로 렌더링하지 않는다");
+  // 문구에 "안전"이라는 낱말 자체는 나온다 — '"안전"이 아니라 "표에 없음"입니다' 로.
+  // 그러니 낱말 유무가 아니라 그 경고가 붙어 있는지를 본다 (unit.mjs 와 같은 기준).
+  ok(/"안전"이 아니라 "표에 없음"입니다/.test(t), "수비 silent 에 '안전이 아니다' 경고가 붙는다");
+  ok(!/막아낼 수 있|안전합니다|문제 없습니다/.test(t), "수비: 침묵을 안전으로 렌더링하지 않는다");
 }
 await ko.click("#mAtk");
 await setRatio(ko, "r", [40, 20, 40]);
@@ -130,6 +136,9 @@ ok(/카롤/.test(await outText(ko)), "고른 영웅이 결과에 반영된다");
     [...document.querySelectorAll(".pgrid img.hpic")].filter(i => i.complete && i.naturalWidth === 0).length);
   ok(broken === 0, "픽커 초상이 깨지지 않는다", broken + "개 깨짐");
 }
+// 고르면 픽커가 닫히므로(위에서 검사했다) 원복하려면 다시 열어야 한다
+await ko.click("#pLan > summary");
+await ko.waitForTimeout(60);
 await ko.click("#gLan .pk[data-id='mia']");
 await ko.waitForTimeout(60);
 
@@ -144,18 +153,91 @@ ok((await ko.textContent("#rSum")).includes("120"), "합이 100이 아니면 경
 await setRatio(ko, "r", [48, 4, 48]);
 ok((await ko.textContent("#rSum")).trim() === "", "합이 100이면 경고 없음");
 
+// ── 3.5 장비 탭 ────────────────────────────────────────────────────────
+section("장비 탭");
+await ko.click("#tabGear");
+await ko.waitForTimeout(80);
+ok(await ko.isVisible("#tab-gear"), "탭을 누르면 장비 탭이 보인다");
+ok(!(await ko.isVisible("#tab-comp")), "편성 탭은 감춰진다");
+ok(/tab=gear/.test(ko.url()), "URL 에 ?tab=gear 가 붙는다", ko.url());
+// 픽스처와 같은 입력을 넣으면 픽스처와 같은 총계가 나와야 한다
+const FIX = {
+  infantry: {helmet: [11, 1], gauntlet: [15, 61], belt: [15, 60], boots: [11, 2]},
+  marksman: {helmet: [13, 59], gauntlet: [11, 1], belt: [11, 1], boots: [13, 59]},
+  lancer:   {helmet: [13, 40], gauntlet: [11, 3], belt: [11, 1], boots: [13, 40]},
+};
+for (const t of Object.keys(FIX)) for (const sl of Object.keys(FIX[t])) {
+  await ko.fill("#gm_" + t + "_" + sl, String(FIX[t][sl][0]));
+  await ko.fill("#gl_" + t + "_" + sl, String(FIX[t][sl][1]));
+}
+await ko.fill("#gWk", "12");
+await ko.waitForTimeout(120);
+{
+  const t = await ko.textContent("#gOutTop");
+  ok(/1560/.test(t), "총 미스릴 1560", t.replace(/\s+/g, " ").slice(0, 120));
+  ok(/\+1020/.test(t), "원정 +1020%p");
+  ok(/130/.test(t), "주당 12 → 130주");
+  const b = await ko.textContent("#gOutBot");
+  ok(/Lv\.40\(탐험\) → Lv\.60/.test(b.replace(/\s+/g, " ")), "통행료 표기 Lv.40(탐험) → Lv.60");
+  const rows = await ko.evaluate(() => document.querySelectorAll("#gSteps tbody tr").length);
+  ok(rows === 28, "업그레이드 순서 28행", String(rows));
+}
+// 예산 슬라이더 — 줄이면 표가 짧아진다
+await ko.evaluate(() => { const b = gBudget; b.value = "60"; b.dispatchEvent(new Event("input", {bubbles: true})); });
+await ko.waitForTimeout(80);
+{
+  const rows = await ko.evaluate(() => document.querySelectorAll("#gSteps tbody tr").length);
+  ok(rows === 6, "예산 60 이면 eff 2.000 구간 6행만 남는다", String(rows));
+}
+await ko.evaluate(() => { const b = gBudget; b.value = b.max; b.dispatchEvent(new Event("input", {bubbles: true})); });
+await ko.waitForTimeout(80);
+// 체크박스 → 진행률
+await ko.click("#gSteps tbody tr:first-child .gchk");
+await ko.waitForTimeout(80);
+ok(/체크 완료/.test(await ko.textContent("#gOutTop")), "체크하면 진행률이 요약에 뜬다");
+// 마스터리 상한 경고 — 계산은 그대로 진행한다
+await ko.fill("#gm_infantry_helmet", "11");
+await ko.fill("#gl_infantry_helmet", "90");
+await ko.waitForTimeout(80);
+ok(/상한을 넘는/.test(await ko.textContent("#gGridWarn")), "마스터리 상한 초과 경고");
+ok((await ko.textContent("#gOutBot")).length > 200, "경고가 떠도 계산은 계속된다");
+await ko.fill("#gl_infantry_helmet", "1");
+await ko.waitForTimeout(80);
+// 경고·한계는 접지 않고 전부 노출
+{
+  const n = await ko.evaluate(() => document.querySelectorAll("#gOutBot .callout li").length);
+  ok(n >= 7, "경고 3 + 한계 4 가 모두 목록으로 노출", String(n));
+  ok((await ko.evaluate(() => document.querySelectorAll("#gOutBot details").length)) === 0,
+     "접어두지 않았다");
+}
+// 편성 탭으로 돌아가면 밴드 판정이 그대로다
+await ko.click("#tabComp");
+await ko.waitForTimeout(80);
+ok(await ko.isVisible("#tab-comp"), "편성 탭으로 돌아온다");
+ok(!/tab=gear/.test(ko.url()), "URL 에서 tab=gear 가 빠진다", ko.url());
+ok(/①/.test(await outText(ko)), "편성 결과가 그대로 있다");
+
+// ?tab=gear 딥링크
+{
+  const dl = await open("?tab=gear");
+  ok(await dl.isVisible("#tab-gear"), "?tab=gear 딥링크로 바로 장비 탭이 열린다");
+  ok(!(await dl.isVisible("#tab-comp")), "딥링크에서 편성 탭은 감춰져 있다");
+  await dl.close();
+}
+
 // ── 4. 언어 ────────────────────────────────────────────────────────────
 section("언어");
-const en = await open("?lang=en");
-const enOut = await outText(en);
+const en = await open("?lang=en&tab=gear");
+const enOut = (await outText(en)) + (await en.textContent("#tab-gear"));
 ok(enOut.includes("Leaders"), "?lang=en 이면 영어로 뜬다");
 const HANGUL = /[가-힣]/;
 const enHits = enOut.split("\n").filter(l => HANGUL.test(l)).slice(0, 3);
 ok(!HANGUL.test(enOut), "영어로 열면 결과에 한글이 없다", enHits.join(" | "));
 
+await ko.click("#tabGear");
 await ko.click("#lgEn");
-await ko.waitForTimeout(80);
-const toggled = await outText(ko);
+await ko.waitForTimeout(120);
+const toggled = (await outText(ko)) + (await ko.textContent("#tab-gear"));
 ok(toggled.includes("Leaders"), "토글하면 영어로 바뀐다");
 const tHits = [...new Set((toggled.match(/[가-힣][가-힣 ·]*/g) || []))].slice(0, 6);
 ok(!HANGUL.test(toggled), "한국어로 열고 English 를 눌러도 결과에 한글이 없다", tHits.join(" | "));
