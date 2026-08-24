@@ -29,7 +29,7 @@ function note(t) { console.log("   " + t); }
 // ── 로더 ───────────────────────────────────────────────────────────────
 const EXPORTS = "GEAR_MS,GEAR_SLOTS,GEAR_SLOT_ORDER,GEAR_TROOPS,GEAR_TROOP_ORDER,GEAR_MASTERY," +
   "GEAR_XP_BANDS,GEAR_DEFAULTS,GEAR_CAVEATS,GEAR_WARNINGS,I18N_TABLES," +
-  "gearChunksFor,gearMasteryCost,gearLevelCap,gearTroopWeight,gearPlan";
+  "GEAR_AXIS,GEAR_AXIS_SUB,gearAtoms,gearHull,gearMasteryCost,gearLevelCap,gearTroopWeight,gearPlan";
 function load(lang) {
   const code = src("i18n.js") + src("gear-data.js") + src("gear-engine.js") +
     "\n;globalThis.__api={" + EXPORTS + "};\n";
@@ -61,6 +61,13 @@ const FIXTURE = {
     lancer:   {helmet: [13, 40], gauntlet: [11, 3],  belt: [11, 1],  boots: [13, 40]},
   },
 };
+
+// 역할 가중을 끈 축. 예전 모델(방향을 값으로 안 보던 때)과 같아야 한다 —
+// 새 껍질 자르기가 옛 자르기를 그대로 포함한다는 증명이다.
+const FLAT = {};
+for (const t of ["infantry", "lancer", "marksman"])
+  FLAT[t] = {attack: 1, defense: 1, health: 1, lethality: 1};
+const FIX_FLAT = Object.assign({}, FIXTURE, {axis: FLAT});
 
 // "번호 병종 슬롯 도달레벨 통행료 방향 효율 미스릴 누적 [마스터리]"
 const ORDER = [
@@ -108,21 +115,42 @@ const FREE_XP = [
   ["infantry", "gauntlet", 61, 79], ["infantry", "belt", 60, 79],
 ];
 
-// ── 1. 청크 생성 ───────────────────────────────────────────────────────
-section("청크 생성");
+// ── 1. 원자 · 껍질 자르기 ─────────────────────────────────────────────
+section("원자 · 껍질");
 {
-  const shape = lv => G.gearChunksFor(lv).map(c => c.map(m => m.level).join("+"));
-  ok(JSON.stringify(shape(1)) === JSON.stringify(["20", "40+60", "80+100"]),
-     "Lv.1 → 20 / 40+60 / 80+100", shape(1).join(" · "));
-  ok(JSON.stringify(shape(59)) === JSON.stringify(["60", "80+100"]), "Lv.59 → 60 / 80+100", shape(59).join(" · "));
-  ok(JSON.stringify(shape(61)) === JSON.stringify(["80+100"]), "Lv.61 → 80+100", shape(61).join(" · "));
-  ok(JSON.stringify(shape(85)) === JSON.stringify(["100"]), "Lv.85 → 100 단독", shape(85).join(" · "));
-  ok(shape(100).length === 0, "Lv.100 은 남은 청크가 없다", shape(100).join(" · "));
-  // 탐험만 남는 꼬리를 청크로 만들면 "Lv.40 에서 멈춤" 이 선택지로 생긴다
-  const tails = [1, 20, 25, 40, 59, 60, 61, 79, 80, 85]
-    .flatMap(lv => G.gearChunksFor(lv))
-    .filter(c => c[c.length - 1].tier !== "expedition");
-  ok(tails.length === 0, "탐험만 남는 꼬리 청크가 없다", String(tails.length));
+  // 역할 가중을 끄면 껍질은 예전의 "탐험 + 다음 원정" 자르기와 정확히 같아야 한다.
+  const shape = (troop, slot, lv, axis) => {
+    const atoms = G.gearAtoms(troop, G.GEAR_SLOTS[slot].side, lv, 0, axis);
+    return G.gearHull(atoms).map(h => atoms.slice(h.from, h.to + 1).map(a => a.level).join("+"));
+  };
+  ok(shape("marksman", "helmet", 1, FLAT).join(",") === "20,40+60,80+100",
+     "가중 OFF · Lv.1 → 20 / 40+60 / 80+100", shape("marksman", "helmet", 1, FLAT).join(" · "));
+  ok(shape("marksman", "helmet", 59, FLAT).join(",") === "60,80+100", "가중 OFF · Lv.59 → 60 / 80+100");
+  ok(shape("marksman", "helmet", 61, FLAT).join(",") === "80+100", "가중 OFF · Lv.61 → 80+100");
+  ok(shape("marksman", "helmet", 85, FLAT).join(",") === "100", "가중 OFF · Lv.85 → 100 단독");
+  ok(shape("marksman", "helmet", 100, FLAT).length === 0, "Lv.100 은 남은 청크가 없다");
+
+  // 값이 0 인 마일스톤은 다음 값 있는 마일스톤에 흡수되고, 뒤에 값이 없으면 꼬리째 버린다.
+  // 보병 헬멧(좌): Lv.20 공격은 보병이 안 쓰는 축 → Lv.60 방어에 흡수, Lv.100 공격은 버림.
+  ok(shape("infantry", "helmet", 1, G.GEAR_AXIS).join(",") === "20+40+60",
+     "보병 헬멧은 Lv.20 공격을 흡수한다 (Lv.100 공격은 껍질 밖)", shape("infantry", "helmet", 1, G.GEAR_AXIS).join(" · "));
+  // 창병 장갑(우): Lv.20 방어 흡수 → Lv.60 공격, Lv.100 방어는 버림.
+  ok(shape("lancer", "gauntlet", 1, G.GEAR_AXIS).join(",") === "20+40+60",
+     "창병 장갑은 Lv.20 방어를 흡수한다 (Lv.100 방어는 껍질 밖)", shape("lancer", "gauntlet", 1, G.GEAR_AXIS).join(" · "));
+  // 궁병은 버리는 축이 없다 — 전부 산다.
+  const mk = shape("marksman", "gauntlet", 1, G.GEAR_AXIS);
+  ok(mk.join("+").split("+").map(Number).sort((a, b) => a - b).join(",") === "20,40,60,80,100",
+     "궁병은 마일스톤을 하나도 버리지 않는다", mk.join(" · "));
+
+  // 껍질 구간의 효율은 반드시 단조 감소해야 한다 — 그리디 최적성의 전제다.
+  const bad = [];
+  for (const t of G.GEAR_TROOP_ORDER) for (const sl of G.GEAR_SLOT_ORDER) for (const lv of [0, 1, 20, 39, 40, 59, 60, 85]) {
+    const a = G.gearAtoms(t, G.GEAR_SLOTS[sl].side, lv, 0.15, G.GEAR_AXIS);
+    const h = G.gearHull(a);
+    h.forEach((x, k) => { if (k && x.eff > h[k - 1].eff + 1e-9) bad.push(t + "/" + sl + "@" + lv); });
+    if (h.length && a.slice(h[h.length - 1].to + 1).some(x => x.value > 0)) bad.push("버린 꼬리에 값 " + t + "/" + sl + "@" + lv);
+  }
+  ok(bad.length === 0, "껍질 구간 효율이 조각 안에서 단조 감소하고, 버린 꼬리에 값이 없다", bad.slice(0, 3).join(", "));
 }
 
 // ── 2. 마스터리 승급 비용 ──────────────────────────────────────────────
@@ -139,8 +167,9 @@ section("마스터리 승급");
 }
 
 // ── 3. 픽스처 총계 ─────────────────────────────────────────────────────
-section("픽스처 총계");
-const plan = G.gearPlan(FIXTURE);
+section("픽스처 총계 (역할 가중 OFF = 예전 모델)");
+const planFlat = G.gearPlan(FIX_FLAT);
+const plan = planFlat;   // 아래 골든은 역할 가중을 끈 예전 모델 그대로다
 ok(plan.steps.length === 28, "스텝 28개", String(plan.steps.length));
 ok(plan.totals.mithril === 1560, "미스릴 1560", String(plan.totals.mithril));
 ok(plan.totals.expedition === 1020, "원정 보너스 +1020%p", String(plan.totals.expedition));
@@ -171,7 +200,7 @@ ORDER.forEach((w, i) => {
   const label = (i + 1) + " " + troop + " " + slot + " Lv." + to +
     (tolls.length ? " (toll " + tolls.join(",") + ")" : "");
   if (!s) { ok(false, label, "스텝 없음"); return; }
-  const got = [s.troop, s.slot, s.toLevel, s.tolls.join(","), s.gain,
+  const got = [s.troop, s.slot, s.toLevel, s.tolls.map(t => t.level).join(","), s.gain,
                +s.eff.toFixed(3), s.mithril, s.cumMithril,
                s.masteryPre ? s.masteryPre.from + "→" + s.masteryPre.to : "-"].join(" ");
   const want = [troop, slot, to, tolls.join(","), gain, eff, mithril, cum,
@@ -214,13 +243,94 @@ ok(!plan.freeXp.some(x => x.from === x.to), "폭 0 인 구간은 목록에 없�
 ok(plan.freeXp.every((x, i) => i === 0 || x.xpRel >= plan.freeXp[i - 1].xpRel),
    "XP 상대 단가 오름차순");
 
+// ── 6.5 원본 우선순위표에서 직접 유도한 골든 ────────────────────────────
+// 커뮤니티 「HERO GEAR — UPGRADE ORDER」 표(32칸)를 옮긴 것. 우리 출력에서 뽑아낸 게
+// 아니라 그림을 그대로 읽어 적었다. 어긋나면 GEAR_AXIS 나 껍질이 틀린 것이다.
+section("원본 우선순위표 대조");
+{
+  // [GOLD, RED+20, RED+60, RED+100] 각 칸의 스탯 — 병종 무관하게 슬롯이 정한다
+  const CELL = {helmet:["lethality","attack","defense","attack"], gauntlet:["health","defense","attack","defense"],
+                belt:["health","attack","defense","attack"],      boots:["lethality","defense","attack","defense"]};
+  // 표에 번호가 붙은 칸(=사야 하는 칸). null = 회색(맨 마지막), "y" 접두 = 노랑(보조)
+  const NUM = {
+    infantry:{helmet:[null,null,17,null], gauntlet:[1,9,null,25], belt:[2,null,18,null], boots:[null,10,null,26]},
+    lancer:  {helmet:[5,13,null,29],      gauntlet:[null,null,21,null], belt:[null,14,null,30], boots:[6,null,22,null]},
+    marksman:{helmet:[3,11,"y23",27],     gauntlet:[7,"y15",19,"y31"],  belt:[8,12,"y24",28],   boots:[4,"y16",20,"y32"]},
+  };
+  const RED = [20, 60, 100];
+
+  // (a) 좌우 사이클과 골드 스탯이 표와 같은가 — 16칸
+  const mism = [];
+  for (const sl of G.GEAR_SLOT_ORDER) {
+    if (G.GEAR_SLOTS[sl].stat !== CELL[sl][0]) mism.push(sl + " GOLD " + G.GEAR_SLOTS[sl].stat + "≠" + CELL[sl][0]);
+    RED.forEach((lv, i) => {
+      const ours = G.GEAR_MS.find(m => m.level === lv)[G.GEAR_SLOTS[sl].side];
+      if (ours !== CELL[sl][i + 1]) mism.push(sl + " Lv." + lv + " " + ours + "≠" + CELL[sl][i + 1]);
+    });
+  }
+  ok(mism.length === 0, "좌우 사이클 · 골드 스탯 16칸이 표와 일치", mism.join(" | "));
+
+  // (b) GEAR_AXIS 가 표의 초록/노랑/회색과 같은가 — 빨강 36칸
+  const grade = [];
+  for (const t of ["infantry", "lancer", "marksman"]) for (const sl of G.GEAR_SLOT_ORDER) RED.forEach((lv, i) => {
+    const w = G.GEAR_AXIS[t][CELL[sl][i + 1]];
+    const n = NUM[t][sl][i + 1];
+    const want = n === null ? 0 : String(n).startsWith("y") ? G.GEAR_AXIS_SUB : 1;
+    if (w !== want) grade.push(t + "/" + sl + " Lv." + lv + " 우리=" + w + " 표=" + want);
+  });
+  ok(grade.length === 0, "GEAR_AXIS 가 표의 초록·노랑·회색 36칸과 일치", grade.join(" | "));
+
+  // (c) 백지에서 계획을 세우면, 값이 붙는 마일스톤이 표의 번호 붙은 빨강 24칸과 정확히 같아야 한다
+  const blank = {infantry:{}, lancer:{}, marksman:{}};
+  for (const t of Object.keys(blank)) for (const sl of G.GEAR_SLOT_ORDER) blank[t][sl] = [G.GEAR_MASTERY.max, 0];
+  const p0 = G.gearPlan(Object.assign({}, FIXTURE, {gear: blank}));
+  const ours = new Set();
+  p0.steps.forEach(s => s.gains.forEach(g => { if (g.tier === "expedition") ours.add(s.troop + "/" + s.slot + "/" + g.level); }));
+  const want = new Set();
+  for (const t of Object.keys(NUM)) for (const sl of G.GEAR_SLOT_ORDER) RED.forEach((lv, i) => {
+    if (NUM[t][sl][i + 1] !== null) want.add(t + "/" + sl + "/" + lv);
+  });
+  const missing = [...want].filter(k => !ours.has(k)), extra = [...ours].filter(k => !want.has(k));
+  ok(want.size === 24, "표의 번호 붙은 빨강 칸은 24개", String(want.size));
+  ok(missing.length === 0 && extra.length === 0,
+     "우리가 값으로 세는 마일스톤이 표의 24칸과 정확히 일치",
+     "빠짐 " + missing.join(",") + " / 남음 " + extra.join(","));
+
+  // (d) 보병은 공격을, 창병은 방어를 값으로 세지 않는다
+  const wrong = [];
+  p0.steps.forEach(s => s.gains.forEach(g => {
+    if (s.troop === "infantry" && g.dir === "attack") wrong.push("보병이 공격을 삼 Lv." + g.level);
+    if (s.troop === "lancer" && g.dir === "defense") wrong.push("창병이 방어를 삼 Lv." + g.level);
+  }));
+  ok(wrong.length === 0, "보병은 공격을 · 창병은 방어를 값으로 세지 않는다", wrong.join(", "));
+
+  // (e) 회색 칸은 버리는 게 아니라 맨 마지막이다 — 총액은 가중을 꺼도 켜도 같아야 한다
+  const on = G.gearPlan(FIXTURE), off = G.gearPlan(FIX_FLAT);
+  ok(on.totals.mithril === off.totals.mithril && on.totals.expedition === off.totals.expedition &&
+     on.totals.essence === off.totals.essence && on.totals.mythic === off.totals.mythic,
+     "역할 가중은 순서만 바꾸고 총액은 그대로다",
+     JSON.stringify([on.totals.mithril, off.totals.mithril, on.totals.mythic, off.totals.mythic]));
+  ok(on.totals.useful === 600 && off.totals.useful === 1020,
+     "쓸모는 달라진다 (켬 600 / 끔 1020)", on.totals.useful + " / " + off.totals.useful);
+  const lo = on.tiers[on.tiers.length - 1];
+  ok(lo.eff === 0 && lo.leftover && lo.steps === 4 && lo.mithril === 360,
+     "맨 뒤가 효율 0 완성용 구간 4스텝 · 미스릴 360", JSON.stringify(lo));
+  ok(on.steps.filter(s => s.leftover).every((s, i, a) =>
+       on.steps.indexOf(s) >= on.steps.length - a.length),
+     "완성용 스텝은 전부 맨 뒤에 몰려 있다");
+  ok(on.leftover.pieces.map(x => x.troop + "/" + x.slot).sort().join(",") ===
+     "infantry/belt,infantry/helmet,lancer/boots,lancer/gauntlet",
+     "완성용으로 밀린 조각이 표의 회색 칸과 같다",
+     on.leftover.pieces.map(x => x.troop + "/" + x.slot).sort().join(","));
+}
+
 // ── 7. 엣지 케이스 ─────────────────────────────────────────────────────
 section("엣지 케이스");
 const one = (troop, slot, cell, over) => {
   const gear = {infantry: {}, marksman: {}, lancer: {}};
   GEAR_ALL.forEach(([t, s]) => { gear[t][s] = [15, 100]; });   // 나머지는 전부 완성 → 제외됨
   gear[troop][slot] = cell;
-  return G.gearPlan(Object.assign({}, FIXTURE, {gear}, over || {}));
+  return G.gearPlan(Object.assign({}, FIX_FLAT, {gear}, over || {}));
 };
 const GEAR_ALL = G.GEAR_TROOP_ORDER.flatMap(t => G.GEAR_SLOT_ORDER.map(s => [t, s]));
 {
@@ -229,11 +339,11 @@ const GEAR_ALL = G.GEAR_TROOP_ORDER.flatMap(t => G.GEAR_SLOT_ORDER.map(s => [t, 
   // 항목이 아예 없는 조각은 0 이 아니라 "입력 없음"이다. 미보유 조각까지 처음부터 올리는
   // 계획을 내면 총액이 통째로 거짓말이 된다 — Orca 브라우저에서 첫 화면을 보고 잡았다.
   {
-    const none = G.gearPlan(Object.assign({}, FIXTURE, {gear: {}}));
+    const none = G.gearPlan(Object.assign({}, FIX_FLAT, {gear: {}}));
     ok(none.steps.length === 0 && none.freeXp.length === 0 && none.totals.mithril === 0,
        "입력이 하나도 없으면 계획도 비어 있다",
        JSON.stringify([none.steps.length, none.freeXp.length, none.totals.mithril]));
-    const partial = G.gearPlan(Object.assign({}, FIXTURE, {gear: {infantry: {helmet: [11, 1]}}}));
+    const partial = G.gearPlan(Object.assign({}, FIX_FLAT, {gear: {infantry: {helmet: [11, 1]}}}));
     ok(partial.steps.length === 3 && partial.totals.mithril === 150,
        "입력한 조각만 계획에 들어간다 (1조각 = 3스텝 · 150)",
        JSON.stringify([partial.steps.length, partial.totals.mithril]));
@@ -252,24 +362,24 @@ const GEAR_ALL = G.GEAR_TROOP_ORDER.flatMap(t => G.GEAR_SLOT_ORDER.map(s => [t, 
 
   const p39 = one("infantry", "helmet", [12, 39]);
   const mp = p39.steps[0].masteryPre || {};
-  ok(p39.steps[0].toLevel === 60 && p39.steps[0].tolls.join() === "40",
-     "[12,39] 첫 청크는 Lv.40+60", JSON.stringify([p39.steps[0].toLevel, p39.steps[0].tolls]));
+  ok(p39.steps[0].toLevel === 60 && p39.steps[0].tolls.map(t => t.level).join() === "40",
+     "[12,39] 첫 청크는 Lv.40+60", JSON.stringify([p39.steps[0].toLevel, p39.steps[0].tolls.map(t => t.level)]));
   ok(mp.from === 12 && mp.to === 13 && mp.essence === 130 && mp.mythic === 3,
      "[12,39] 마스터리 선행은 M12→M13 만 (에센스 130 · 신화 3)", JSON.stringify(mp));
 
   const gearAll11 = {infantry: {}, marksman: {}, lancer: {}};
   GEAR_ALL.forEach(([t, s]) => { gearAll11[t][s] = [11, 1]; });
-  const pAll = G.gearPlan(Object.assign({}, FIXTURE, {gear: gearAll11}));
+  const pAll = G.gearPlan(Object.assign({}, FIX_FLAT, {gear: gearAll11}));
   ok(pAll.totals.mithril === 1800, "12조각 전부 [11,1] → 미스릴 1800 (12×150)", String(pAll.totals.mithril));
   ok(pAll.steps.length === 36, "12조각 × 청크 3개 = 36스텝", String(pAll.steps.length));
 
-  const high = G.gearPlan(Object.assign({}, FIXTURE, {arenaPriority: "high"}));
+  const high = G.gearPlan(Object.assign({}, FIX_FLAT, {arenaPriority: "high"}));
   const effs = high.tiers.map(t => t.eff);
   ok(effs.join() === "2,1,0.675,0.639",
      'arenaPriority "high" → 0.600→0.675 · 0.556→0.639', effs.join(" / "));
   ok(high.totals.mithril === plan.totals.mithril, "아레나 가중은 비용을 바꾸지 않는다");
 
-  const low = G.gearPlan(Object.assign({}, FIXTURE, {arenaPriority: "low"}));
+  const low = G.gearPlan(Object.assign({}, FIX_FLAT, {arenaPriority: "low"}));
   ok(low.tiers.every((t, i) => t.eff >= plan.tiers[i].eff), "아레나 low 는 none 보다 효율이 높거나 같다");
 }
 
@@ -309,7 +419,8 @@ section("gear-data 무결성");
   // gear-engine 에 숫자를 하드코딩하면 패치 대응이 불가능해진다
   {
     const code = src("gear-engine.js").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "")
-      .replace(/toFixed\(\d+\)/g, "toFixed()");   // 표시용 반올림 자릿수는 게임 상수가 아니다
+      .replace(/toFixed\(\d+\)/g, "toFixed()")     // 표시용 반올림 자릿수는 게임 상수가 아니다
+      .replace(/1e-\d+/g, "EPS");                 // 부동소수 비교 오차도 게임 상수가 아니다
     // 0·1 은 항등원이고 100 은 % → 비율 환산이다. 게임 수치는 하나도 없어야 한다.
     const nums = [...new Set((code.match(/(?<![\w.])\d+(\.\d+)?/g) || []))].filter(n => !["0", "1", "100"].includes(n));
     ok(nums.length === 0, "gear-engine.js 에 상수 하드코딩 없음", nums.join(","));
@@ -371,10 +482,15 @@ section("렌더");
     // 트랙은 gearTracks() 가 자식 노드에 직접 쓴다(카드를 다시 만들면 포커스가 날아가므로).
     // dom.mjs 스텁은 진짜 트리가 아니라 자식 변경이 부모 문자열에 안 비친다 → 노드를 직접 읽는다.
     const one = a.el("gt_infantry_gauntlet").innerHTML;
-    ok((one.match(/class="exp/g) || []).length >= 3 && (one.match(/class="tol/g) || []).length >= 2,
-       "트랙 눈금이 원정·탐험으로 갈라진다");
-    ok(/Lv\.61/.test(one) && /다음 Lv\.80/.test(one), "트랙이 현재 레벨과 다음 마일스톤을 적는다",
-       one.slice(0, 160));
+    // 보병 장갑(우) — Lv.20 방어·Lv.100 방어가 필요, Lv.60 공격은 이 병종이 안 쓰는 축
+    ok((one.match(/class="g-need/g) || []).length === 2 &&
+       (one.match(/class="g-axis/g) || []).length === 1 &&
+       (one.match(/class="g-arena/g) || []).length === 2,
+       "트랙 눈금이 필요·통행료(축)·통행료(탐험)로 갈라진다",
+       one.replace(/title="[^"]*"/g, "").slice(0, 200));
+    // "다음"은 값이 있는 다음 관문이다. Lv.61 보병 장갑은 Lv.80 이 아니라 Lv.100 을 가리켜야 한다.
+    ok(/Lv\.61/.test(one) && /다음 Lv\.100/.test(one),
+       "트랙의 '다음'은 값이 있는 관문을 가리킨다", one.slice(-90));
     // 입력이 없는 조각은 트랙도 제외라고 말해야 한다
     const blankGrid = boot("ko");
     blankGrid.tab("gear");

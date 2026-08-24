@@ -90,6 +90,7 @@ tr.dead td{opacity:.5}
 .t-ok{background:var(--pick-bg);color:var(--pick);border:1px solid #1c5c38}
 .t-bad{background:var(--skip-bg);color:var(--skip);border:1px solid #6b2338}
 .t-warn{background:var(--cond-bg);color:var(--cond);border:1px solid #6b571b}
+.t-off{background:var(--card2);color:var(--muted);border:1px solid var(--line)}
 .callout{border-radius:13px;padding:14px 16px;margin:12px 0;border:1px solid}
 .co-key{background:var(--star-bg);border-color:#6b571b}
 .co-tip{background:var(--accent-bg);border-color:#25467c}
@@ -138,13 +139,16 @@ footer a{color:var(--accent);text-decoration:none}
 .ms>i{display:block;height:100%;border-radius:3px;background:var(--accent)}
 .ms>b{position:absolute;top:-4px;width:2px;height:12px;border-radius:1px;
  background:var(--muted);transform:translateX(-1px)}
-.ms>b.exp{background:var(--star);width:3px;transform:translateX(-1.5px)}
+/* 눈금 색이 곧 이 병종에게의 값이다 — 필요 / 보조 / 통행료(축 안 맞음·아레나) */
+.ms>b.g-need{background:var(--star);width:3px;transform:translateX(-1.5px)}
+.ms>b.g-sub{background:var(--cond);width:3px;transform:translateX(-1.5px)}
 .ms>b.on{opacity:.4}
 .msn{display:flex;justify-content:space-between;flex-wrap:wrap;gap:1px 8px;font-size:10.5px;color:var(--muted);margin-top:5px}
 .mslegend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:13px;font-size:11.5px;color:var(--muted)}
 .mstag{display:flex;align-items:center;gap:6px}
 .mstag i{width:3px;height:12px;border-radius:1px;flex:0 0 auto;background:var(--muted)}
-.mstag i.exp{background:var(--star)}
+.mstag i.g-need{background:var(--star)}
+.mstag i.g-sub{background:var(--cond)}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px}
 .tiles>div{background:var(--card2);border:1px solid var(--line);border-radius:11px;padding:11px 13px}
 .tiles b{display:block;font-size:20px;font-weight:800;color:var(--star);line-height:1.35}

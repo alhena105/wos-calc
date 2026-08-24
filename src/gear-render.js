@@ -139,21 +139,41 @@ function gearIcon(slot){
   GEAR_ICON[slot]+"</svg>";
 }
 
-/* 마일스톤 트랙 — 이 조각이 0~100 중 어디까지 왔고, 다음 관문이 실전(원정)인지
-   통행료(탐험)인지를 한눈에 보여준다. 표에서 통행료를 설명하는 것보다 이게 빠르다. */
-function gearTrack(level,entered){
- var max=GEAR_MS[GEAR_MS.length-1].level;
+var gearDirName=function(d){return{attack:L("공격","attack"),defense:L("방어","defense"),
+ health:L("체력","health"),lethality:L("치명","lethality")}[d]||d;};
+/* 이 병종에게 이 마일스톤이 무엇인가 — 필요 / 보조 / 축이 안 맞는 통행료 / 탐험 통행료 */
+function gearGrade(troop,side,m){
+ if(m.tier!=="expedition")return "arena";
+ var w=(GEAR_AXIS[troop]||{})[m[side]]||0;
+ return w>=1?"need":w>0?"sub":"axis";
+}
+
+/* 마일스톤 트랙 — 이 조각이 0~100 중 어디까지 왔고, 다음 관문이 이 병종에게 값이 있는지
+   통행료인지를 한눈에 보여준다. 표에서 설명하는 것보다 눈금 색 하나가 빠르다. */
+function gearTrack(troop,slot,level,entered){
+ var max=GEAR_MS[GEAR_MS.length-1].level, side=GEAR_SLOTS[slot].side;
  var pct=Math.max(0,Math.min(100,level/max*100));
  var ticks=GEAR_MS.map(function(m){
-  return '<b class="'+(m.tier==="expedition"?"exp":"tol")+(level>=m.level?" on":"")+
-   '" style="left:'+(m.level/max*100)+'%" title="Lv.'+m.level+" · "+
-   (m.tier==="expedition"?L("원정 +"+m.bonus+"%","expedition +"+m.bonus+"%")
-                         :L("탐험 통행료 (실전 기여 0)","exploration toll (no combat value)"))+
+  var g=gearGrade(troop,side,m), t;
+  if(g==="need")t=L("필요 — "+gearDirName(m[side])+" +"+m.bonus+"%",
+                    "needed — "+m[side]+" +"+m.bonus+"%");
+  else if(g==="sub")t=L("보조 — "+gearDirName(m[side])+" +"+m.bonus+"% (가중 "+GEAR_AXIS_SUB+")",
+                        "secondary — "+m[side]+" +"+m.bonus+"% (weight "+GEAR_AXIS_SUB+")");
+  else if(g==="axis")t=L("통행료 — "+gearDirName(m[side])+"는 "+L(GEAR_TROOPS[troop].ko,"")+"에게 안 쓰는 축",
+                         "toll — "+m[side]+" is not an axis "+GEAR_TROOPS[troop].en+" use");
+  else t=L("통행료 — 탐험은 아레나 전용","toll — exploration is arena only");
+  return '<b class="g-'+g+(level>=m.level?" on":"")+
+   '" style="left:'+(m.level/max*100)+'%" title="Lv.'+m.level+" · "+t+
    " · "+L("미스릴 ","mithril ")+m.mithril+'"></b>';}).join("");
- var next=GEAR_MS.filter(function(m){return m.level>level;})[0];
+ // "다음"은 값이 있는 다음 관문이다. 통행료만 남았으면 더 살 이유가 없다.
+ var rest=GEAR_MS.filter(function(m){return m.level>level;});
+ var next=rest.filter(function(m){var g=gearGrade(troop,side,m);return g==="need"||g==="sub";})[0];
+ var cost=next?rest.filter(function(m){return m.level<=next.level;})
+   .reduce(function(a,m){return a+m.mithril;},0):0;
  var right=!entered?L("미입력 — 계획에서 제외","not entered — left out")
-   :next?L("다음 Lv."+next.level+" · 미스릴 "+next.mithril,"next Lv."+next.level+" · "+next.mithril+" mithril")
-        :L("완주","complete");
+   :next?L("다음 Lv."+next.level+" · 미스릴 "+cost,"next Lv."+next.level+" · "+cost+" mithril")
+        :rest.length?L("여기서 끝 — 남은 건 통행료뿐","done here — only tolls remain")
+                    :L("완주","complete");
  return '<div class="ms'+(entered?"":" off")+'"><i style="width:'+pct.toFixed(0)+'%"></i>'+ticks+"</div>"+
   '<div class="msn"><span>'+(entered?"Lv."+level:"—")+"</span><span>"+right+"</span></div>";
 }
@@ -187,22 +207,17 @@ function gearGrid(){
      '" placeholder="M" title="'+L("마스터리","Mastery")+'" aria-label="'+esc(nm)+" "+L("마스터리","mastery")+
      '"><input id="'+gid("gl",t,sl)+'" type="number" min="0" max="'+GEAR_MS[GEAR_MS.length-1].level+
      '" placeholder="+" title="'+L("홍색 레벨","Red level")+'" aria-label="'+esc(nm)+" "+
-     L("홍색 레벨","red level")+'"></div><div id="'+gid("gt",t,sl)+'">'+gearTrack(0,false)+"</div></div>";
+     L("홍색 레벨","red level")+'"></div><div id="'+gid("gt",t,sl)+'">'+gearTrack(t,sl,0,false)+"</div></div>";
   });
   h+="</div></div>";
  });
  box.innerHTML=h+"</div>";
  Object.keys(keep).forEach(function(k){var e=gEl(k); if(e)e.value=keep[k];});
  var lg=gEl("gGridLegend");
- if(lg)lg.innerHTML='<span class="mstag"><i class="exp"></i>'+
-   L("원정 Lv."+GEAR_MS.filter(function(m){return m.tier==="expedition";}).map(function(m){return m.level;}).join("·")+
-     " — 랠리·개리슨에 실제로 붙는 스탯",
-     "Expedition Lv."+GEAR_MS.filter(function(m){return m.tier==="expedition";}).map(function(m){return m.level;}).join(", ")+
-     " — the stats that actually apply to rallies and garrison")+'</span><span class="mstag"><i class="tol"></i>'+
-   L("탐험 Lv."+GEAR_MS.filter(function(m){return m.tier==="exploration";}).map(function(m){return m.level;}).join("·")+
-     " — 아레나 전용. 미스릴은 내지만 실전 기여 0 (통행료)",
-     "Exploration Lv."+GEAR_MS.filter(function(m){return m.tier==="exploration";}).map(function(m){return m.level;}).join(", ")+
-     " — arena only. Costs mithril, contributes nothing in combat (a toll)")+"</span>";
+ if(lg)lg.innerHTML=
+   '<span class="mstag"><i class="g-need"></i>'+L("필요 — 이 병종이 쓰는 축","Needed — the axis this troop uses")+"</span>"+
+   '<span class="mstag"><i class="g-sub"></i>'+L("보조 — 궁병 방어(가중 "+GEAR_AXIS_SUB+")","Secondary — marksman defense (weight "+GEAR_AXIS_SUB+")")+"</span>"+
+   '<span class="mstag"><i class="g-axis"></i>'+L("통행료 — 미스릴은 내고 얻는 건 안 쓰는 축이거나 아레나 전용","Toll — you pay mithril and get an unused axis, or arena-only stats")+"</span>";
  var cap=gEl("gGridCap");
  if(cap)cap.innerHTML=L("<b>+1 은 아직 한 번도 돌파하지 않은 상태입니다.</b> 홍색은 Lv.1 에서 시작해 Lv."+
    GEAR_MS.map(function(m){return m.level;}).join("/")+" 에서 각각 미스릴을 냅니다 — 이걸 거꾸로 알면 비용이 두 배로 틀립니다. <b>두 칸을 다 비우면 그 조각은 계획에서 빠집니다</b>(미보유 조각).",
@@ -215,7 +230,7 @@ function gearTracks(input){
  GEAR_CELLS.forEach(function(c){
   var el=gEl(gid("gt",c[0],c[1])); if(!el)return;
   var cell=(input.gear[c[0]]||{})[c[1]];
-  el.innerHTML=gearTrack(cell?cell[1]:0,!!cell);});
+  el.innerHTML=gearTrack(c[0],c[1],cell?cell[1]:0,!!cell);});
 }
 
 /* ── localStorage · JSON 입출력 ────────────────────────────────────────
@@ -341,7 +356,9 @@ function gearRender(plan,input){
   '<div><span>'+L("미스릴","Mithril")+'</span><b>'+T.mithril+"</b>"+
    (doneSteps.length?'<div class="note">'+L("체크 완료 ","done ")+doneM+" ("+
      (T.mithril?Math.round(doneM/T.mithril*100):0)+"%)</div>":"")+"</div>"+
-  '<div><span>'+L("원정 획득","Expedition gain")+'</span><b>+'+T.expedition+"%p</b>"+
+  '<div><span>'+L("실제 쓸모","Usable gain")+'</span><b>+'+Math.round(T.useful)+"%p</b>"+
+   '<div class="note">'+L("원정 총량 +"+T.expedition+"%p 중 이 편성이 쓰는 몫",
+     "of +"+T.expedition+"%p total expedition, what this comp actually uses")+"</div>"+
    (doneSteps.length?'<div class="note">'+L("체크 완료 +","done +")+doneE+"%p</div>":"")+"</div>"+
   '<div class="bn"><span>'+L("신화 조각","Mythic shards")+'</span><b>'+T.mythic+"</b>"+
    '<div class="note">'+L("상자 100개당 1개 — 미스릴보다 먼저 마릅니다","~1 per 100 boxes — runs dry before mithril")+"</div></div>"+
@@ -379,17 +396,18 @@ function gearRender(plan,input){
   o+='<p class="note">'+L("올릴 것이 없습니다.","Nothing left to upgrade.")+"</p>";
  }else{
   o+='<table><thead><tr><th>'+L("효율","Efficiency")+'</th><th>'+L("스텝","Steps")+'</th><th>'+
-   L("미스릴","Mithril")+'</th><th>'+L("원정 획득","Expedition")+'</th><th>'+L("누적 미스릴","Cumulative")+
+   L("미스릴","Mithril")+'</th><th>'+L("쓸모","Usable")+'</th><th>'+L("누적 미스릴","Cumulative")+
    "</th></tr></thead><tbody>"+
    plan.tiers.map(function(t,i){
     var prev=i?plan.tiers[i-1].eff:null;
     var drop=prev?Math.round((1-t.eff/prev)*100):0;
-    return "<tr"+(i===0?' class="hi"':"")+'><td class="big">'+t.eff.toFixed(3)+
-      (drop>=25?'<div class="tag t-bad">'+L("−"+drop+"%","−"+drop+"%")+"</div>":"")+
-      "</td><td>"+t.steps+"</td><td>"+t.mithril+"</td><td>+"+t.expedition+"%p</td><td>"+t.cumMithril+"</td></tr>";}).join("")+
+    return "<tr"+(i===0?' class="hi"':t.leftover?' class="dead"':"")+'><td class="big">'+t.eff.toFixed(3)+
+      (t.leftover?'<div class="tag t-bad">'+L("쓸모 0","no value")+"</div>":
+       drop>=25?'<div class="tag t-bad">'+L("−"+drop+"%","−"+drop+"%")+"</div>":"")+
+      "</td><td>"+t.steps+"</td><td>"+t.mithril+"</td><td>+"+Math.round(t.useful)+"%p</td><td>"+t.cumMithril+"</td></tr>";}).join("")+
    "</tbody></table>"+
-   '<p class="cap">'+L("효율 = (원정 보너스 + 아레나 가중 × 탐험 보너스) ÷ 미스릴. 청크 효율은 각 조각 안에서 <b>단조 감소</b>하므로, 효율 내림차순으로 사는 것이 <b>모든 예산 지점에서</b> 최적입니다 — 휴리스틱이 아니라 교환 논증으로 증명되는 성질입니다.",
-     "Efficiency = (expedition bonus + arena weight × exploration bonus) ÷ mithril. Chunk efficiency <b>decreases monotonically</b> within each piece, so buying in descending order of efficiency is optimal <b>at every budget point</b> — this is an exchange argument, not a heuristic.")+"</p>";
+   '<p class="cap">'+L("효율 = (필요 축 가중 × 원정 보너스 + 아레나 가중 × 탐험 보너스) ÷ 미스릴. 청크 효율은 각 조각 안에서 <b>단조 감소</b>하므로, 효율 내림차순으로 사는 것이 <b>모든 예산 지점에서</b> 최적입니다 — 휴리스틱이 아니라 교환 논증으로 증명되는 성질입니다.",
+     "Efficiency = (axis weight × expedition bonus + arena weight × exploration bonus) ÷ mithril. Chunk efficiency <b>decreases monotonically</b> within each piece, so buying in descending order of efficiency is optimal <b>at every budget point</b> — this is an exchange argument, not a heuristic.")+"</p>";
  }
  o+="</div>";
  if(top)top.innerHTML=o;
@@ -403,23 +421,26 @@ function gearRender(plan,input){
     "Every piece is at Lv."+GEAR_MS[GEAR_MS.length-1].level+". Nothing left.")+"</p>";
  }else{
   b+='<div class="xscroll"><table id="gSteps"><thead><tr><th>#</th><th></th><th>'+L("조각","Piece")+'</th><th>'+L("좌우","Side")+
-   '</th><th>'+L("작업","Work")+'</th><th>'+L("원정","Expedition")+'</th><th>'+L("효율","Eff")+'</th><th>'+
+   '</th><th>'+L("작업","Work")+'</th><th>'+L("쓸모","Usable")+'</th><th>'+L("효율","Eff")+'</th><th>'+
    L("미스릴","Mithril")+'</th><th>'+L("누적","Cumulative")+'</th><th>'+L("마스터리 선행","Mastery first")+
    "</th></tr></thead><tbody>"+
    shown.map(function(s,i){
     var k=key(s), done=!!GEAR_DONE[k];
     // 통행료를 지나는 스텝은 왜 미스릴이 더 드는지가 표기로 드러나야 한다
     var work="Lv."+s.fromLevel+" → "+
-      s.tolls.map(function(t){return "Lv."+t+"("+L("탐험","exploration")+") → ";}).join("")+
+      s.tolls.map(function(t){return "Lv."+t.level+"("+(t.kind==="axis"?L("불필요","unused"):L("탐험","exploration"))+") → ";}).join("")+
       "Lv."+s.toLevel;
-    return "<tr"+(done?' class="done"':"")+"><td>"+(i+1)+
+    return "<tr"+(done?' class="done"':s.leftover?' class="dead"':"")+"><td>"+(i+1)+
      '</td><td><input type="checkbox" class="gchk" data-k="'+k+'"'+(done?" checked":"")+
      ' aria-label="'+esc(pieceName(s.troop,s.slot)+" Lv."+s.toLevel)+" "+L("완료","done")+'"></td>'+
      '<td class="b">'+esc(pieceName(s.troop,s.slot))+"</td>"+
      "<td>"+sideName(s.side)+'<div class="note">'+gainName(s.gain)+"</div></td>"+
      "<td>"+work+(s.tolls.length?'<div class="note">'+
-       L("탐험 마일스톤은 아레나 전용이라 실전 기여 0 — 지나가는 값입니다","exploration milestones are arena-only, so this is pure toll")+"</div>":"")+"</td>"+
-     '<td class="big">+'+s.expedition+"%p</td><td>"+s.eff.toFixed(3)+"</td><td>"+s.mithril+
+       L(s.tolls.map(function(t){return "Lv."+t.level+(t.kind==="axis"?" "+gearDirName(GEAR_MS.filter(function(m){return m.level===t.level;})[0][s.side])+" · 이 병종이 안 쓰는 축":" 탐험 · 아레나 전용");}).join(" / ")+" — 미스릴만 내고 지나갑니다",
+         s.tolls.map(function(t){return "Lv."+t.level+(t.kind==="axis"?" gives an axis this troop does not use":" is arena-only");}).join(" · ")+" — pure toll")+"</div>":"")+"</td>"+
+     '<td class="big">+'+Math.round(s.useful)+"%p"+
+     (Math.round(s.useful)!==s.expedition?'<div class="note">'+L("원값 +","raw +")+s.expedition+"%p</div>":"")+
+     "</td><td>"+s.eff.toFixed(3)+"</td><td>"+s.mithril+
      "</td><td>"+s.cumMithril+"</td><td>"+(s.masteryPre?
        '<span class="tag t-warn">M'+s.masteryPre.from+"→M"+s.masteryPre.to+'</span><div class="note">'+
        L("에센스 ","essence ")+s.masteryPre.essence+L(" · 신화 "," · mythic ")+s.masteryPre.mythic+"</div>":
@@ -431,6 +452,7 @@ function gearRender(plan,input){
  }
  b+="</div>";
 
+ b+=gearDropBlock(plan.leftover);
  b+=gearCycleRef();
 
  // ── ⑥ 경고 · 한계 ── (접지 않는다)
@@ -440,35 +462,71 @@ function gearRender(plan,input){
 
 /* ⑤ 좌우 사이클 참조 — 입력이 없어도 읽을 값이라 빈 상태에서도 낸다 */
 function gearCycleRef(){
- var gainName=function(x){return x==="attack"?L("공격","Attack"):L("방어","Defense");};
  var exp=GEAR_MS.filter(function(m){return m.tier==="expedition";});
- var tot=function(side,want){return exp.reduce(function(a,m){return a+(m[side]===want?m.bonus:0);},0);};
- var b='<h2>'+L("⑤ 좌우 사이클 참조","⑤ Left / right cycle")+' <span>'+
-   L("총량은 같고 공·방 배분만 다르다","same total, different split")+'</span></h2><div class="panel"><table><thead><tr><th>'+
-   L("원정 마일스톤","Expedition milestone")+'</th><th>'+L("좌 (헬멧·벨트)","Left (helmet, belt)")+'</th><th>'+
-   L("우 (장갑·신발)","Right (gauntlet, boots)")+'</th><th>'+L("미스릴","Mithril")+"</th></tr></thead><tbody>"+
-   exp.map(function(m){return "<tr><td class=\"b\">Lv."+m.level+"</td><td>"+gainName(m.left)+
-     ' <span class="big">+'+m.bonus+"%</span></td><td>"+gainName(m.right)+
-     ' <span class="big">+'+m.bonus+"%</span></td><td>"+m.mithril+"</td></tr>";}).join("")+
-   '<tr class="hi"><td class="b">'+L("완주 합계","Full clear")+"</td><td>"+
-   L("공격","Attack")+" +"+tot("left","attack")+"% · "+L("방어","Defense")+" +"+tot("left","defense")+"%</td><td>"+
-   L("공격","Attack")+" +"+tot("right","attack")+"% · "+L("방어","Defense")+" +"+tot("right","defense")+"%</td><td>"+
-   exp.reduce(function(a,m){return a+m.mithril;},0)+"</td></tr>"+
-   "</tbody></table>"+
-   '<p class="cap">'+L("탐험 마일스톤(Lv."+GEAR_MS.filter(function(m){return m.tier==="exploration";}).map(function(m){return m.level;}).join("·")+
-     ")은 아레나 전용이라 이 표에 없습니다. 미스릴은 내지만 랠리·개리슨 기여는 0입니다.",
-     "Exploration milestones (Lv."+GEAR_MS.filter(function(m){return m.tier==="exploration";}).map(function(m){return m.level;}).join(", ")+
-     ") are arena-only and are not in this table. They cost mithril but contribute nothing to rallies or garrison.")+"</p></div>";
+ var gl={need:["t-ok",L("필요","Needed")],sub:["t-warn",L("보조","Secondary")],axis:["t-off",L("맨 마지막","Last")]};
+ var b='<h2>'+L("⑤ 병종별 필요 축 — 원본 우선순위표","⑤ Which axis each troop needs")+' <span>'+
+  L("좌=헬멧·벨트 / 우=장갑·신발","left = helmet·belt / right = gauntlet·boots")+'</span></h2><div class="panel">'+
+  '<p class="cap">'+L("아래 표는 커뮤니티 <b>HERO GEAR — UPGRADE ORDER</b> 표를 우리 데이터로 다시 그린 것입니다. 좌우 사이클과 골드 스탯 16칸이 그 표와 전부 일치했고, 표가 더해 준 것이 <b>병종마다 쓰는 축이 다르다</b>는 판정입니다.",
+    "The table below is the community <b>HERO GEAR — UPGRADE ORDER</b> chart, redrawn from our own data. All 16 cells of the left/right cycle and the gold stats matched it; what the chart adds is the judgement that <b>each troop only uses one axis</b>.")+"</p>"+
+  '<p class="cap">'+L('<span class="tag t-ok">필요</span> 이 병종이 쓰는 축 · <span class="tag t-warn">보조</span> 궁병 방어(가중 '+GEAR_AXIS_SUB+') · <span class="tag t-off">맨 마지막</span> 안 쓰는 축 — <b>금지가 아니라 우선순위 맨 뒤</b>입니다.',
+    '<span class="tag t-ok">Needed</span> the axis this troop uses · <span class="tag t-warn">Secondary</span> marksman defense (weight '+GEAR_AXIS_SUB+') · <span class="tag t-off">Last</span> an unused axis — <b>not forbidden, just last</b>.')+"</p>"+
+  '<div class="xscroll"><table><thead><tr><th>'+L("병종","Troop")+"</th><th>"+L("조각","Piece")+"</th><th>GOLD</th>"+
+  exp.map(function(m){return "<th>RED +"+m.level+"</th>";}).join("")+"</tr></thead><tbody>";
+ GEAR_ROW_ORDER.forEach(function(t){
+  GEAR_SLOT_ORDER.forEach(function(sl,k){
+   var side=GEAR_SLOTS[sl].side;
+   b+="<tr>"+(k===0?'<td class="b" rowspan="'+GEAR_SLOT_ORDER.length+'" style="vertical-align:middle">'+
+     L(GEAR_TROOPS[t].ko,GEAR_TROOPS[t].en)+"</td>":"");
+   // GOLD 칸은 슬롯 고유 스탯. 주 스탯이면 필요, 아니면 병종 축을 따른다.
+   var gstat=GEAR_SLOTS[sl].stat, gw=(GEAR_AXIS[t]||{})[gstat]||0;
+   var gg=gw>=1?"need":gw>0?"sub":"axis";
+   b+='<td>'+L(GEAR_SLOTS[sl].ko,GEAR_SLOTS[sl].en)+'<div class="note">'+
+     (side==="left"?L("좌","L"):L("우","R"))+"</div></td>"+
+     '<td><span class="tag '+gl[gg][0]+'">'+gearDirName(gstat)+"</span></td>"+
+     exp.map(function(m){var g=gearGrade(t,side,m);
+      return '<td><span class="tag '+gl[g][0]+'">'+gearDirName(m[side])+" +"+m.bonus+"%</span></td>";}).join("")+"</tr>";
+  });
+ });
+ b+="</tbody></table></div>"+
+  '<p class="cap">'+L("완주 합계 — 좌: 공격 +"+exp.reduce(function(a,m){return a+(m.left==="attack"?m.bonus:0);},0)+
+    "% · 방어 +"+exp.reduce(function(a,m){return a+(m.left==="defense"?m.bonus:0);},0)+
+    "% / 우: 공격 +"+exp.reduce(function(a,m){return a+(m.right==="attack"?m.bonus:0);},0)+
+    "% · 방어 +"+exp.reduce(function(a,m){return a+(m.right==="defense"?m.bonus:0);},0)+
+    "%. 좌우는 <b>총량이 같고 공·방 배분만 다릅니다</b>. 탐험 Lv."+
+    GEAR_MS.filter(function(m){return m.tier==="exploration";}).map(function(m){return m.level;}).join("·")+
+    " 은 아레나 전용이라 이 표에 없습니다 — 미스릴은 내지만 실전 기여 0 입니다.",
+    "Full clear — left: attack +"+exp.reduce(function(a,m){return a+(m.left==="attack"?m.bonus:0);},0)+
+    "%, defense +"+exp.reduce(function(a,m){return a+(m.left==="defense"?m.bonus:0);},0)+
+    "% / right: attack +"+exp.reduce(function(a,m){return a+(m.right==="attack"?m.bonus:0);},0)+
+    "%, defense +"+exp.reduce(function(a,m){return a+(m.right==="defense"?m.bonus:0);},0)+
+    "%. The two sides give the <b>same total, split differently</b>. Exploration Lv."+
+    GEAR_MS.filter(function(m){return m.tier==="exploration";}).map(function(m){return m.level;}).join(", ")+
+    " is arena-only and absent here — it costs mithril and contributes nothing in combat.")+"</p></div>";
  return b;
 }
 
 /* ⑥ 경고 · 한계 — 접지 않는다. 미스릴을 쓰기 전에 읽어야 하는 값이라 빈 상태에서도 낸다. */
+function gearDropBlock(lo){
+ if(!lo||!lo.steps)return "";
+ return '<div class="callout co-tip"><h3>'+L("⏹ 맨 마지막 — 완성용 "+lo.steps+"스텝 · 미스릴 "+lo.mithril,
+   "⏹ Last of all — "+lo.steps+" completion steps · "+lo.mithril+" mithril")+"</h3>"+
+  "<p>"+L("아래 자리는 <b>미스릴을 내도 이 병종이 안 쓰는 축</b>만 남았습니다. 원본 표에서 번호가 안 붙은 칸이고, <b>금지가 아니라 맨 마지막</b>이라는 뜻입니다 — 번호 붙은 자리를 다 끝낸 뒤에 조각을 완성하려고 하는 일입니다.",
+    "What is left here only leads to an axis this troop does not use. These are the unnumbered cells of the source chart — <b>not forbidden, just last</b>: you do them after everything numbered, to finish the piece.")+"</p><p>"+
+  lo.pieces.map(function(x){
+   return '<span class="pill">'+esc(L(GEAR_TROOPS[x.troop].ko+" "+GEAR_SLOTS[x.slot].ko,
+     GEAR_TROOPS[x.troop].en+" "+GEAR_SLOTS[x.slot].en))+" Lv."+x.from+"→"+x.to+"</span>";}).join("")+"</p>"+
+  '<p class="cap">'+L("원정 총량으로는 +"+lo.expedition+"%p 가 붙지만 이 편성이 쓰는 축이 아니라 쓸모는 0 입니다.",
+    "It does add +"+lo.expedition+"%p of raw expedition stat, but on an axis this comp does not use, so its usable value is 0.")+"</p></div>";
+}
 function gearWarnBlock(){
  return '<h2>'+L("⑥ 경고 · 이 계산의 한계","⑥ Warnings and limits")+'</h2>'+
   '<div class="callout co-warn"><h3>'+L("⚠️ 되돌릴 수 없는 것","⚠️ What you cannot undo")+"</h3><ul>"+
   GEAR_WARNINGS.map(function(w){return "<li>"+esc(w)+"</li>";}).join("")+"</ul></div>"+
   '<div class="callout co-tip"><h3>'+L("📋 자료의 한계","📋 Where the data runs out")+"</h3><ul>"+
-  GEAR_CAVEATS.map(function(w){return "<li>"+esc(w)+"</li>";}).join("")+"</ul></div>";
+  GEAR_CAVEATS.map(function(w){return "<li>"+esc(w)+"</li>";}).join("")+
+  "<li>"+L("병종별 필요 축은 커뮤니티 <b>HERO GEAR — UPGRADE ORDER</b> 표를 옮긴 것입니다. <b>필요 1.0 · 통행료 0</b> 은 표를 그대로 읽은 값이지만, <b>궁병 방어(보조)의 가중 "+GEAR_AXIS_SUB+" 는 표에 근거가 없는 우리 선택</b>입니다 — 궁병 방어의 순위만 이 숫자에 흔들립니다.",
+    "The per-troop axis grading comes from the community <b>HERO GEAR — UPGRADE ORDER</b> chart. <b>Needed 1.0 and toll 0</b> read straight off it, but the <b>weight "+GEAR_AXIS_SUB+" for marksman defense (secondary) is our own choice</b> — only the ranking of marksman defense depends on it.")+"</li>"+
+  "</ul></div>";
 }
 
 /* ── init ──────────────────────────────────────────────────────────────

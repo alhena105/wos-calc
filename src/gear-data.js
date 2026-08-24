@@ -53,6 +53,28 @@ const GEAR_TROOP_ORDER = ["infantry", "marksman", "lancer"];       // 입력 그
    보병 → 체력(장갑·벨트) / 궁·창 → 치명(헬멧·신발).
    완전히 버려도 되는 축은 창병 체력·창병 방어 하나뿐이다(60/40 기준). */
 
+/* --- 병종별 필요 축 --------------------------------------------------------
+   출처: 커뮤니티 「HERO GEAR — UPGRADE ORDER」 표 (jiujitefu-jitsu, State 2062).
+   32칸 우선순위표를 그대로 옮긴 것이다. 좌우 사이클·골드 스탯 16칸은 우리 GEAR_MS /
+   GEAR_SLOTS 와 전부 일치했고(교차검증 통과), 이 표가 새로 더한 것이 아래 등급이다.
+
+     보병  초록 Defense·Health      / 회색 Attack·Lethality
+     창병  초록 Attack·Lethality    / 회색 Defense·Health
+     궁병  초록 Attack·Lethality·Health / 노랑 Defense   (회색 없음)
+
+   즉 병종마다 필요한 축이 있고 반대 축은 버린다. 표는 회색 칸에 번호를 아예 안 붙였다 —
+   "미루라"가 아니라 "그 스탯은 안 친다"는 뜻이므로, 값 0 = 탐험과 같은 통행료로 다룬다.
+
+   ⚠️ 초록 1.0 / 회색 0 은 표를 그대로 읽은 값이다. 노랑(Secondary)에는 표가 숫자를
+      주지 않는다 — 0.5 는 우리가 고른 값이다. 화면 ⑥ 한계에 그렇게 적는다.
+--------------------------------------------------------------------------- */
+const GEAR_AXIS = {
+  infantry: { attack: 0,   defense: 1,   health: 1,   lethality: 0   },
+  lancer:   { attack: 1,   defense: 0,   health: 0,   lethality: 1   },
+  marksman: { attack: 1,   defense: 0.5, health: 1,   lethality: 1   }
+};
+const GEAR_AXIS_SUB = 0.5;   // 노랑(Secondary) 가중 — 표에 근거 없음, 우리가 고른 값
+
 /* --- 마스터리 승급 --------------------------------------------------------
    Lv.N 승급 = 에센스 N*10 + 신화조각 max(0, N-10)
    홍색 Lv.100 은 M15 면 충분. M16~20 은 미스릴 진행과 무관한 순수 스탯 버프.

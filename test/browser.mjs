@@ -194,14 +194,19 @@ await ko.waitForTimeout(120);
   const b = await ko.textContent("#gOutBot");
   ok(/Lv\.40\(탐험\) → Lv\.60/.test(b.replace(/\s+/g, " ")), "통행료 표기 Lv.40(탐험) → Lv.60");
   const rows = await ko.evaluate(() => document.querySelectorAll("#gSteps tbody tr").length);
-  ok(rows === 28, "업그레이드 순서 28행", String(rows));
+  // 역할 가중을 켜면 회색 칸이 맨 뒤 "완성용" 한 덩어리로 뭉쳐 스텝 수가 준다 (28 → 21)
+  ok(rows === 21, "업그레이드 순서 21행", String(rows));
+  const lo = await ko.evaluate(() => document.querySelectorAll("#gSteps tbody tr.dead").length);
+  ok(lo === 4, "맨 뒤 완성용 4행이 흐리게 표시된다", String(lo));
+  ok(/맨 마지막 — 완성용/.test(await ko.textContent("#gOutBot")), "완성용 안내가 붙는다");
+  ok(/필요/.test(await ko.textContent("#gGridLegend")), "범례가 필요·보조·통행료로 나뉜다");
 }
 // 예산 슬라이더 — 줄이면 표가 짧아진다
 await ko.evaluate(() => { const b = gBudget; b.value = "60"; b.dispatchEvent(new Event("input", {bubbles: true})); });
 await ko.waitForTimeout(80);
 {
   const rows = await ko.evaluate(() => document.querySelectorAll("#gSteps tbody tr").length);
-  ok(rows === 6, "예산 60 이면 eff 2.000 구간 6행만 남는다", String(rows));
+  ok(rows === 4, "예산 60 이면 eff 2.000~1.000 구간 4행만 남는다", String(rows));
 }
 await ko.evaluate(() => { const b = gBudget; b.value = b.max; b.dispatchEvent(new Event("input", {bubbles: true})); });
 await ko.waitForTimeout(80);
@@ -221,7 +226,7 @@ await ko.waitForTimeout(80);
 // 스텝이 계속 감춰진다. Orca 브라우저에서 실제로 그렇게 잡혔다.
 {
   const rows = await ko.evaluate(() => document.querySelectorAll("#gSteps tbody tr").length);
-  ok(rows === 28, "총액이 회복되면 예산 슬라이더도 따라와 28행이 돌아온다", String(rows));
+  ok(rows === 21, "총액이 회복되면 예산 슬라이더도 따라와 21행이 돌아온다", String(rows));
 }
 // 경고·한계는 접지 않고 전부 노출
 {
