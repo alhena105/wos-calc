@@ -245,6 +245,20 @@ ok((await ko.textContent("#gaSum")).trim() === "", "합이 100이면 경고 없�
   ok(rows.join(",") === "보병,창병,궁병", "카드 행이 보 → 창 → 궁", rows.join(","));
   const cards = await ko.evaluate(() => document.querySelectorAll(".gcard").length);
   ok(cards === 12, "카드 12장", String(cards));
+  // 병종 한 칸 안에서 2×2 — 헬멧·장갑 / 벨트·신발. 좌(헬멧·벨트)가 세로로 맞아야 한다.
+  {
+    const lay = await ko.evaluate(() => {
+      const cs = [...document.querySelectorAll(".gsec")[0].querySelectorAll(".gcard")];
+      const top = cs[0].getBoundingClientRect().top;
+      return {
+        cols: getComputedStyle(cs[0].parentElement).gridTemplateColumns.split(" ").length,
+        row1: cs.filter(c => Math.abs(c.getBoundingClientRect().top - top) < 2).length,
+        leftAligned: Math.abs(cs[0].getBoundingClientRect().left - cs[2].getBoundingClientRect().left) < 2,
+      };
+    });
+    ok(lay.cols === 2 && lay.row1 === 2, "병종 한 칸이 2열 × 2줄", JSON.stringify(lay));
+    ok(lay.leftAligned, "헬멧과 벨트(좌 계열)가 같은 열에 선다");
+  }
   // 트랙이 입력을 따라 갱신되는가 — 카드를 다시 만들지 않고 트랙만 갈아끼운다
   await ko.fill("#gl_lancer_belt", "85");
   await ko.waitForTimeout(80);

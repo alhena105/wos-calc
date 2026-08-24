@@ -111,12 +111,13 @@ footer a{color:var(--accent);text-decoration:none}
    새 색을 만들지 않는다. 위의 CSS 변수만 쓴다. */
 /* 12조각 입력 — 병종 3줄(보→창→궁) × 슬롯 4장 카드.
    행 순서는 화면 전용이다. 엔진 타이브레이크의 GEAR_TROOP_ORDER 와 별개다. */
-.gsec{margin-top:15px}
-.gsec:first-child{margin-top:6px}
+.gwrap{display:grid;grid-template-columns:repeat(auto-fit,minmax(322px,1fr));gap:14px;margin-top:8px}
+.gsec{min-width:0}
 .gsec>h4{margin:0 0 8px;font-size:13.5px;display:flex;align-items:center;gap:8px;font-weight:700}
 .gsec>h4 .dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
 .gsec>h4 span{font-size:11px;color:var(--muted);font-weight:400;letter-spacing:.3px}
-.gcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(178px,1fr));gap:9px}
+/* 병종 한 칸 안에서 헬멧·장갑 / 벨트·신발 두 줄 — 좌(헬멧·벨트)·우(장갑·신발) 가 세로로 맞는다 */
+.gcards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
 .gcard{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px 11px 10px}
 .gcard.main{border-color:#3d4c72}
 .gcard>header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
@@ -139,7 +140,7 @@ footer a{color:var(--accent);text-decoration:none}
  background:var(--muted);transform:translateX(-1px)}
 .ms>b.exp{background:var(--star);width:3px;transform:translateX(-1.5px)}
 .ms>b.on{opacity:.4}
-.msn{display:flex;justify-content:space-between;gap:6px;font-size:10.5px;color:var(--muted);margin-top:5px}
+.msn{display:flex;justify-content:space-between;flex-wrap:wrap;gap:1px 8px;font-size:10.5px;color:var(--muted);margin-top:5px}
 .mslegend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:13px;font-size:11.5px;color:var(--muted)}
 .mstag{display:flex;align-items:center;gap:6px}
 .mstag i{width:3px;height:12px;border-radius:1px;flex:0 0 auto;background:var(--muted)}
@@ -160,7 +161,7 @@ input[type=range]{padding:0;accent-color:var(--accent);background:none;border:no
 textarea{width:100%;background:var(--card2);color:var(--ink);border:1px solid var(--line);
  border-radius:9px;padding:9px 10px;font-size:12px;font-family:ui-monospace,Menlo,Consolas,monospace;
  min-height:120px;margin-top:8px}
-@media(max-width:700px){.gcards{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}}
+@media(max-width:700px){.gwrap{gap:12px}.gcards{gap:8px}.gcard{padding:9px 9px 9px}}
 @media(max-width:700px){table{font-size:12px}.ratio3{grid-template-columns:1fr}}
 </style>
 </head>
@@ -1526,7 +1527,7 @@ function gearGrid(){
  var keep={};
  GEAR_CELLS.forEach(function(c){
   ["gm","gl"].forEach(function(p){var e=gEl(gid(p,c[0],c[1])); if(e)keep[gid(p,c[0],c[1])]=e.value;});});
- var h="";
+ var h='<div class="gwrap">';
  GEAR_ROW_ORDER.forEach(function(t){
   h+='<div class="gsec"><h4><i class="dot" style="background:'+GEAR_ROW_COLOR[t]+'"></i>'+
    L(GEAR_TROOPS[t].ko,GEAR_TROOPS[t].en)+"<span>"+
@@ -1550,7 +1551,7 @@ function gearGrid(){
   });
   h+="</div></div>";
  });
- box.innerHTML=h;
+ box.innerHTML=h+"</div>";
  Object.keys(keep).forEach(function(k){var e=gEl(k); if(e)e.value=keep[k];});
  var lg=gEl("gGridLegend");
  if(lg)lg.innerHTML='<span class="mstag"><i class="exp"></i>'+

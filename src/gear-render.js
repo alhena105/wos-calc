@@ -167,7 +167,7 @@ function gearGrid(){
  var keep={};
  GEAR_CELLS.forEach(function(c){
   ["gm","gl"].forEach(function(p){var e=gEl(gid(p,c[0],c[1])); if(e)keep[gid(p,c[0],c[1])]=e.value;});});
- var h="";
+ var h='<div class="gwrap">';
  GEAR_ROW_ORDER.forEach(function(t){
   h+='<div class="gsec"><h4><i class="dot" style="background:'+GEAR_ROW_COLOR[t]+'"></i>'+
    L(GEAR_TROOPS[t].ko,GEAR_TROOPS[t].en)+"<span>"+
@@ -191,7 +191,7 @@ function gearGrid(){
   });
   h+="</div></div>";
  });
- box.innerHTML=h;
+ box.innerHTML=h+"</div>";
  Object.keys(keep).forEach(function(k){var e=gEl(k); if(e)e.value=keep[k];});
  var lg=gEl("gGridLegend");
  if(lg)lg.innerHTML='<span class="mstag"><i class="exp"></i>'+
