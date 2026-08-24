@@ -324,26 +324,39 @@ ok((await ko.textContent("#gaSum")).trim() === "", "합이 100이면 경고 없�
 }
 
 // 표 칸이 두 줄로 접히지 않는다.
-// 배포본에서 순서표의 '보병 헬멧' 이 공백에서 접혔다 — '작업' 칸이 폭을 다 먹어
-// 조각 칸이 1400px 화면에서도 71px 였다. 접혀도 되는 건 '작업' 칸 하나뿐이다.
-// 뱃지가 섞인 칸은 rect 가 여러 개라 줄 수 판정이 안 되므로 텍스트만 있는 칸만 본다.
+// 배포본에서 순서표의 "보병 헬멧" 이 접혔고(작업 칸이 폭을 다 먹어 조각 칸이 71px),
+// 그걸 nowrap 으로 고치면서 예외를 .note 전체로 너무 넓게 줘서 이번엔 좌우 칸의 "방어" 가
+// 24px 안에서 방/어 로 쪼개졌다(한글은 음절 사이에서 끊긴다). 둘 다 여기서 잡는다.
+//
+// 검사 단위가 중요하다:
+//  - 칸 단위로 높이를 보면 패딩을 접힘으로 오인한다
+//  - 뱃지가 섞인 칸은 getClientRects() 가 여러 개라 칸 단위 Range 로는 판정이 안 된다
+//  - 자식이 있는 칸을 빼면 좌우 칸(<div class="note">)을 놓친다  ← 실제로 놓쳤다
+//  → 표 안의 텍스트 노드마다 Range 로 줄 수를 센다. 일부러 접히는 .work/.cap 만 뺀다.
 for (const w of [1400, 1024, 800, 600, 390, 320]) {
   const r = await ko.evaluate(width => {
     const st = document.createElement("style");
     st.id = "pwnarrow"; st.textContent = "html{width:" + width + "px!important}";
     document.head.appendChild(st);
-    const lines = el => { const g = document.createRange(); g.selectNodeContents(el);
-      return new Set([...g.getClientRects()].map(x => Math.round(x.top))).size; };
     const bad = [];
-    document.querySelectorAll("#tab-gear table td, #tab-gear table th").forEach(c => {
-      if (c.children.length || !c.textContent.trim()) return;
-      if (lines(c) > 1) bad.push(c.textContent.trim().slice(0, 14));
+    document.querySelectorAll("#tab-gear table").forEach(tb => {
+      const tw = document.createTreeWalker(tb, NodeFilter.SHOW_TEXT);
+      for (let n; (n = tw.nextNode());) {
+        if (!n.textContent.trim()) continue;
+        let skip = false;
+        for (let e = n.parentElement; e && e !== tb; e = e.parentElement)
+          if (e.classList.contains("work") || e.classList.contains("cap")) skip = true;
+        if (skip) continue;
+        const g = document.createRange(); g.selectNodeContents(n);
+        if (new Set([...g.getClientRects()].map(x => Math.round(x.top))).size > 1)
+          bad.push((tb.id || "table") + " [" + n.textContent.trim().slice(0, 14) + "]");
+      }
     });
     const body = document.body.scrollWidth;
     st.remove();
     return {body, bad: [...new Set(bad)]};
   }, w);
-  ok(r.bad.length === 0, w + "px 에서 표 칸이 두 줄로 접히지 않는다", r.bad.join(" / "));
+  ok(r.bad.length === 0, w + "px 에서 표 안 글자가 접히지 않는다", r.bad.slice(0, 4).join(" / "));
   ok(r.body <= w + 2, w + "px 에서 본문이 가로로 넘치지 않는다", r.body + "px");
 }
 
