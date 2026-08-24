@@ -193,9 +193,12 @@ await ko.waitForTimeout(120);
   ok(/130/.test(t), "주당 12 → 130주");
   const b = await ko.textContent("#gOutBot");
   ok(/Lv\.40\(탐험\) → Lv\.60/.test(b.replace(/\s+/g, " ")), "통행료 표기 Lv.40(탐험) → Lv.60");
-  const rows = await ko.evaluate(() => document.querySelectorAll("#gSteps tbody tr").length);
-  // 역할 가중을 켜면 회색 칸이 맨 뒤 "완성용" 한 덩어리로 뭉쳐 스텝 수가 준다 (28 → 21)
-  ok(rows === 21, "업그레이드 순서 21행", String(rows));
+  // 스텝 수는 GEAR_AXIS_SUB 에 따라 바뀐다. 상수로 박지 말고 엔진과 화면이 맞는지를 본다.
+  const {rows, want} = await ko.evaluate(() => ({
+    rows: document.querySelectorAll("#gSteps tbody tr").length,
+    want: gearPlan(gearInput()).steps.length,
+  }));
+  ok(rows === want && rows > 12, "순서표 행 수가 엔진 스텝 수와 같다", rows + " vs " + want);
   const lo = await ko.evaluate(() => document.querySelectorAll("#gSteps tbody tr.dead").length);
   ok(lo === 4, "맨 뒤 완성용 4행이 흐리게 표시된다", String(lo));
   ok(/맨 마지막 — 완성용/.test(await ko.textContent("#gOutBot")), "완성용 안내가 붙는다");
@@ -226,8 +229,12 @@ await ko.waitForTimeout(80);
 // 총액이 줄었다 돌아오면 예산도 따라와야 한다 — 안 그러면 슬라이더가 낮은 값에 눌러앉아
 // 스텝이 계속 감춰진다. Orca 브라우저에서 실제로 그렇게 잡혔다.
 {
-  const rows = await ko.evaluate(() => document.querySelectorAll("#gSteps tbody tr").length);
-  ok(rows === 21, "총액이 회복되면 예산 슬라이더도 따라와 21행이 돌아온다", String(rows));
+  const back = await ko.evaluate(() => ({
+    rows: document.querySelectorAll("#gSteps tbody tr").length,
+    want: gearPlan(gearInput()).steps.length,
+  }));
+  ok(back.rows === back.want, "총액이 회복되면 예산 슬라이더도 따라와 전체가 돌아온다",
+     back.rows + " vs " + back.want);
 }
 // 경고·한계는 접지 않고 전부 노출
 {

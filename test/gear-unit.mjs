@@ -310,8 +310,13 @@ section("원본 우선순위표 대조");
      on.totals.essence === off.totals.essence && on.totals.mythic === off.totals.mythic,
      "역할 가중은 순서만 바꾸고 총액은 그대로다",
      JSON.stringify([on.totals.mithril, off.totals.mithril, on.totals.mythic, off.totals.mythic]));
-  ok(on.totals.useful === 600 && off.totals.useful === 1020,
-     "쓸모는 달라진다 (켬 600 / 끔 1020)", on.totals.useful + " / " + off.totals.useful);
+  // 쓸모는 달라진다. 매직넘버로 박으면 GEAR_AXIS_SUB 를 건드릴 때 뜻이 안 보이므로 유도한다:
+  //   필수(가중 1)로 얻는 원정 510%p + 궁병 방어 180%p × SUB
+  //   (궁병 방어 180 = 헬멧 60:30 + 신발 100:50 + 장갑 20:20·100:50 + 벨트 60:30)
+  ok(off.totals.useful === 1020, "가중을 끄면 쓸모 = 원정 총량 1020", String(off.totals.useful));
+  ok(Math.abs(on.totals.useful - (510 + 180 * G.GEAR_AXIS_SUB)) < 1e-9,
+     "가중을 켜면 쓸모 = 510 + 궁병방어 180 × " + G.GEAR_AXIS_SUB,
+     on.totals.useful + " vs " + (510 + 180 * G.GEAR_AXIS_SUB));
   const lo = on.tiers[on.tiers.length - 1];
   ok(lo.eff === 0 && lo.leftover && lo.steps === 4 && lo.mithril === 360,
      "맨 뒤가 효율 0 완성용 구간 4스텝 · 미스릴 360", JSON.stringify(lo));
