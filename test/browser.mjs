@@ -203,6 +203,12 @@ ok(/상한을 넘는/.test(await ko.textContent("#gGridWarn")), "마스터리 �
 ok((await ko.textContent("#gOutBot")).length > 200, "경고가 떠도 계산은 계속된다");
 await ko.fill("#gl_infantry_helmet", "1");
 await ko.waitForTimeout(80);
+// 총액이 줄었다 돌아오면 예산도 따라와야 한다 — 안 그러면 슬라이더가 낮은 값에 눌러앉아
+// 스텝이 계속 감춰진다. Orca 브라우저에서 실제로 그렇게 잡혔다.
+{
+  const rows = await ko.evaluate(() => document.querySelectorAll("#gSteps tbody tr").length);
+  ok(rows === 28, "총액이 회복되면 예산 슬라이더도 따라와 28행이 돌아온다", String(rows));
+}
 // 경고·한계는 접지 않고 전부 노출
 {
   const n = await ko.evaluate(() => document.querySelectorAll("#gOutBot .callout li").length);

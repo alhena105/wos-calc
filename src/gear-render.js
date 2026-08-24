@@ -11,7 +11,7 @@
 var GEAR_TAB = "comp";
 var GEAR_ARENA = "none";
 var GEAR_DONE = {};        // "병종/슬롯/seq" → true (체크박스)
-var GEAR_BUDGET = null;    // 미스릴 예산 슬라이더. null = 전액
+var GEAR_BUDGET = null;    // 미스릴 예산 슬라이더. null = 아직 안 건드림 = 항상 전액
 var GEAR_LS = "wos-calc.gear.v1";
 var GEAR_CELLS = [];       // [[병종, 슬롯], ...] — 그리드 순서
 GEAR_TROOP_ORDER.forEach(function(t){GEAR_SLOT_ORDER.forEach(function(s){GEAR_CELLS.push([t,s]);});});
@@ -205,14 +205,16 @@ function gearRender(plan,input){
  var key=function(s){return s.troop+"/"+s.slot+"/"+s.seq;};
 
  // 예산 슬라이더 — 총액이 바뀌면 범위를 다시 잡는다
+ // GEAR_BUDGET 은 사용자가 슬라이더를 실제로 움직였을 때만 값이 들어간다.
+ // 여기서 총액으로 덮어쓰면 안 된다 — 조각 레벨을 잠깐 올렸다 내리는 사이 총액이 줄었을 때
+ // 예산이 그 값에 눌러앉아, 총액이 회복돼도 스텝이 계속 감춰진다(Orca 브라우저에서 잡혔다).
+ var budget=GEAR_BUDGET===null?T.mithril:Math.min(GEAR_BUDGET,T.mithril);
  var bud=gEl("gBudget");
  if(bud){
   bud.max=String(T.mithril);
   bud.step="10";   // 총액에 비례한 눈금은 값이 엉뚱하게 스냅된다. 미스릴은 10 단위면 충분하다.
-  if(GEAR_BUDGET===null||GEAR_BUDGET>T.mithril)GEAR_BUDGET=T.mithril;
-  bud.value=String(GEAR_BUDGET);
+  bud.value=String(budget);
  }
- var budget=GEAR_BUDGET===null?T.mithril:GEAR_BUDGET;
  var shown=plan.steps.filter(function(s){return s.cumMithril<=budget;});
  var bn=gEl("gBudgetN");
  if(bn)bn.innerHTML=L("미스릴 <b>"+budget+"</b> 안에서 실행 가능한 <b>"+shown.length+"</b>스텝 / 전체 "+
