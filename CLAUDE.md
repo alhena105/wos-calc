@@ -187,7 +187,7 @@ Playwright 는 저장소 의존성이 아니다 — 필요할 때 `npm i -D play
 이 표의 **좌우 사이클 · 골드 스탯 16칸이 우리 `GEAR_MS`/`GEAR_SLOTS` 와 전부 일치**했다(교차검증 통과).
 표가 새로 더해 준 것이 `GEAR_AXIS` 다:
 
-| | 초록(필요) | 노랑(보조) | 회색 |
+| | 초록(필수) | 노랑(추천) | 회색(맨 마지막) |
 |---|---|---|---|
 | 보병 | Defense · Health | — | Attack · Lethality |
 | 창병 | Attack · Lethality | — | Defense · Health |
@@ -199,6 +199,7 @@ Playwright 는 저장소 의존성이 아니다 — 필요할 때 `npm i -D play
 **바뀌는 건 순서와 "실제 쓸모"뿐**이다.
 
 ⚠️ **초록 1.0 · 회색 0 은 표를 그대로 읽은 값이지만, 노랑 `GEAR_AXIS_SUB = 0.5` 는 우리가 고른 값이다.**
+화면 라벨은 **필수 / 추천 / 맨 마지막** 이다(표 원문 키는 Recommended / Secondary / Not important).
 표는 "Secondary" 라고만 적었지 숫자를 안 준다. 화면 ⑥ 한계에 그렇게 밝힌다.
 
 ### 왜 "청크" 로 자르는가 — 이 설계의 핵심

@@ -199,7 +199,8 @@ await ko.waitForTimeout(120);
   const lo = await ko.evaluate(() => document.querySelectorAll("#gSteps tbody tr.dead").length);
   ok(lo === 4, "맨 뒤 완성용 4행이 흐리게 표시된다", String(lo));
   ok(/맨 마지막 — 완성용/.test(await ko.textContent("#gOutBot")), "완성용 안내가 붙는다");
-  ok(/필요/.test(await ko.textContent("#gGridLegend")), "범례가 필요·보조·통행료로 나뉜다");
+  ok(/필수/.test(await ko.textContent("#gGridLegend")) && /추천/.test(await ko.textContent("#gGridLegend")),
+     "범례가 필수·추천·통행료로 나뉜다", await ko.textContent("#gGridLegend"));
 }
 // 예산 슬라이더 — 줄이면 표가 짧아진다
 await ko.evaluate(() => { const b = gBudget; b.value = "60"; b.dispatchEvent(new Event("input", {bubbles: true})); });

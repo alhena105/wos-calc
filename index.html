@@ -1591,10 +1591,10 @@ function gearTrack(troop,slot,level,entered){
  var pct=Math.max(0,Math.min(100,level/max*100));
  var ticks=GEAR_MS.map(function(m){
   var g=gearGrade(troop,side,m), t;
-  if(g==="need")t=L("필요 — "+gearDirName(m[side])+" +"+m.bonus+"%",
-                    "needed — "+m[side]+" +"+m.bonus+"%");
-  else if(g==="sub")t=L("보조 — "+gearDirName(m[side])+" +"+m.bonus+"% (가중 "+GEAR_AXIS_SUB+")",
-                        "secondary — "+m[side]+" +"+m.bonus+"% (weight "+GEAR_AXIS_SUB+")");
+  if(g==="need")t=L("필수 — "+gearDirName(m[side])+" +"+m.bonus+"%",
+                    "essential — "+m[side]+" +"+m.bonus+"%");
+  else if(g==="sub")t=L("추천 — "+gearDirName(m[side])+" +"+m.bonus+"% (가중 "+GEAR_AXIS_SUB+")",
+                        "recommended — "+m[side]+" +"+m.bonus+"% (weight "+GEAR_AXIS_SUB+")");
   else if(g==="axis")t=L("통행료 — "+gearDirName(m[side])+"는 "+L(GEAR_TROOPS[troop].ko,"")+"에게 안 쓰는 축",
                          "toll — "+m[side]+" is not an axis "+GEAR_TROOPS[troop].en+" use");
   else t=L("통행료 — 탐험은 아레나 전용","toll — exploration is arena only");
@@ -1651,8 +1651,8 @@ function gearGrid(){
  Object.keys(keep).forEach(function(k){var e=gEl(k); if(e)e.value=keep[k];});
  var lg=gEl("gGridLegend");
  if(lg)lg.innerHTML=
-   '<span class="mstag"><i class="g-need"></i>'+L("필요 — 이 병종이 쓰는 축","Needed — the axis this troop uses")+"</span>"+
-   '<span class="mstag"><i class="g-sub"></i>'+L("보조 — 궁병 방어(가중 "+GEAR_AXIS_SUB+")","Secondary — marksman defense (weight "+GEAR_AXIS_SUB+")")+"</span>"+
+   '<span class="mstag"><i class="g-need"></i>'+L("필수 — 이 병종이 쓰는 축","Essential — the axis this troop uses")+"</span>"+
+   '<span class="mstag"><i class="g-sub"></i>'+L("추천 — 궁병 방어(가중 "+GEAR_AXIS_SUB+")","Recommended — marksman defense (weight "+GEAR_AXIS_SUB+")")+"</span>"+
    '<span class="mstag"><i class="g-axis"></i>'+L("통행료 — 미스릴은 내고 얻는 건 안 쓰는 축이거나 아레나 전용","Toll — you pay mithril and get an unused axis, or arena-only stats")+"</span>";
  var cap=gEl("gGridCap");
  if(cap)cap.innerHTML=L("<b>+1 은 아직 한 번도 돌파하지 않은 상태입니다.</b> 홍색은 Lv.1 에서 시작해 Lv."+
@@ -1899,13 +1899,13 @@ function gearRender(plan,input){
 /* ⑤ 좌우 사이클 참조 — 입력이 없어도 읽을 값이라 빈 상태에서도 낸다 */
 function gearCycleRef(){
  var exp=GEAR_MS.filter(function(m){return m.tier==="expedition";});
- var gl={need:["t-ok",L("필요","Needed")],sub:["t-warn",L("보조","Secondary")],axis:["t-off",L("맨 마지막","Last")]};
- var b='<h2>'+L("⑤ 병종별 필요 축 — 원본 우선순위표","⑤ Which axis each troop needs")+' <span>'+
+ var gl={need:["t-ok",L("필수","Essential")],sub:["t-warn",L("추천","Recommended")],axis:["t-off",L("맨 마지막","Last")]};
+ var b='<h2>'+L("⑤ 병종별 필수 축 — 원본 우선순위표","⑤ Which axis each troop needs")+' <span>'+
   L("좌=헬멧·벨트 / 우=장갑·신발","left = helmet·belt / right = gauntlet·boots")+'</span></h2><div class="panel">'+
   '<p class="cap">'+L("아래 표는 커뮤니티 <b>HERO GEAR — UPGRADE ORDER</b> 표를 우리 데이터로 다시 그린 것입니다. 좌우 사이클과 골드 스탯 16칸이 그 표와 전부 일치했고, 표가 더해 준 것이 <b>병종마다 쓰는 축이 다르다</b>는 판정입니다.",
     "The table below is the community <b>HERO GEAR — UPGRADE ORDER</b> chart, redrawn from our own data. All 16 cells of the left/right cycle and the gold stats matched it; what the chart adds is the judgement that <b>each troop only uses one axis</b>.")+"</p>"+
-  '<p class="cap">'+L('<span class="tag t-ok">필요</span> 이 병종이 쓰는 축 · <span class="tag t-warn">보조</span> 궁병 방어(가중 '+GEAR_AXIS_SUB+') · <span class="tag t-off">맨 마지막</span> 안 쓰는 축 — <b>금지가 아니라 우선순위 맨 뒤</b>입니다.',
-    '<span class="tag t-ok">Needed</span> the axis this troop uses · <span class="tag t-warn">Secondary</span> marksman defense (weight '+GEAR_AXIS_SUB+') · <span class="tag t-off">Last</span> an unused axis — <b>not forbidden, just last</b>.')+"</p>"+
+  '<p class="cap">'+L('<span class="tag t-ok">필수</span> 이 병종이 쓰는 축 · <span class="tag t-warn">추천</span> 궁병 방어(가중 '+GEAR_AXIS_SUB+') · <span class="tag t-off">맨 마지막</span> 안 쓰는 축 — <b>금지가 아니라 우선순위 맨 뒤</b>입니다.',
+    '<span class="tag t-ok">Essential</span> the axis this troop uses · <span class="tag t-warn">Recommended</span> marksman defense (weight '+GEAR_AXIS_SUB+') · <span class="tag t-off">Last</span> an unused axis — <b>not forbidden, just last</b>.')+"</p>"+
   '<div class="xscroll"><table><thead><tr><th>'+L("병종","Troop")+"</th><th>"+L("조각","Piece")+"</th><th>GOLD</th>"+
   exp.map(function(m){return "<th>RED +"+m.level+"</th>";}).join("")+"</tr></thead><tbody>";
  GEAR_ROW_ORDER.forEach(function(t){
@@ -1960,8 +1960,8 @@ function gearWarnBlock(){
   GEAR_WARNINGS.map(function(w){return "<li>"+esc(w)+"</li>";}).join("")+"</ul></div>"+
   '<div class="callout co-tip"><h3>'+L("📋 자료의 한계","📋 Where the data runs out")+"</h3><ul>"+
   GEAR_CAVEATS.map(function(w){return "<li>"+esc(w)+"</li>";}).join("")+
-  "<li>"+L("병종별 필요 축은 커뮤니티 <b>HERO GEAR — UPGRADE ORDER</b> 표를 옮긴 것입니다. <b>필요 1.0 · 통행료 0</b> 은 표를 그대로 읽은 값이지만, <b>궁병 방어(보조)의 가중 "+GEAR_AXIS_SUB+" 는 표에 근거가 없는 우리 선택</b>입니다 — 궁병 방어의 순위만 이 숫자에 흔들립니다.",
-    "The per-troop axis grading comes from the community <b>HERO GEAR — UPGRADE ORDER</b> chart. <b>Needed 1.0 and toll 0</b> read straight off it, but the <b>weight "+GEAR_AXIS_SUB+" for marksman defense (secondary) is our own choice</b> — only the ranking of marksman defense depends on it.")+"</li>"+
+  "<li>"+L("병종별 필수 축은 커뮤니티 <b>HERO GEAR — UPGRADE ORDER</b> 표를 옮긴 것입니다. <b>필수 1.0 · 맨 마지막 0</b> 은 표를 그대로 읽은 값이지만, <b>궁병 방어(추천)의 가중 "+GEAR_AXIS_SUB+" 는 표에 근거가 없는 우리 선택</b>입니다 — 궁병 방어의 순위만 이 숫자에 흔들립니다.",
+    "The per-troop axis grading comes from the community <b>HERO GEAR — UPGRADE ORDER</b> chart. <b>Essential 1.0 and last 0</b> read straight off it, but the <b>weight "+GEAR_AXIS_SUB+" for marksman defense (secondary) is our own choice</b> — only the ranking of marksman defense depends on it.")+"</li>"+
   "</ul></div>";
 }
 
