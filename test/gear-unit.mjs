@@ -1,0 +1,374 @@
+// 장비 계산기 검사. 브라우저 없이 돈다.
+//   node test/gear-unit.mjs
+//
+// FIXTURE 와 그 아래 표들이 이 엔진의 정답지다. 하나라도 어긋나면 엔진이 틀린 것이지
+// 픽스처가 틀린 게 아니다 — 이 도메인은 직관이 반복해서 틀리는 곳이라 수치를 먼저 고정했다.
+import {readFileSync} from "node:fs";
+import {fileURLToPath} from "node:url";
+import {dirname, join} from "node:path";
+import vm from "node:vm";
+import {boot} from "./dom.mjs";
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const src = p => readFileSync(join(ROOT, "src", p), "utf8");
+
+const KNOWN_DEFECTS = {
+  // 비어 있는 게 정상이다. unit.mjs 의 같은 이름 주석 참고.
+};
+let pass = 0, fail = 0, known = 0;
+const fails = [], stale = [];
+function ok(cond, name, detail) {
+  const isKnown = Object.prototype.hasOwnProperty.call(KNOWN_DEFECTS, name);
+  if (cond) { pass++; if (isKnown) stale.push(name); return true; }
+  if (isKnown) { known++; console.log("   🔧 알려진 결함 — " + name + ": " + KNOWN_DEFECTS[name]); return false; }
+  fail++; fails.push(name + (detail ? " — " + detail : "")); return false;
+}
+function section(t) { console.log("\n── " + t + " " + "─".repeat(Math.max(0, 58 - t.length))); }
+function note(t) { console.log("   " + t); }
+
+// ── 로더 ───────────────────────────────────────────────────────────────
+const EXPORTS = "GEAR_MS,GEAR_SLOTS,GEAR_SLOT_ORDER,GEAR_TROOPS,GEAR_TROOP_ORDER,GEAR_MASTERY," +
+  "GEAR_XP_BANDS,GEAR_DEFAULTS,GEAR_CAVEATS,GEAR_WARNINGS,I18N_TABLES," +
+  "gearChunksFor,gearMasteryCost,gearLevelCap,gearTroopWeight,gearPlan";
+function load(lang) {
+  const code = src("i18n.js") + src("gear-data.js") + src("gear-engine.js") +
+    "\n;globalThis.__api={" + EXPORTS + "};\n";
+  const sandbox = {
+    console, URLSearchParams,
+    location: {search: lang ? "?lang=" + lang : "", href: "https://x/"},
+    navigator: {language: "ko"},
+    history: {replaceState() {}},
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(code, sandbox, {filename: "gear.js"});
+  return sandbox;
+}
+const CTX = load("ko");
+const G = CTX.__api;
+
+// ── 정답지 ─────────────────────────────────────────────────────────────
+const FIXTURE = {
+  ratios: {
+    attack:  {infantry: 48, lancer: 4,  marksman: 48},
+    defense: {infantry: 60, lancer: 40, marksman: 0},
+  },
+  attackWeight: 0.75,
+  arenaPriority: "none",
+  mithrilPerWeek: 12,
+  gear: {
+    infantry: {helmet: [11, 1],  gauntlet: [15, 61], belt: [15, 60], boots: [11, 2]},
+    marksman: {helmet: [13, 59], gauntlet: [11, 1],  belt: [11, 1],  boots: [13, 59]},
+    lancer:   {helmet: [13, 40], gauntlet: [11, 3],  belt: [11, 1],  boots: [13, 40]},
+  },
+};
+
+// "번호 병종 슬롯 도달레벨 통행료 방향 효율 미스릴 누적 [마스터리]"
+const ORDER = [
+  ["infantry", "boots",    20,  [],   "defense", 2.000, 10,   10, null],
+  ["infantry", "helmet",   20,  [],   "attack",  2.000, 10,   20, null],
+  ["marksman", "belt",     20,  [],   "attack",  2.000, 10,   30, null],
+  ["marksman", "gauntlet", 20,  [],   "defense", 2.000, 10,   40, null],
+  ["lancer",   "belt",     20,  [],   "attack",  2.000, 10,   50, null],
+  ["lancer",   "gauntlet", 20,  [],   "defense", 2.000, 10,   60, null],
+  ["marksman", "boots",    60,  [],   "attack",  1.000, 30,   90, null],
+  ["marksman", "helmet",   60,  [],   "defense", 1.000, 30,  120, null],
+  ["lancer",   "boots",    60,  [],   "attack",  1.000, 30,  150, null],
+  ["lancer",   "helmet",   60,  [],   "defense", 1.000, 30,  180, null],
+  ["infantry", "helmet",   60,  [40], "defense", 0.600, 50,  230, [11, 13]],
+  ["infantry", "boots",    60,  [40], "attack",  0.600, 50,  280, [11, 13]],
+  ["marksman", "gauntlet", 60,  [40], "attack",  0.600, 50,  330, [11, 13]],
+  ["marksman", "belt",     60,  [40], "defense", 0.600, 50,  380, [11, 13]],
+  ["lancer",   "gauntlet", 60,  [40], "attack",  0.600, 50,  430, [11, 13]],
+  ["lancer",   "belt",     60,  [40], "defense", 0.600, 50,  480, [11, 13]],
+  ["infantry", "gauntlet", 100, [80], "defense", 0.556, 90,  570, null],
+  ["infantry", "belt",     100, [80], "attack",  0.556, 90,  660, null],
+  ["infantry", "boots",    100, [80], "defense", 0.556, 90,  750, [13, 15]],
+  ["infantry", "helmet",   100, [80], "attack",  0.556, 90,  840, [13, 15]],
+  ["marksman", "helmet",   100, [80], "attack",  0.556, 90,  930, [13, 15]],
+  ["marksman", "boots",    100, [80], "defense", 0.556, 90, 1020, [13, 15]],
+  ["marksman", "belt",     100, [80], "attack",  0.556, 90, 1110, [13, 15]],
+  ["marksman", "gauntlet", 100, [80], "defense", 0.556, 90, 1200, [13, 15]],
+  ["lancer",   "helmet",   100, [80], "attack",  0.556, 90, 1290, [13, 15]],
+  ["lancer",   "boots",    100, [80], "defense", 0.556, 90, 1380, [13, 15]],
+  ["lancer",   "belt",     100, [80], "attack",  0.556, 90, 1470, [13, 15]],
+  ["lancer",   "gauntlet", 100, [80], "defense", 0.556, 90, 1560, [13, 15]],
+];
+
+const TIERS = [
+  {eff: 2.000, steps: 6,  mithril: 60,   expedition: 120, cumMithril: 60},
+  {eff: 1.000, steps: 4,  mithril: 120,  expedition: 120, cumMithril: 180},
+  {eff: 0.600, steps: 6,  mithril: 300,  expedition: 180, cumMithril: 480},
+  {eff: 0.556, steps: 12, mithril: 1080, expedition: 600, cumMithril: 1560},
+];
+
+const FREE_XP = [
+  ["lancer", "gauntlet", 3, 19], ["infantry", "boots", 2, 19], ["infantry", "helmet", 1, 19],
+  ["marksman", "gauntlet", 1, 19], ["marksman", "belt", 1, 19], ["lancer", "belt", 1, 19],
+  ["lancer", "helmet", 40, 59], ["lancer", "boots", 40, 59],
+  ["infantry", "gauntlet", 61, 79], ["infantry", "belt", 60, 79],
+];
+
+// ── 1. 청크 생성 ───────────────────────────────────────────────────────
+section("청크 생성");
+{
+  const shape = lv => G.gearChunksFor(lv).map(c => c.map(m => m.level).join("+"));
+  ok(JSON.stringify(shape(1)) === JSON.stringify(["20", "40+60", "80+100"]),
+     "Lv.1 → 20 / 40+60 / 80+100", shape(1).join(" · "));
+  ok(JSON.stringify(shape(59)) === JSON.stringify(["60", "80+100"]), "Lv.59 → 60 / 80+100", shape(59).join(" · "));
+  ok(JSON.stringify(shape(61)) === JSON.stringify(["80+100"]), "Lv.61 → 80+100", shape(61).join(" · "));
+  ok(JSON.stringify(shape(85)) === JSON.stringify(["100"]), "Lv.85 → 100 단독", shape(85).join(" · "));
+  ok(shape(100).length === 0, "Lv.100 은 남은 청크가 없다", shape(100).join(" · "));
+  // 탐험만 남는 꼬리를 청크로 만들면 "Lv.40 에서 멈춤" 이 선택지로 생긴다
+  const tails = [1, 20, 25, 40, 59, 60, 61, 79, 80, 85]
+    .flatMap(lv => G.gearChunksFor(lv))
+    .filter(c => c[c.length - 1].tier !== "expedition");
+  ok(tails.length === 0, "탐험만 남는 꼬리 청크가 없다", String(tails.length));
+}
+
+// ── 2. 마스터리 승급 비용 ──────────────────────────────────────────────
+section("마스터리 승급");
+{
+  const a = G.gearMasteryCost(11, 13), b = G.gearMasteryCost(13, 15), c = G.gearMasteryCost(12, 13);
+  ok(a.essence === 250 && a.mythic === 5, "M11→M13 = 에센스 250 · 신화 5", JSON.stringify(a));
+  ok(b.essence === 290 && b.mythic === 9, "M13→M15 = 에센스 290 · 신화 9", JSON.stringify(b));
+  ok(c.essence === 130 && c.mythic === 3, "M12→M13 = 에센스 130 · 신화 3", JSON.stringify(c));
+  ok(G.gearMasteryCost(15, 15).essence === 0, "같은 레벨이면 비용 0");
+  ok(G.gearLevelCap(11) === 20 && G.gearLevelCap(13) === 60 && G.gearLevelCap(15) === 100,
+     "마스터리별 레벨 상한 (M11=20 · M13=60 · M15=100)",
+     [11, 13, 15].map(G.gearLevelCap).join("/"));
+}
+
+// ── 3. 픽스처 총계 ─────────────────────────────────────────────────────
+section("픽스처 총계");
+const plan = G.gearPlan(FIXTURE);
+ok(plan.steps.length === 28, "스텝 28개", String(plan.steps.length));
+ok(plan.totals.mithril === 1560, "미스릴 1560", String(plan.totals.mithril));
+ok(plan.totals.expedition === 1020, "원정 보너스 +1020%p", String(plan.totals.expedition));
+ok(plan.totals.essence === 4400, "에센스 스톤 4400", String(plan.totals.essence));
+ok(plan.totals.mythic === 120, "신화 조각 120", String(plan.totals.mythic));
+ok(plan.totals.weeks === 130, "주당 12 → 130주", String(plan.totals.weeks));
+note("총 " + plan.steps.length + "스텝 · 미스릴 " + plan.totals.mithril +
+     " · 원정 +" + plan.totals.expedition + "%p · 신화 " + plan.totals.mythic);
+
+// ── 4. 효율 티어 ───────────────────────────────────────────────────────
+section("효율 티어");
+ok(plan.tiers.length === TIERS.length, "티어 " + TIERS.length + "개", String(plan.tiers.length));
+TIERS.forEach((w, i) => {
+  const g = plan.tiers[i] || {};
+  ok(g.eff === w.eff && g.steps === w.steps && g.mithril === w.mithril &&
+     g.expedition === w.expedition && g.cumMithril === w.cumMithril,
+     "티어 " + w.eff.toFixed(3) + " → " + w.steps + "스텝 · 미스릴 " + w.mithril,
+     JSON.stringify(g));
+});
+// 효율 절벽이 실제로 존재해야 화면에 보여줄 것이 있다
+ok(plan.tiers.every((t, i) => i === 0 || t.eff < plan.tiers[i - 1].eff), "티어 효율이 단조 감소");
+
+// ── 5. 업그레이드 순서 28스텝 ──────────────────────────────────────────
+section("업그레이드 순서");
+ORDER.forEach((w, i) => {
+  const s = plan.steps[i];
+  const [troop, slot, to, tolls, gain, eff, mithril, cum, mp] = w;
+  const label = (i + 1) + " " + troop + " " + slot + " Lv." + to +
+    (tolls.length ? " (toll " + tolls.join(",") + ")" : "");
+  if (!s) { ok(false, label, "스텝 없음"); return; }
+  const got = [s.troop, s.slot, s.toLevel, s.tolls.join(","), s.gain,
+               +s.eff.toFixed(3), s.mithril, s.cumMithril,
+               s.masteryPre ? s.masteryPre.from + "→" + s.masteryPre.to : "-"].join(" ");
+  const want = [troop, slot, to, tolls.join(","), gain, eff, mithril, cum,
+                mp ? mp[0] + "→" + mp[1] : "-"].join(" ");
+  ok(got === want, label, "결과 [" + got + "] 기대 [" + want + "]");
+});
+// 같은 조각의 청크는 원래 순서를 지켜야 한다 (효율 정렬이 seq 를 넘어설 수 없다)
+{
+  const seen = {};
+  const bad = [];
+  plan.steps.forEach(s => {
+    const k = s.troop + "/" + s.slot;
+    if (seen[k] !== undefined && s.seq !== seen[k] + 1) bad.push(k + " seq " + seen[k] + "→" + s.seq);
+    if (seen[k] === undefined && s.seq !== 0) bad.push(k + " 첫 청크가 seq " + s.seq);
+    seen[k] = s.seq;
+  });
+  ok(bad.length === 0, "같은 조각의 청크가 seq 순서를 지킨다", bad.join(" | "));
+  const jumps = plan.steps.filter((s, i) => i > 0 && s.eff > plan.steps[i - 1].eff + 1e-9);
+  ok(jumps.length === 0, "전체가 효율 내림차순", String(jumps.length) + "곳 역전");
+  const chain = [];
+  plan.steps.forEach(s => {
+    const k = s.troop + "/" + s.slot;
+    if (chain[k] !== undefined && s.fromLevel !== chain[k]) chain.push(k);
+    chain[k] = s.toLevel;
+  });
+  ok(plan.steps.every(s => s.toLevel > s.fromLevel), "레벨이 항상 올라간다");
+}
+
+// ── 6. 무료 XP 구간 ────────────────────────────────────────────────────
+section("무료 XP 구간");
+ok(plan.freeXp.length === FREE_XP.length, "무료 구간 " + FREE_XP.length + "개", String(plan.freeXp.length));
+FREE_XP.forEach((w, i) => {
+  const g = plan.freeXp[i] || {};
+  ok(g.troop === w[0] && g.slot === w[1] && g.from === w[2] && g.to === w[3],
+     (i + 1) + " " + w[0] + " " + w[1] + " +" + w[2] + "→+" + w[3],
+     JSON.stringify(g));
+});
+// Lv.59 는 다음 마일스톤이 60 이라 무료 구간의 폭이 0 이다 → 목록에 넣지 않는다
+ok(!plan.freeXp.some(x => x.from === x.to), "폭 0 인 구간은 목록에 없다");
+ok(plan.freeXp.every((x, i) => i === 0 || x.xpRel >= plan.freeXp[i - 1].xpRel),
+   "XP 상대 단가 오름차순");
+
+// ── 7. 엣지 케이스 ─────────────────────────────────────────────────────
+section("엣지 케이스");
+const one = (troop, slot, cell, over) => {
+  const gear = {infantry: {}, marksman: {}, lancer: {}};
+  GEAR_ALL.forEach(([t, s]) => { gear[t][s] = [15, 100]; });   // 나머지는 전부 완성 → 제외됨
+  gear[troop][slot] = cell;
+  return G.gearPlan(Object.assign({}, FIXTURE, {gear}, over || {}));
+};
+const GEAR_ALL = G.GEAR_TROOP_ORDER.flatMap(t => G.GEAR_SLOT_ORDER.map(s => [t, s]));
+{
+  ok(one("infantry", "helmet", [15, 100]).steps.length === 0, "[15,100] 인 조각은 스텝에서 제외된다");
+
+  const p0 = one("infantry", "helmet", [11, 0]);
+  ok(p0.steps.length === 3 && p0.steps[0].toLevel === 20,
+     "[11,0] (홍색 미해금) 은 Lv.20 청크부터", JSON.stringify(p0.steps.map(s => s.toLevel)));
+
+  const p85 = one("infantry", "helmet", [13, 85]);
+  ok(p85.steps.length === 1 && p85.steps[0].toLevel === 100 &&
+     +p85.steps[0].eff.toFixed(3) === 1.000 && p85.steps[0].mithril === 50,
+     "[13,85] 다음 청크는 Lv.100 단독 · eff 1.000 · 미스릴 50",
+     JSON.stringify(p85.steps.map(s => [s.toLevel, +s.eff.toFixed(3), s.mithril])));
+
+  const p39 = one("infantry", "helmet", [12, 39]);
+  const mp = p39.steps[0].masteryPre || {};
+  ok(p39.steps[0].toLevel === 60 && p39.steps[0].tolls.join() === "40",
+     "[12,39] 첫 청크는 Lv.40+60", JSON.stringify([p39.steps[0].toLevel, p39.steps[0].tolls]));
+  ok(mp.from === 12 && mp.to === 13 && mp.essence === 130 && mp.mythic === 3,
+     "[12,39] 마스터리 선행은 M12→M13 만 (에센스 130 · 신화 3)", JSON.stringify(mp));
+
+  const gearAll11 = {infantry: {}, marksman: {}, lancer: {}};
+  GEAR_ALL.forEach(([t, s]) => { gearAll11[t][s] = [11, 1]; });
+  const pAll = G.gearPlan(Object.assign({}, FIXTURE, {gear: gearAll11}));
+  ok(pAll.totals.mithril === 1800, "12조각 전부 [11,1] → 미스릴 1800 (12×150)", String(pAll.totals.mithril));
+  ok(pAll.steps.length === 36, "12조각 × 청크 3개 = 36스텝", String(pAll.steps.length));
+
+  const high = G.gearPlan(Object.assign({}, FIXTURE, {arenaPriority: "high"}));
+  const effs = high.tiers.map(t => t.eff);
+  ok(effs.join() === "2,1,0.675,0.639",
+     'arenaPriority "high" → 0.600→0.675 · 0.556→0.639', effs.join(" / "));
+  ok(high.totals.mithril === plan.totals.mithril, "아레나 가중은 비용을 바꾸지 않는다");
+
+  const low = G.gearPlan(Object.assign({}, FIXTURE, {arenaPriority: "low"}));
+  ok(low.tiers.every((t, i) => t.eff >= plan.tiers[i].eff), "아레나 low 는 none 보다 효율이 높거나 같다");
+}
+
+// ── 8. 병종 가중 · 정렬 근거 ───────────────────────────────────────────
+section("병종 가중");
+{
+  const w = t => G.gearTroopWeight(t, FIXTURE.ratios, FIXTURE.attackWeight);
+  ok(Math.abs(w("infantry") - 0.51) < 1e-9, "보병 0.51 (0.75×48 + 0.25×60)", String(w("infantry")));
+  ok(Math.abs(w("marksman") - 0.36) < 1e-9, "궁병 0.36", String(w("marksman")));
+  ok(Math.abs(w("lancer") - 0.13) < 1e-9, "창병 0.13", String(w("lancer")));
+  // 공격 가중을 0 으로 두면 수비 병비만 남는다 → 궁병(수비 0)이 꼴찌
+  const d = t => G.gearTroopWeight(t, FIXTURE.ratios, 0);
+  ok(d("marksman") === 0 && d("lancer") === 0.4, "attackWeight 0 이면 수비 병비만 본다",
+     [d("infantry"), d("lancer"), d("marksman")].join("/"));
+}
+
+// ── 9. 데이터 무결성 ───────────────────────────────────────────────────
+section("gear-data 무결성");
+{
+  ok(G.GEAR_MS.length === 5, "마일스톤 5개", String(G.GEAR_MS.length));
+  ok(G.GEAR_MS.filter(m => m.tier === "expedition").length === 3, "원정 마일스톤은 20·60·100 셋뿐");
+  ok(G.GEAR_MS.every((m, i) => i === 0 || m.level > G.GEAR_MS[i - 1].level), "마일스톤이 레벨 오름차순");
+  ok(G.GEAR_MS.every(m => ["attack", "defense", "health", "lethality"].includes(m.left) &&
+                          ["attack", "defense", "health", "lethality"].includes(m.right)),
+     "좌우 스탯 값이 유효");
+  // 완주 좌우 합계 — 좌 공70/방30, 우 방70/공30
+  const sum = (sideKey, want) => G.GEAR_MS.filter(m => m.tier === "expedition")
+    .reduce((a, m) => a + (m[sideKey] === want ? m.bonus : 0), 0);
+  ok(sum("left", "attack") === 70 && sum("left", "defense") === 30, "좌 완주 = 공70 / 방30",
+     sum("left", "attack") + "/" + sum("left", "defense"));
+  ok(sum("right", "defense") === 70 && sum("right", "attack") === 30, "우 완주 = 방70 / 공30",
+     sum("right", "defense") + "/" + sum("right", "attack"));
+  ok(G.GEAR_SLOT_ORDER.length === 4 && G.GEAR_SLOT_ORDER.every(s => G.GEAR_SLOTS[s]), "슬롯 4개가 모두 정의됨");
+  ok(G.GEAR_TROOP_ORDER.length === 3 && G.GEAR_TROOP_ORDER.every(t => G.GEAR_TROOPS[t]), "병종 3개가 모두 정의됨");
+  ok(G.GEAR_CAVEATS.length >= 4 && G.GEAR_WARNINGS.length >= 3, "경고·한계 문구가 있다",
+     G.GEAR_CAVEATS.length + "/" + G.GEAR_WARNINGS.length);
+  // gear-engine 에 숫자를 하드코딩하면 패치 대응이 불가능해진다
+  {
+    const code = src("gear-engine.js").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "")
+      .replace(/toFixed\(\d+\)/g, "toFixed()");   // 표시용 반올림 자릿수는 게임 상수가 아니다
+    // 0·1 은 항등원이고 100 은 % → 비율 환산이다. 게임 수치는 하나도 없어야 한다.
+    const nums = [...new Set((code.match(/(?<![\w.])\d+(\.\d+)?/g) || []))].filter(n => !["0", "1", "100"].includes(n));
+    ok(nums.length === 0, "gear-engine.js 에 상수 하드코딩 없음", nums.join(","));
+  }
+}
+
+// ── 10. i18n ───────────────────────────────────────────────────────────
+section("i18n");
+{
+  const dump = () => JSON.stringify(G.GEAR_CAVEATS) + JSON.stringify(G.GEAR_WARNINGS);
+  ok(/[가-힣]/.test(dump()), "한국어로 열면 경고·한계가 한글");
+  vm.runInContext("LANG='en'; I18N_TABLES.forEach(function(f){f();});", CTX);
+  const left = [...new Set((dump().match(/[가-힣][가-힣 ·]*/g) || []))].slice(0, 3);
+  ok(!/[가-힣]/.test(dump()), "언어를 토글하면 GEAR_CAVEATS·GEAR_WARNINGS 에 한글이 남지 않는다", left.join(" | "));
+  vm.runInContext("LANG='ko'; I18N_TABLES.forEach(function(f){f();});", CTX);
+  // 슬롯·병종 이름은 L() 이 아니라 ko/en 필드로 들고 있다
+  ok(G.GEAR_SLOT_ORDER.every(s => G.GEAR_SLOTS[s].ko && G.GEAR_SLOTS[s].en), "슬롯 이름이 한/영 짝");
+  ok(G.GEAR_TROOP_ORDER.every(t => G.GEAR_TROOPS[t].ko && G.GEAR_TROOPS[t].en), "병종 이름이 한/영 짝");
+}
+
+// ── 11. 렌더 (최소 DOM 스텁) ───────────────────────────────────────────
+// 화면에 무엇이 어떤 순서로 나오는가까지 브라우저 없이 본다.
+section("렌더");
+{
+  const a = boot("ko");
+  a.tab("gear");
+  const html = a.gearRender();
+  ok(html.length > 500, "장비 탭 렌더 결과가 비어 있지 않다", html.length + "자");
+  for (const head of ["0단계", "효율 구간", "업그레이드 순서", "좌우 사이클", "경고"])
+    ok(html.includes(head), "섹션 " + head + " 렌더", html.slice(0, 60));
+  // 무료 XP 구간이 업그레이드 순서보다 위 — 대개 여기가 가장 큰 즉시 이득이다
+  ok(html.indexOf("0단계") < html.indexOf("업그레이드 순서"), "0단계(무료 XP)가 업그레이드 순서보다 위");
+  ok(html.indexOf("효율 구간") < html.indexOf("업그레이드 순서"), "효율 구간 요약이 순서표보다 위");
+  // 통행료 표기 — 왜 미스릴이 더 드는지가 드러나야 한다
+  ok(/Lv\.40\s*\(.*?\)\s*→\s*Lv\.60/.test(a.gearText()), "통행료를 지나는 스텝이 Lv.40(탐험) → Lv.60 으로 표기된다");
+  // 경고·한계는 접지 않고 전부 노출
+  const txt = a.gearText();
+  const missing = G.GEAR_WARNINGS.concat(G.GEAR_CAVEATS)
+    .filter(w => !txt.includes(w.replace(/\s+/g, " ").slice(0, 20)));
+  ok(missing.length === 0, "GEAR_WARNINGS · GEAR_CAVEATS 가 전부 화면에 있다", String(missing.length) + "건 누락");
+
+  // 영어
+  const en = boot("en");
+  en.tab("gear");
+  const enTxt = en.gearText();
+  const enLeft = [...new Set((enTxt.match(/[가-힣][가-힣 ·]*/g) || []))].slice(0, 3);
+  ok(!/[가-힣]/.test(enTxt), "?lang=en 장비 탭에 한글이 없다", enLeft.join(" | "));
+  const tog = boot("ko");
+  tog.tab("gear"); tog.gearRender(); tog.setLang("en");
+  const togLeft = [...new Set((tog.gearText().match(/[가-힣][가-힣 ·]*/g) || []))].slice(0, 3);
+  ok(!/[가-힣]/.test(tog.gearText()), "한국어로 열고 English 를 눌러도 장비 탭에 한글이 없다", togLeft.join(" | "));
+}
+
+// ── 12. 편성 탭 회귀 ───────────────────────────────────────────────────
+// 탭을 붙이면서 기존 판정 UI 가 망가지지 않았는지. 자세한 검사는 test/unit.mjs 몫이다.
+section("편성 탭 회귀");
+{
+  const c = boot("ko").mine([50, 0, 50]).enemy([60, 40, 0]);
+  const t = c.text();
+  ok(/금지 편성/.test(t), "밴드 판정이 그대로 나온다");
+  ok(c.el("rPre").innerHTML.split("chip").length - 1 === 12, "병비 프리셋 칩 12종",
+     String(c.el("rPre").innerHTML.split("chip").length - 1));
+  c.mine([60, 40, 20]);
+  c.js('showSum("rSum",["r1","r2","r3"])');
+  ok(/120/.test(c.el("rSum").innerHTML), "합계 ≠ 100 경고", c.el("rSum").innerHTML.slice(0, 40));
+}
+
+// ── 결과 ───────────────────────────────────────────────────────────────
+console.log("\n" + "=".repeat(62));
+console.log("통과 " + pass + " · 실패 " + fail + (known ? " · 알려진 결함 " + known + "건" : ""));
+if (fail) { console.log("\n실패 목록:"); fails.forEach(f => console.log("  ❌ " + f)); }
+if (stale.length) {
+  console.log("\n고쳐진 것 같습니다 — KNOWN_DEFECTS 에서 지우세요:");
+  stale.forEach(s => console.log("  ✨ " + s));
+}
+process.exit(fail ? 1 : 0);

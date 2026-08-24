@@ -12,9 +12,11 @@ import {readFileSync} from "node:fs";
 import {fileURLToPath} from "node:url";
 import {dirname, join} from "node:path";
 import vm from "node:vm";
+import {PARTS as ALL_PARTS} from "../build.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const PARTS = ["i18n.js", "data.js", "engine.js", "render.js"];
+// build.mjs 의 조립 순서를 그대로 따른다 — 파트가 늘면 여기도 자동으로 따라간다
+const PARTS = ALL_PARTS.filter(p => p.endsWith(".js"));
 
 function makeEl(id) {
   const set = new Set();
@@ -81,6 +83,8 @@ export function boot(lang = "ko") {
     gcap(n) { el("gcap").value = String(n); return api; },
     /** 계산 후 #out 의 HTML */
     render() { vm.runInContext("calc()", sandbox); return el("out").innerHTML; },
+    /** 임의 표현식 실행 — init IIFE 가 이벤트로만 부르는 함수(showSum 등)를 직접 부를 때 */
+    js(expr) { return vm.runInContext(expr, sandbox); },
     /** 태그를 걷어낸 본문 텍스트 */
     text() { return api.render().replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(); },
     /** <p> 단위 본문 (문단 순서 검사용) */
@@ -90,6 +94,12 @@ export function boot(lang = "ko") {
         .filter(Boolean);
     },
     setLang(l) { vm.runInContext("setLang(" + JSON.stringify(l) + ")", sandbox); return api; },
+
+    /** 탭 전환 — gear-render.js 의 핸들러가 하는 일과 같다 */
+    tab(t) { vm.runInContext("gearShowTab(" + JSON.stringify(t) + ")", sandbox); return api; },
+    /** 장비 탭 계산 후 #gOutTop + #gOutBot 의 HTML (화면에 나오는 순서 그대로) */
+    gearRender() { vm.runInContext("gearCalc()", sandbox); return el("gOutTop").innerHTML + el("gOutBot").innerHTML; },
+    gearText() { return api.gearRender().replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(); },
     el,
   };
   // 기본값 — init IIFE 와 같은 조합에서 출발한다
