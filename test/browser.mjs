@@ -160,6 +160,20 @@ await ko.waitForTimeout(80);
 ok(await ko.isVisible("#tab-gear"), "탭을 누르면 장비 탭이 보인다");
 ok(!(await ko.isVisible("#tab-comp")), "편성 탭은 감춰진다");
 ok(/tab=gear/.test(ko.url()), "URL 에 ?tab=gear 가 붙는다", ko.url());
+// 아무것도 입력하지 않았으면 계획 대신 안내가 나와야 한다.
+// 첫 화면에 36스텝·미스릴 1800 짜리 가짜 계획이 떠 있던 것을 Orca 브라우저에서 잡았다.
+await ko.evaluate(() => {
+  document.querySelectorAll("#gGrid input").forEach(i => { i.value = ""; });
+  document.querySelector("#gGrid input").dispatchEvent(new Event("input", {bubbles: true}));
+});
+await ko.waitForTimeout(80);
+{
+  const t = await ko.textContent("#tab-gear");
+  ok(/보유 장비를 입력하세요/.test(t), "입력이 없으면 안내가 나온다");
+  ok(!(await ko.evaluate(() => !!document.getElementById("gSteps"))), "입력이 없으면 순서표가 없다");
+  ok(await ko.evaluate(() => document.getElementById("gBudgetBox").hidden), "입력이 없으면 예산 슬라이더를 감춘다");
+  ok(/좌우 사이클/.test(t) && /되돌릴 수 없는 것/.test(t), "참조표와 경고는 입력 전에도 보인다");
+}
 // 픽스처와 같은 입력을 넣으면 픽스처와 같은 총계가 나와야 한다
 const FIX = {
   infantry: {helmet: [11, 1], gauntlet: [15, 61], belt: [15, 60], boots: [11, 2]},
@@ -216,6 +230,34 @@ await ko.waitForTimeout(80);
   ok((await ko.evaluate(() => document.querySelectorAll("#gOutBot details").length)) === 0,
      "접어두지 않았다");
 }
+// 병비 합이 100이 아니면 경고 — 장비 쪽은 정규화하지 않으므로 두 축 무게가 실제로 틀어진다
+await ko.fill("#ga2", "40");
+await ko.waitForTimeout(80);
+ok(/합이/.test(await ko.textContent("#gaSum")), "공격 병비 합계 경고", await ko.textContent("#gaSum"));
+await ko.fill("#ga2", "4");
+await ko.waitForTimeout(80);
+ok((await ko.textContent("#gaSum")).trim() === "", "합이 100이면 경고 없음");
+
+// 접근명 — 그리드 24칸과 체크박스에 이름이 붙어 있어야 한다
+{
+  const noName = await ko.evaluate(() =>
+    [...document.querySelectorAll("#gGrid input, .gchk")].filter(i => !i.getAttribute("aria-label")).length);
+  ok(noName === 0, "그리드 입력과 체크박스에 aria-label 이 있다", noName + "개 누락");
+}
+
+// 모바일 폭에서 본문이 가로로 삐져나가지 않는다 (순서표는 자기 컨테이너 안에서만 스크롤)
+{
+  const over = await ko.evaluate(() => {
+    const s = document.createElement("style");
+    s.id = "pwnarrow"; s.textContent = "html{width:390px!important}";
+    document.head.appendChild(s);
+    const w = document.body.scrollWidth;
+    s.remove();
+    return w;
+  });
+  ok(over <= 400, "390px 폭에서 본문이 가로로 넘치지 않는다", over + "px");
+}
+
 // 편성 탭으로 돌아가면 밴드 판정이 그대로다
 await ko.click("#tabComp");
 await ko.waitForTimeout(80);

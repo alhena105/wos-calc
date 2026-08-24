@@ -95,6 +95,14 @@ export function boot(lang = "ko") {
     },
     setLang(l) { vm.runInContext("setLang(" + JSON.stringify(l) + ")", sandbox); return api; },
 
+    /** 장비 12조각 입력 — {병종:{슬롯:[마스터리, 홍색레벨]}}. 비워 두면 미입력 = 계획 제외 */
+    gearCells(g) {
+      for (const t of Object.keys(g)) for (const sl of Object.keys(g[t])) {
+        el("gm_" + t + "_" + sl).value = String(g[t][sl][0]);
+        el("gl_" + t + "_" + sl).value = String(g[t][sl][1]);
+      }
+      return api;
+    },
     /** 탭 전환 — gear-render.js 의 핸들러가 하는 일과 같다 */
     tab(t) { vm.runInContext("gearShowTab(" + JSON.stringify(t) + ")", sandbox); return api; },
     /** 장비 탭 계산 후 #gOutTop + #gOutBot 의 HTML (화면에 나오는 순서 그대로) */

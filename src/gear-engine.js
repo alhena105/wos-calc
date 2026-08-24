@@ -56,7 +56,10 @@ function gearPlan(input){
  // ── 조각 12개 × 남은 청크 ──
  const pieces=[];
  GEAR_TROOP_ORDER.forEach((troop,ti)=>GEAR_SLOT_ORDER.forEach((slot,si)=>{
-  const cell=(gear[troop]||{})[slot]||[0,0];
+  // 항목이 아예 없는 조각은 계획에서 뺀다. 0 이 아니라 "입력이 없다"는 뜻이다 —
+  // 미보유 조각까지 처음부터 올리는 계획을 내면 총액이 통째로 거짓말이 된다.
+  const cell=(gear[troop]||{})[slot];
+  if(!cell)return;
   const mastery=Math.round(cell[0]||0), level=Math.round(cell[1]||0);
   const side=GEAR_SLOTS[slot].side;
   const chunks=gearChunksFor(level).map((ms,seq)=>{

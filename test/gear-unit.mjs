@@ -226,6 +226,20 @@ const GEAR_ALL = G.GEAR_TROOP_ORDER.flatMap(t => G.GEAR_SLOT_ORDER.map(s => [t, 
 {
   ok(one("infantry", "helmet", [15, 100]).steps.length === 0, "[15,100] 인 조각은 스텝에서 제외된다");
 
+  // 항목이 아예 없는 조각은 0 이 아니라 "입력 없음"이다. 미보유 조각까지 처음부터 올리는
+  // 계획을 내면 총액이 통째로 거짓말이 된다 — Orca 브라우저에서 첫 화면을 보고 잡았다.
+  {
+    const none = G.gearPlan(Object.assign({}, FIXTURE, {gear: {}}));
+    ok(none.steps.length === 0 && none.freeXp.length === 0 && none.totals.mithril === 0,
+       "입력이 하나도 없으면 계획도 비어 있다",
+       JSON.stringify([none.steps.length, none.freeXp.length, none.totals.mithril]));
+    const partial = G.gearPlan(Object.assign({}, FIXTURE, {gear: {infantry: {helmet: [11, 1]}}}));
+    ok(partial.steps.length === 3 && partial.totals.mithril === 150,
+       "입력한 조각만 계획에 들어간다 (1조각 = 3스텝 · 150)",
+       JSON.stringify([partial.steps.length, partial.totals.mithril]));
+    ok(partial.freeXp.length === 1, "무료 XP 도 입력한 조각만", String(partial.freeXp.length));
+  }
+
   const p0 = one("infantry", "helmet", [11, 0]);
   ok(p0.steps.length === 3 && p0.steps[0].toLevel === 20,
      "[11,0] (홍색 미해금) 은 Lv.20 청크부터", JSON.stringify(p0.steps.map(s => s.toLevel)));
@@ -321,7 +335,7 @@ section("i18n");
 section("렌더");
 {
   const a = boot("ko");
-  a.tab("gear");
+  a.tab("gear").gearCells(FIXTURE.gear);
   const html = a.gearRender();
   ok(html.length > 500, "장비 탭 렌더 결과가 비어 있지 않다", html.length + "자");
   for (const head of ["0단계", "효율 구간", "업그레이드 순서", "좌우 사이클", "경고"])
@@ -337,14 +351,26 @@ section("렌더");
     .filter(w => !txt.includes(w.replace(/\s+/g, " ").slice(0, 20)));
   ok(missing.length === 0, "GEAR_WARNINGS · GEAR_CAVEATS 가 전부 화면에 있다", String(missing.length) + "건 누락");
 
+  // 아무것도 입력하지 않으면 가짜 계획 대신 안내가 나와야 한다.
+  // (첫 화면에 36스텝·미스릴 1800 짜리 계획이 떠 있던 것을 Orca 브라우저에서 잡았다.)
+  {
+    const blank = boot("ko");
+    blank.tab("gear");
+    const t = blank.gearText();
+    ok(/보유 장비를 입력하세요/.test(t), "입력이 없으면 안내가 나온다", t.slice(0, 80));
+    ok(!/id="gSteps"/.test(blank.gearRender()), "입력이 없으면 순서표를 그리지 않는다");
+    ok(/좌우 사이클/.test(t) && /경고/.test(t), "참조표와 경고는 입력 전에도 보인다");
+    ok(blank.el("gBudgetBox").hidden === true, "스텝이 없으면 예산 슬라이더를 감춘다");
+  }
+
   // 영어
   const en = boot("en");
-  en.tab("gear");
+  en.tab("gear").gearCells(FIXTURE.gear);
   const enTxt = en.gearText();
   const enLeft = [...new Set((enTxt.match(/[가-힣][가-힣 ·]*/g) || []))].slice(0, 3);
   ok(!/[가-힣]/.test(enTxt), "?lang=en 장비 탭에 한글이 없다", enLeft.join(" | "));
   const tog = boot("ko");
-  tog.tab("gear"); tog.gearRender(); tog.setLang("en");
+  tog.tab("gear").gearCells(FIXTURE.gear); tog.gearRender(); tog.setLang("en");
   const togLeft = [...new Set((tog.gearText().match(/[가-힣][가-힣 ·]*/g) || []))].slice(0, 3);
   ok(!/[가-힣]/.test(tog.gearText()), "한국어로 열고 English 를 눌러도 장비 탭에 한글이 없다", togLeft.join(" | "));
 }

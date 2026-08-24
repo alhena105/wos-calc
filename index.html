@@ -129,6 +129,9 @@ tbody tr.done td{opacity:.42}
 input[type=range]{padding:0;accent-color:var(--accent);background:none;border:none}
 .gio{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:12px}
 .gio .chip{margin:0}
+.xscroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.xscroll>table{min-width:520px}
+.xscroll>.ggrid{min-width:420px}
 textarea{width:100%;background:var(--card2);color:var(--ink);border:1px solid var(--line);
  border-radius:9px;padding:9px 10px;font-size:12px;font-family:ui-monospace,Menlo,Consolas,monospace;
  min-height:120px;margin-top:8px}
@@ -977,7 +980,10 @@ function gearPlan(input){
  // ── 조각 12개 × 남은 청크 ──
  const pieces=[];
  GEAR_TROOP_ORDER.forEach((troop,ti)=>GEAR_SLOT_ORDER.forEach((slot,si)=>{
-  const cell=(gear[troop]||{})[slot]||[0,0];
+  // 항목이 아예 없는 조각은 계획에서 뺀다. 0 이 아니라 "입력이 없다"는 뜻이다 —
+  // 미보유 조각까지 처음부터 올리는 계획을 내면 총액이 통째로 거짓말이 된다.
+  const cell=(gear[troop]||{})[slot];
+  if(!cell)return;
   const mastery=Math.round(cell[0]||0), level=Math.round(cell[1]||0);
   const side=GEAR_SLOTS[slot].side;
   const chunks=gearChunksFor(level).map((ms,seq)=>{
@@ -1374,6 +1380,20 @@ function gearStatic(){
  gearMountPresets("gdPre",["gd1","gd2","gd3"]);
  gearGrid();
  gearHints();
+ gearSums();
+}
+
+/* 병비 합계 경고. 편성 탭과 달리 여기서는 정규화하지 않는다 — 순서 타이브레이크 공식이
+   공격비율/100 · 수비비율/100 을 그대로 쓰기 때문이다. 그래서 한 줄만 합이 다르면
+   공격 축과 수비 축의 무게 비율이 의도와 어긋난다. 고쳐야 하는 건 사용자 입력이다. */
+function gearSums(){
+ [["gaSum",["ga1","ga2","ga3"],L("공격","Attack")],["gdSum",["gd1","gd2","gd3"],L("수비","Defense")]]
+  .forEach(function(x){
+   var el=gEl(x[0]); if(!el)return;
+   var t=x[1].reduce(function(a,id){return a+gearNum(id,0,100,0);},0);
+   el.innerHTML=(t===0||t===100)?"":
+    L("⚠️ "+x[2]+" 병비 합이 <b>"+t+"</b>입니다. 장비 계산은 병비를 정규화하지 않으므로, 공격·수비 두 줄의 합이 서로 다르면 두 축의 무게 비율이 의도와 달라집니다.",
+      "⚠️ The "+x[2].toLowerCase()+" ratio adds to <b>"+t+"</b>. Gear ordering does not normalise ratios, so if the two rows sum differently the attack/defense weighting is not what you meant.");});
 }
 
 /* 병비 프리셋 칩 — 편성 탭과 같은 이유다. 2자리 약칭을 손으로 옮기다 틀린다. */
@@ -1385,7 +1405,7 @@ function gearMountPresets(boxId,ids){
   var b=e.target&&e.target.closest?e.target.closest(".chip"):null; if(!b)return;
   var a=GEAR_DEFAULTS.ratioPresets[+b.dataset.i].attack;
   [a.infantry,a.lancer,a.marksman].forEach(function(v,k){var el=gEl(ids[k]); if(el)el.value=v;});
-  gearCalc(); gearSave();};
+  gearSums(); gearCalc(); gearSave();};
 }
 
 /* 슬라이더·세그먼트 옆의 근거 문구. 값이 바뀌면 다시 쓴다. */
@@ -1416,6 +1436,12 @@ function gearInput(){
  var gear={};
  GEAR_TROOP_ORDER.forEach(function(t){gear[t]={};});
  GEAR_CELLS.forEach(function(c){
+  // 두 칸 다 비어 있으면 "미입력"이다. 0 으로 읽어 계획에 넣으면 안 갖고 있는 조각까지
+  // 처음부터 올리는 계획이 나와서 총액이 통째로 거짓말이 된다.
+  var m=gEl(gid("gm",c[0],c[1])), l=gEl(gid("gl",c[0],c[1]));
+  var mv=m&&m.value!==undefined?String(m.value).trim():"";
+  var lv=l&&l.value!==undefined?String(l.value).trim():"";
+  if(mv===""&&lv==="")return;
   gear[c[0]][c[1]]=[gearNum(gid("gm",c[0],c[1]),0,GEAR_MASTERY.max,0),
                     gearNum(gid("gl",c[0],c[1]),0,GEAR_MS[GEAR_MS.length-1].level,0)];});
  var rat=function(p){return{infantry:gearNum(p+"1",0,100,0),lancer:gearNum(p+"2",0,100,0),marksman:gearNum(p+"3",0,100,0)};};
@@ -1440,18 +1466,21 @@ function gearGrid(){
     '<div class="note" style="font-weight:400">'+
     (GEAR_TROOPS[t].role==="tank"?L("탱커","tank"):L("딜러","dps"))+"</div></td>";
   GEAR_SLOT_ORDER.forEach(function(s){
+   var nm=L(GEAR_TROOPS[t].ko+" "+GEAR_SLOTS[s].ko,GEAR_TROOPS[t].en+" "+GEAR_SLOTS[s].en);
+   // 스크린리더에는 placeholder 가 이름이 되지 않는다. 조각 이름까지 붙여 준다.
    h+='<td><div class="gcell"><input id="'+gid("gm",t,s)+'" type="number" min="0" max="'+GEAR_MASTERY.max+
-     '" placeholder="M" title="'+L("마스터리","Mastery")+'"><input id="'+gid("gl",t,s)+
-     '" type="number" min="0" max="'+GEAR_MS[GEAR_MS.length-1].level+'" placeholder="+" title="'+
-     L("홍색 레벨","Red level")+'"></div></td>';});
+     '" placeholder="M" title="'+L("마스터리","Mastery")+'" aria-label="'+esc(nm)+" "+L("마스터리","mastery")+
+     '"><input id="'+gid("gl",t,s)+'" type="number" min="0" max="'+GEAR_MS[GEAR_MS.length-1].level+
+     '" placeholder="+" title="'+L("홍색 레벨","Red level")+'" aria-label="'+esc(nm)+" "+
+     L("홍색 레벨","red level")+'"></div></td>';});
   h+="</tr>";});
- box.innerHTML=h+"</tbody></table>";
+ box.innerHTML='<div class="xscroll">'+h+"</tbody></table></div>";
  Object.keys(keep).forEach(function(k){var e=gEl(k); if(e)e.value=keep[k];});
  var cap=gEl("gGridCap");
  if(cap)cap.innerHTML=L("<b>+1 은 아직 한 번도 돌파하지 않은 상태입니다.</b> 홍색은 Lv.1 에서 시작해 Lv."+
-   GEAR_MS.map(function(m){return m.level;}).join("/")+" 에서 각각 미스릴을 냅니다 — 이걸 거꾸로 알면 비용이 두 배로 틀립니다. 미보유 조각은 M·+ 를 비워 두세요.",
+   GEAR_MS.map(function(m){return m.level;}).join("/")+" 에서 각각 미스릴을 냅니다 — 이걸 거꾸로 알면 비용이 두 배로 틀립니다. <b>두 칸을 다 비우면 그 조각은 계획에서 빠집니다</b>(미보유 조각).",
    "<b>'+1' means no breakthrough yet.</b> Red gear starts at Lv.1 and pays mithril at Lv."+
-   GEAR_MS.map(function(m){return m.level;}).join("/")+" — getting this backwards doubles your cost estimate. Leave M and + blank for pieces you do not own.");
+   GEAR_MS.map(function(m){return m.level;}).join("/")+" — getting this backwards doubles your cost estimate. <b>Leaving both boxes blank drops that piece from the plan</b> (pieces you do not own).");
 }
 
 /* ── localStorage · JSON 입출력 ────────────────────────────────────────
@@ -1511,7 +1540,8 @@ function gearCalc(){
 function gearWarnLevels(input){
  var over=[];
  GEAR_CELLS.forEach(function(c){
-  var cell=input.gear[c[0]][c[1]], cap=gearLevelCap(cell[0]);
+  var cell=(input.gear[c[0]]||{})[c[1]]; if(!cell)return;
+  var cap=gearLevelCap(cell[0]);
   var e=gEl(gid("gl",c[0],c[1]));
   var bad=cell[1]>cap;
   if(e&&e.classList)e.classList.toggle("over",bad);
@@ -1526,6 +1556,7 @@ function gearWarnLevels(input){
 function gearRender(plan,input){
  var top=gEl("gOutTop"), bot=gEl("gOutBot");
  var T=plan.totals;
+ var entered=GEAR_CELLS.filter(function(c){return (input.gear[c[0]]||{})[c[1]];}).length;
  var pieceName=function(t,s){return L(GEAR_TROOPS[t].ko+" "+GEAR_SLOTS[s].ko,GEAR_TROOPS[t].en+" "+GEAR_SLOTS[s].en);};
  var sideName=function(x){return x==="left"?L("좌","Left"):L("우","Right");};
  var gainName=function(x){return x==="attack"?L("공격","Attack"):L("방어","Defense");};
@@ -1536,6 +1567,8 @@ function gearRender(plan,input){
  // 여기서 총액으로 덮어쓰면 안 된다 — 조각 레벨을 잠깐 올렸다 내리는 사이 총액이 줄었을 때
  // 예산이 그 값에 눌러앉아, 총액이 회복돼도 스텝이 계속 감춰진다(Orca 브라우저에서 잡혔다).
  var budget=GEAR_BUDGET===null?T.mithril:Math.min(GEAR_BUDGET,T.mithril);
+ var box=gEl("gBudgetBox");
+ if(box)box.hidden=!plan.steps.length;
  var bud=gEl("gBudget");
  if(bud){
   bud.max=String(T.mithril);
@@ -1552,6 +1585,19 @@ function gearRender(plan,input){
  var doneSteps=plan.steps.filter(function(s){return GEAR_DONE[key(s)];});
  var doneM=doneSteps.reduce(function(a,s){return a+s.mithril;},0);
  var doneE=doneSteps.reduce(function(a,s){return a+s.expedition;},0);
+
+ if(!entered){
+  // 아무것도 입력하지 않았는데 12조각을 처음부터 올리는 계획을 내면 총액이 거짓말이 된다.
+  // 참조표(⑤)와 경고(⑥)는 입력 전에도 읽을 값이라 그대로 남긴다.
+  if(top)top.innerHTML='<div class="callout co-tip"><h3>'+
+    L("🛡️ 보유 장비를 입력하세요","🛡️ Enter the gear you own")+'</h3>'+
+    "<p>"+L("위 12조각 그리드에 <b>마스터리(M)</b> 와 <b>홍색 레벨(+)</b> 을 넣으면 업그레이드 순서를 계산합니다.",
+      "Fill in <b>mastery (M)</b> and <b>red level (+)</b> in the 12-piece grid above and the upgrade order appears here.")+"</p>"+
+    "<p>"+L("두 칸을 다 비워 둔 조각은 <b>안 갖고 있는 것</b>으로 보고 계획에서 뺍니다. 홍색을 아직 안 뚫었으면 마스터리만 넣고 <b>+</b> 는 비우거나 0 을 넣으세요.",
+      "A piece with both boxes blank counts as <b>not owned</b> and is left out of the plan. If a piece has not gone red yet, fill in mastery and leave <b>+</b> blank or 0.")+"</p></div>";
+  if(bot)bot.innerHTML=gearCycleRef()+gearWarnBlock();
+  return;
+ }
 
  // ── ① 요약 타일 ──
  var o='<h2>'+L("① 총 비용","① Total cost")+' <span>'+
@@ -1620,7 +1666,7 @@ function gearRender(plan,input){
   b+='<p class="note">'+L("모든 조각이 Lv."+GEAR_MS[GEAR_MS.length-1].level+" 입니다. 남은 업그레이드가 없습니다.",
     "Every piece is at Lv."+GEAR_MS[GEAR_MS.length-1].level+". Nothing left.")+"</p>";
  }else{
-  b+='<table id="gSteps"><thead><tr><th>#</th><th></th><th>'+L("조각","Piece")+'</th><th>'+L("좌우","Side")+
+  b+='<div class="xscroll"><table id="gSteps"><thead><tr><th>#</th><th></th><th>'+L("조각","Piece")+'</th><th>'+L("좌우","Side")+
    '</th><th>'+L("작업","Work")+'</th><th>'+L("원정","Expedition")+'</th><th>'+L("효율","Eff")+'</th><th>'+
    L("미스릴","Mithril")+'</th><th>'+L("누적","Cumulative")+'</th><th>'+L("마스터리 선행","Mastery first")+
    "</th></tr></thead><tbody>"+
@@ -1631,7 +1677,8 @@ function gearRender(plan,input){
       s.tolls.map(function(t){return "Lv."+t+"("+L("탐험","exploration")+") → ";}).join("")+
       "Lv."+s.toLevel;
     return "<tr"+(done?' class="done"':"")+"><td>"+(i+1)+
-     '</td><td><input type="checkbox" class="gchk" data-k="'+k+'"'+(done?" checked":"")+"></td>"+
+     '</td><td><input type="checkbox" class="gchk" data-k="'+k+'"'+(done?" checked":"")+
+     ' aria-label="'+esc(pieceName(s.troop,s.slot)+" Lv."+s.toLevel)+" "+L("완료","done")+'"></td>'+
      '<td class="b">'+esc(pieceName(s.troop,s.slot))+"</td>"+
      "<td>"+sideName(s.side)+'<div class="note">'+gainName(s.gain)+"</div></td>"+
      "<td>"+work+(s.tolls.length?'<div class="note">'+
@@ -1641,17 +1688,26 @@ function gearRender(plan,input){
        '<span class="tag t-warn">M'+s.masteryPre.from+"→M"+s.masteryPre.to+'</span><div class="note">'+
        L("에센스 ","essence ")+s.masteryPre.essence+L(" · 신화 "," · mythic ")+s.masteryPre.mythic+"</div>":
        '<span class="note">—</span>')+"</td></tr>";}).join("")+
-   "</tbody></table>";
+   "</tbody></table></div>";
   if(shown.length<plan.steps.length)
    b+='<p class="note">'+L("예산을 줄여서 "+(plan.steps.length-shown.length)+"스텝을 감췄습니다. 슬라이더를 올리면 전체가 보입니다.",
      (plan.steps.length-shown.length)+" steps hidden by the budget slider. Raise it to see them all.")+"</p>";
  }
  b+="</div>";
 
- // ── ⑤ 좌우 사이클 참조 ──
+ b+=gearCycleRef();
+
+ // ── ⑥ 경고 · 한계 ── (접지 않는다)
+ b+=gearWarnBlock();
+ if(bot)bot.innerHTML=b;
+}
+
+/* ⑤ 좌우 사이클 참조 — 입력이 없어도 읽을 값이라 빈 상태에서도 낸다 */
+function gearCycleRef(){
+ var gainName=function(x){return x==="attack"?L("공격","Attack"):L("방어","Defense");};
  var exp=GEAR_MS.filter(function(m){return m.tier==="expedition";});
  var tot=function(side,want){return exp.reduce(function(a,m){return a+(m[side]===want?m.bonus:0);},0);};
- b+='<h2>'+L("⑤ 좌우 사이클 참조","⑤ Left / right cycle")+' <span>'+
+ var b='<h2>'+L("⑤ 좌우 사이클 참조","⑤ Left / right cycle")+' <span>'+
    L("총량은 같고 공·방 배분만 다르다","same total, different split")+'</span></h2><div class="panel"><table><thead><tr><th>'+
    L("원정 마일스톤","Expedition milestone")+'</th><th>'+L("좌 (헬멧·벨트)","Left (helmet, belt)")+'</th><th>'+
    L("우 (장갑·신발)","Right (gauntlet, boots)")+'</th><th>'+L("미스릴","Mithril")+"</th></tr></thead><tbody>"+
@@ -1667,14 +1723,16 @@ function gearRender(plan,input){
      ")은 아레나 전용이라 이 표에 없습니다. 미스릴은 내지만 랠리·개리슨 기여는 0입니다.",
      "Exploration milestones (Lv."+GEAR_MS.filter(function(m){return m.tier==="exploration";}).map(function(m){return m.level;}).join(", ")+
      ") are arena-only and are not in this table. They cost mithril but contribute nothing to rallies or garrison.")+"</p></div>";
+ return b;
+}
 
- // ── ⑥ 경고 · 한계 ── (접지 않는다)
- b+='<h2>'+L("⑥ 경고 · 이 계산의 한계","⑥ Warnings and limits")+'</h2>'+
-   '<div class="callout co-warn"><h3>'+L("⚠️ 되돌릴 수 없는 것","⚠️ What you cannot undo")+"</h3><ul>"+
-   GEAR_WARNINGS.map(function(w){return "<li>"+esc(w)+"</li>";}).join("")+"</ul></div>"+
-   '<div class="callout co-tip"><h3>'+L("📋 자료의 한계","📋 Where the data runs out")+"</h3><ul>"+
-   GEAR_CAVEATS.map(function(w){return "<li>"+esc(w)+"</li>";}).join("")+"</ul></div>";
- if(bot)bot.innerHTML=b;
+/* ⑥ 경고 · 한계 — 접지 않는다. 미스릴을 쓰기 전에 읽어야 하는 값이라 빈 상태에서도 낸다. */
+function gearWarnBlock(){
+ return '<h2>'+L("⑥ 경고 · 이 계산의 한계","⑥ Warnings and limits")+'</h2>'+
+  '<div class="callout co-warn"><h3>'+L("⚠️ 되돌릴 수 없는 것","⚠️ What you cannot undo")+"</h3><ul>"+
+  GEAR_WARNINGS.map(function(w){return "<li>"+esc(w)+"</li>";}).join("")+"</ul></div>"+
+  '<div class="callout co-tip"><h3>'+L("📋 자료의 한계","📋 Where the data runs out")+"</h3><ul>"+
+  GEAR_CAVEATS.map(function(w){return "<li>"+esc(w)+"</li>";}).join("")+"</ul></div>";
 }
 
 /* ── init ──────────────────────────────────────────────────────────────
@@ -1706,7 +1764,7 @@ function gearRender(plan,input){
 
  ["ga1","ga2","ga3","gd1","gd2","gd3","gAW","gWk"].forEach(function(id){
   var e=gEl(id); if(!e)return;
-  e.addEventListener("input",function(){gearHints();recalc();});});
+  e.addEventListener("input",function(){gearHints();gearSums();recalc();});});
 
  var ar=gEl("gArena");
  if(ar)ar.addEventListener("click",function(e){
@@ -1747,7 +1805,7 @@ function gearRender(plan,input){
   var d=null;
   try{d=JSON.parse(ta.value);}catch(e){msg(L("JSON 을 읽지 못했습니다.","Could not parse that JSON."));return;}
   if(!gearApply(d)){msg(L("JSON 을 읽지 못했습니다.","Could not parse that JSON."));return;}
-  ta.hidden=true; msg(L("적용했습니다.","Applied.")); recalc();};
+  ta.hidden=true; msg(L("적용했습니다.","Applied.")); gearHints(); gearSums(); recalc();};
  var cl=gEl("gClear");
  if(cl)cl.onclick=function(){GEAR_DONE={};msg(L("체크를 모두 지웠습니다.","Checkmarks cleared."));recalc();};
 
