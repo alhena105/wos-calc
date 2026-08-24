@@ -5,9 +5,12 @@
 // 조립 순서가 곧 의존 순서다.
 //   part1.html  마크업 + CSS + <script> 여는 태그
 //   i18n.js     LANG 결정 · L(ko,en) · HN() · STR      ← engine 이 최상위에서 L() 을 부르므로 data 보다 앞
-//   data.js     영웅 45명 데이터베이스
+//   data.js     영웅 61명 데이터베이스
+//   gear-data.js   홍색 장비 상수 (L() 을 쓰므로 i18n 뒤)
 //   engine.js   계산 로직 + calc() (DOM 읽기)
-//   render.js   출력 HTML 생성 + 프리셋/합계 경고 + init IIFE + </script></body></html>
+//   gear-engine.js 장비 계산 (순수 함수, DOM 접근 없음)
+//   render.js   출력 HTML 생성 + 프리셋/합계 경고 + init IIFE
+//   gear-render.js 장비 탭 렌더 + 탭 전환 + </script></body></html>
 //
 // 사용법:  node build.mjs          src → index.html
 //          node build.mjs --check  산출물이 최신인지만 확인 (쓰지 않음, 다르면 exit 1)
@@ -16,7 +19,8 @@ import {fileURLToPath} from "node:url";
 import {dirname, join} from "node:path";
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
-export const PARTS = ["part1.html", "i18n.js", "data.js", "engine.js", "render.js"];
+export const PARTS = ["part1.html", "i18n.js", "data.js", "gear-data.js",
+                      "engine.js", "gear-engine.js", "render.js", "gear-render.js"];
 export const OUT = "index.html";
 
 export function bundle() {

@@ -264,4 +264,3 @@ function rebuildSelects(){
  sums();
  calc();
 })();
-</script></body></html>
