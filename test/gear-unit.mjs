@@ -29,7 +29,7 @@ function note(t) { console.log("   " + t); }
 // ── 로더 ───────────────────────────────────────────────────────────────
 const EXPORTS = "GEAR_MS,GEAR_SLOTS,GEAR_SLOT_ORDER,GEAR_TROOPS,GEAR_TROOP_ORDER,GEAR_MASTERY," +
   "GEAR_XP_BANDS,GEAR_DEFAULTS,GEAR_CAVEATS,GEAR_WARNINGS,I18N_TABLES," +
-  "GEAR_AXIS,GEAR_AXIS_SUB,gearAtoms,gearHull,gearMasteryCost,gearLevelCap,gearTroopWeight,gearPlan";
+  "GEAR_AXIS,GEAR_AXIS_SUB,GEAR_ORDER,GEAR_ORDER_STAGES,gearAtoms,gearHull,gearMasteryCost,gearLevelCap,gearTroopWeight,gearPlan";
 function load(lang) {
   const code = src("i18n.js") + src("gear-data.js") + src("gear-engine.js") +
     "\n;globalThis.__api={" + EXPORTS + "};\n";
@@ -307,6 +307,71 @@ section("원본 우선순위표 대조");
   ok(missing.length === 0 && extra.length === 0,
      "우리가 값으로 세는 마일스톤이 표의 24칸과 정확히 일치",
      "빠짐 " + missing.join(",") + " / 남음 " + extra.join(","));
+
+  // (c2) 우선순위 번호 — 그림에서 읽은 NUM 과 gear-data 의 GEAR_ORDER 가 같은가
+  const numBad = [];
+  for (const t of Object.keys(NUM)) for (const sl of G.GEAR_SLOT_ORDER) [0, 1, 2, 3].forEach(k => {
+    const mine = G.GEAR_ORDER[t][sl][k];
+    const img = NUM[t][sl][k] === null ? null : +String(NUM[t][sl][k]).replace("y", "");
+    if (mine !== img) numBad.push(t + "/" + sl + "[" + k + "] " + mine + "≠" + img);
+  });
+  ok(numBad.length === 0, "GEAR_ORDER 가 그림의 번호와 같다", numBad.join(" | "));
+
+  // 그림에서 눈으로 읽히는 구조 — 복사 검사가 아니라 규칙 검증이다
+  {
+    const flat = [];
+    for (const t of Object.keys(G.GEAR_ORDER)) for (const sl of G.GEAR_SLOT_ORDER)
+      G.GEAR_ORDER[t][sl].forEach((n, k) => { if (n !== null) flat.push({n, t, sl, k}); });
+    ok(flat.length === 32 && new Set(flat.map(x => x.n)).size === 32 &&
+       Math.min(...flat.map(x => x.n)) === 1 && Math.max(...flat.map(x => x.n)) === 32,
+       "번호 1~32 가 겹치지도 빠지지도 않는다", String(flat.length));
+    // 단계마다 딱 8칸씩, 그리고 번호 구간이 단계와 정확히 겹친다
+    const stageBad = [];
+    [0, 1, 2, 3].forEach(k => {
+      const ns = flat.filter(x => x.k === k).map(x => x.n).sort((a, b) => a - b);
+      const lo = k * 8 + 1, hi = k * 8 + 8;
+      if (ns.length !== 8 || ns[0] !== lo || ns[7] !== hi)
+        stageBad.push(G.GEAR_ORDER_STAGES[k] + " " + ns.join(","));
+    });
+    ok(stageBad.length === 0, "GOLD 1~8 · +20 9~16 · +60 17~24 · +100 25~32 로 단계마다 8칸",
+       stageBad.join(" | "));
+    // 단계 안의 병종 순서 — 그림에서 그대로 읽힌다: 보병2 → 궁병2 → 창병2 → 궁병2.
+    // 궁병이 두 번 나오는 이유가 단계마다 다르다. GOLD 는 주 스탯(치명) 먼저·체력 나중이고,
+    // 빨강은 필수(공격) 먼저·추천(방어) 나중이다. 그래서 가중이 아니라 병종으로만 본다.
+    const seqBad = [];
+    [0, 1, 2, 3].forEach(k => {
+      const got = flat.filter(x => x.k === k).sort((a, b) => a.n - b.n)
+        .map(x => ({infantry: "보", marksman: "궁", lancer: "창"})[x.t]).join("");
+      if (got !== "보보궁궁창창궁궁") seqBad.push(G.GEAR_ORDER_STAGES[k] + " " + got);
+    });
+    ok(seqBad.length === 0, "단계 안 순서가 보병2 → 궁병2 → 창병2 → 궁병2", seqBad.join(" | "));
+    // 빨강 단계에서는 뒤에 오는 궁병 둘이 곧 '추천(방어)' 이다
+    const subBad = [];
+    [1, 2, 3].forEach(k => {
+      const mk = flat.filter(x => x.k === k && x.t === "marksman").sort((a, b) => a.n - b.n);
+      if (mk.length !== 4) { subBad.push(G.GEAR_ORDER_STAGES[k] + " 궁병 " + mk.length + "칸"); return; }
+      const w = mk.map(x => G.GEAR_AXIS.marksman[CELL[x.sl][x.k]]);
+      if (!(w[0] === 1 && w[1] === 1 && w[2] === G.GEAR_AXIS_SUB && w[3] === G.GEAR_AXIS_SUB))
+        subBad.push(G.GEAR_ORDER_STAGES[k] + " " + w.join(","));
+    });
+    ok(subBad.length === 0, "빨강 단계의 궁병 4칸은 필수2 → 추천2 순", subBad.join(" | "));
+    // GOLD 단계는 병종마다 '주 스탯' 조각이 먼저다
+    {
+      const g = flat.filter(x => x.k === 0).sort((a, b) => a.n - b.n);
+      const bad = g.filter((x, i) => {
+        const main = G.GEAR_SLOTS[x.sl].stat === G.GEAR_TROOPS[x.t].mainStat;
+        return i < 6 ? !main : main;   // 1~6 은 전부 주 스탯, 7~8(궁병 체력)은 아니다
+      }).map(x => x.n + " " + x.t + "/" + x.sl);
+      ok(bad.length === 0, "GOLD 1~6 은 주 스탯 조각 · 7~8 은 궁병 체력", bad.join(", "));
+    }
+    // 번호가 붙은 칸은 곧 값이 있는 칸이다 (GEAR_AXIS 와 앞뒤가 맞아야 한다)
+    const axisBad = flat.filter(x => G.GEAR_AXIS[x.t][CELL[x.sl][x.k]] <= 0)
+      .map(x => x.n + " " + x.t + "/" + x.sl);
+    ok(axisBad.length === 0, "번호 붙은 칸은 전부 가중이 0보다 크다", axisBad.join(", "));
+    ok(flat.filter(x => x.t === "marksman").length === 16,
+       "궁병이 32칸 중 16칸 — 버리는 축이 없어 투자 가치가 두 배",
+       String(flat.filter(x => x.t === "marksman").length));
+  }
 
   // (d) 보병은 공격을, 창병은 방어를 값으로 세지 않는다
   const wrong = [];

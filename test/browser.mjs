@@ -202,6 +202,17 @@ await ko.waitForTimeout(120);
   const lo = await ko.evaluate(() => document.querySelectorAll("#gSteps tbody tr.dead").length);
   ok(lo === 4, "맨 뒤 완성용 4행이 흐리게 표시된다", String(lo));
   ok(/맨 마지막 — 완성용/.test(await ko.textContent("#gOutBot")), "완성용 안내가 붙는다");
+  // ⑤ 원본 우선순위표에 1~32 번호가 다 찍혀야 한다
+  {
+    const ns = await ko.evaluate(() =>
+      [...document.querySelectorAll("#gOutBot .ono.on")].map(e => +e.textContent).sort((a, b) => a - b));
+    ok(ns.length === 32 && ns[0] === 1 && ns[31] === 32 && new Set(ns).size === 32,
+       "우선순위표에 번호 1~32 가 전부 찍힌다", ns.length + "개 " + ns.slice(0, 5).join(","));
+    const blank = await ko.evaluate(() => document.querySelectorAll("#gOutBot .ono:not(.on)").length);
+    ok(blank === 16, "번호 없는 칸이 16개 (보병 8 + 창병 8 · 궁병은 0)", String(blank));
+    const done = await ko.evaluate(() => document.querySelectorAll("#gOutBot td.cdone").length);
+    ok(done > 0, "이미 지난 칸에 ✓ 가 붙는다", String(done));
+  }
   ok(/필수/.test(await ko.textContent("#gGridLegend")) && /추천/.test(await ko.textContent("#gGridLegend")),
      "범례가 필수·추천·통행료로 나뉜다", await ko.textContent("#gGridLegend"));
 }

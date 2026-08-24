@@ -91,6 +91,13 @@ tr.dead td{opacity:.5}
 .t-bad{background:var(--skip-bg);color:var(--skip);border:1px solid #6b2338}
 .t-warn{background:var(--cond-bg);color:var(--cond);border:1px solid #6b571b}
 .t-off{background:var(--card2);color:var(--muted);border:1px solid var(--line)}
+/* ⑤ 원본 표의 우선순위 번호 */
+.ono{display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;
+ border-radius:50%;font-size:10.5px;font-style:normal;font-weight:800;margin-right:6px;
+ background:var(--card2);border:1px solid var(--line);color:var(--muted);flex:0 0 auto}
+.ono.on{background:var(--skip-bg);border-color:#6b2338;color:#ff8fa8}
+td.cdone{opacity:.45}
+.ck{font-style:normal;color:var(--pick);margin-left:5px;font-size:11px}
 .callout{border-radius:13px;padding:14px 16px;margin:12px 0;border:1px solid}
 .co-key{background:var(--star-bg);border-color:#6b571b}
 .co-tip{background:var(--accent-bg);border-color:#25467c}

@@ -346,7 +346,7 @@ function gearRender(plan,input){
       "Fill in <b>mastery (M)</b> and <b>red level (+)</b> in the 12-piece grid above and the upgrade order appears here.")+"</p>"+
     "<p>"+L("두 칸을 다 비워 둔 조각은 <b>안 갖고 있는 것</b>으로 보고 계획에서 뺍니다. 홍색을 아직 안 뚫었으면 마스터리만 넣고 <b>+</b> 는 비우거나 0 을 넣으세요.",
       "A piece with both boxes blank counts as <b>not owned</b> and is left out of the plan. If a piece has not gone red yet, fill in mastery and leave <b>+</b> blank or 0.")+"</p></div>";
-  if(bot)bot.innerHTML=gearCycleRef()+gearWarnBlock();
+  if(bot)bot.innerHTML=gearCycleRef(input.gear)+gearWarnBlock();
   return;
  }
 
@@ -453,7 +453,7 @@ function gearRender(plan,input){
  b+="</div>";
 
  b+=gearDropBlock(plan.leftover);
- b+=gearCycleRef();
+ b+=gearCycleRef(input.gear);
 
  // ── ⑥ 경고 · 한계 ── (접지 않는다)
  b+=gearWarnBlock();
@@ -461,13 +461,16 @@ function gearRender(plan,input){
 }
 
 /* ⑤ 좌우 사이클 참조 — 입력이 없어도 읽을 값이라 빈 상태에서도 낸다 */
-function gearCycleRef(){
+function gearCycleRef(now){
+ now=now||{};
  var exp=GEAR_MS.filter(function(m){return m.tier==="expedition";});
  var gl={need:["t-ok",L("필수","Essential")],sub:["t-warn",L("추천","Recommended")],axis:["t-off",L("맨 마지막","Last")]};
  var b='<h2>'+L("⑤ 병종별 필수 축 — 원본 우선순위표","⑤ Which axis each troop needs")+' <span>'+
   L("좌=헬멧·벨트 / 우=장갑·신발","left = helmet·belt / right = gauntlet·boots")+'</span></h2><div class="panel">'+
   '<p class="cap">'+L("아래 표는 커뮤니티 <b>HERO GEAR — UPGRADE ORDER</b> 표를 우리 데이터로 다시 그린 것입니다. 좌우 사이클과 골드 스탯 16칸이 그 표와 전부 일치했고, 표가 더해 준 것이 <b>병종마다 쓰는 축이 다르다</b>는 판정입니다.",
     "The table below is the community <b>HERO GEAR — UPGRADE ORDER</b> chart, redrawn from our own data. All 16 cells of the left/right cycle and the gold stats matched it; what the chart adds is the judgement that <b>each troop only uses one axis</b>.")+"</p>"+
+  '<p class="cap">'+L("동그라미 숫자가 <b>원본 표의 우선순위</b>입니다 — 1~8 GOLD · 9~16 RED+20 · 17~24 RED+60 · 25~32 RED+100 로 단계마다 딱 8칸씩이고, 단계 안에서는 <b>보병 → 궁병(필수) → 창병(필수) → 궁병(추천)</b> 순입니다. <b>1~8 이 전부 골드 장비</b>라 표는 <b>홍색보다 골드가 먼저</b>라고 말하고 있습니다 — 이 계산기는 홍색만 계산하므로 그 여덟은 위 순서표에 안 들어갑니다. ✓ 는 지금 입력한 레벨이 이미 지난 칸입니다.",
+    "The circled number is the <b>source chart's priority</b> — 1-8 GOLD, 9-16 RED+20, 17-24 RED+60, 25-32 RED+100, exactly eight per stage, and within a stage the order runs <b>infantry → marksman (essential) → lancer (essential) → marksman (recommended)</b>. <b>All of 1-8 are gold gear</b>, so the chart is saying <b>gold comes before red</b> — this calculator only plans red, so those eight are absent from the order table above. ✓ marks a cell your current level has already passed.")+"</p>"+
   '<p class="cap">'+L('<span class="tag t-ok">필수</span> 이 병종이 쓰는 축 · <span class="tag t-warn">추천</span> 궁병 방어(가중 '+GEAR_AXIS_SUB+') · <span class="tag t-off">맨 마지막</span> 안 쓰는 축 — <b>금지가 아니라 우선순위 맨 뒤</b>입니다.',
     '<span class="tag t-ok">Essential</span> the axis this troop uses · <span class="tag t-warn">Recommended</span> marksman defense (weight '+GEAR_AXIS_SUB+') · <span class="tag t-off">Last</span> an unused axis — <b>not forbidden, just last</b>.')+"</p>"+
   '<div class="xscroll"><table><thead><tr><th>'+L("병종","Troop")+"</th><th>"+L("조각","Piece")+"</th><th>GOLD</th>"+
@@ -480,11 +483,18 @@ function gearCycleRef(){
    // GOLD 칸은 슬롯 고유 스탯. 주 스탯이면 필요, 아니면 병종 축을 따른다.
    var gstat=GEAR_SLOTS[sl].stat, gw=(GEAR_AXIS[t]||{})[gstat]||0;
    var gg=gw>=1?"need":gw>0?"sub":"axis";
+   var ord=(GEAR_ORDER[t]||{})[sl]||[];
+   var cur=(now[t]||{})[sl];                   // [마스터리, 홍색레벨] · 미입력이면 undefined
+   var lvl=cur?cur[1]:undefined;
+   var no=function(n){return n==null?'<i class="ono">—</i>':'<i class="ono on">'+n+"</i>";};
    b+='<td>'+L(GEAR_SLOTS[sl].ko,GEAR_SLOTS[sl].en)+'<div class="note">'+
      (side==="left"?L("좌","L"):L("우","R"))+"</div></td>"+
-     '<td><span class="tag '+gl[gg][0]+'">'+gearDirName(gstat)+"</span></td>"+
-     exp.map(function(m){var g=gearGrade(t,side,m);
-      return '<td><span class="tag '+gl[g][0]+'">'+gearDirName(m[side])+" +"+m.bonus+"%</span></td>";}).join("")+"</tr>";
+     '<td>'+no(ord[0])+'<span class="tag '+gl[gg][0]+'">'+gearDirName(gstat)+"</span></td>"+
+     exp.map(function(m,k){var g=gearGrade(t,side,m);
+      var done=lvl!==undefined&&lvl>=m.level;
+      return '<td'+(done?' class="cdone"':"")+">"+no(ord[k+1])+
+       '<span class="tag '+gl[g][0]+'">'+gearDirName(m[side])+" +"+m.bonus+"%</span>"+
+       (done?'<i class="ck">✓</i>':"")+"</td>";}).join("")+"</tr>";
   });
  });
  b+="</tbody></table></div>"+
