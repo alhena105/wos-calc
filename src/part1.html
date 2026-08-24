@@ -109,15 +109,41 @@ footer{margin-top:36px;color:var(--muted);font-size:12px;text-align:center;borde
 footer a{color:var(--accent);text-decoration:none}
 /* ── 장비 탭 ────────────────────────────────────────────────────────
    새 색을 만들지 않는다. 위의 CSS 변수만 쓴다. */
-.ggrid{width:100%;border-collapse:collapse;font-size:13px;margin-top:0}
-.ggrid th{background:var(--card2);color:var(--sub);padding:7px 8px;font-size:11px;font-weight:600;
- text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--line);text-align:center}
-.ggrid th:first-child{text-align:left}
-.ggrid td{padding:6px 5px;border-bottom:1px solid var(--line);background:var(--card)}
-.ggrid td:first-child{font-weight:700;color:#fff;white-space:nowrap;padding-left:9px}
-.gcell{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+/* 12조각 입력 — 병종 3줄(보→창→궁) × 슬롯 4장 카드.
+   행 순서는 화면 전용이다. 엔진 타이브레이크의 GEAR_TROOP_ORDER 와 별개다. */
+.gsec{margin-top:15px}
+.gsec:first-child{margin-top:6px}
+.gsec>h4{margin:0 0 8px;font-size:13.5px;display:flex;align-items:center;gap:8px;font-weight:700}
+.gsec>h4 .dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
+.gsec>h4 span{font-size:11px;color:var(--muted);font-weight:400;letter-spacing:.3px}
+.gcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(178px,1fr));gap:9px}
+.gcard{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px 11px 10px}
+.gcard.main{border-color:#3d4c72}
+.gcard>header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.gcard>header svg{width:21px;height:21px;flex:0 0 auto;color:var(--sub)}
+.gcard.main>header svg{color:var(--accent)}
+.gcard>header b{font-size:13px;font-weight:700}
+.sidep{margin-left:auto;font-size:10px;font-weight:700;padding:1px 7px;border-radius:20px;
+ border:1px solid var(--line);color:var(--sub);background:var(--card)}
+.sidep.l{color:var(--accent);border-color:#25467c}
+.sidep.r{color:var(--lance);border-color:#4a3a6b}
+.gcell{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .gcell input{padding:6px 4px;font-size:13px;text-align:center}
 .gcell input.over{border-color:var(--skip);color:var(--skip)}
+/* 마일스톤 트랙 — 원정(실전)과 탐험(통행료)을 눈금 색으로 갈라 놓는다 */
+.ms{position:relative;height:6px;border-radius:3px;background:var(--card);
+ border:1px solid var(--line);margin-top:10px}
+.ms.off{opacity:.4}
+.ms>i{display:block;height:100%;border-radius:3px;background:var(--accent)}
+.ms>b{position:absolute;top:-4px;width:2px;height:12px;border-radius:1px;
+ background:var(--muted);transform:translateX(-1px)}
+.ms>b.exp{background:var(--star);width:3px;transform:translateX(-1.5px)}
+.ms>b.on{opacity:.4}
+.msn{display:flex;justify-content:space-between;gap:6px;font-size:10.5px;color:var(--muted);margin-top:5px}
+.mslegend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:13px;font-size:11.5px;color:var(--muted)}
+.mstag{display:flex;align-items:center;gap:6px}
+.mstag i{width:3px;height:12px;border-radius:1px;flex:0 0 auto;background:var(--muted)}
+.mstag i.exp{background:var(--star)}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px}
 .tiles>div{background:var(--card2);border:1px solid var(--line);border-radius:11px;padding:11px 13px}
 .tiles b{display:block;font-size:20px;font-weight:800;color:var(--star);line-height:1.35}
@@ -131,11 +157,10 @@ input[type=range]{padding:0;accent-color:var(--accent);background:none;border:no
 .gio .chip{margin:0}
 .xscroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .xscroll>table{min-width:520px}
-.xscroll>.ggrid{min-width:420px}
 textarea{width:100%;background:var(--card2);color:var(--ink);border:1px solid var(--line);
  border-radius:9px;padding:9px 10px;font-size:12px;font-family:ui-monospace,Menlo,Consolas,monospace;
  min-height:120px;margin-top:8px}
-@media(max-width:700px){.ggrid{font-size:11.5px}.gcell{grid-template-columns:1fr}}
+@media(max-width:700px){.gcards{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}}
 @media(max-width:700px){table{font-size:12px}.ratio3{grid-template-columns:1fr}}
 </style>
 </head>
@@ -182,6 +207,7 @@ textarea{width:100%;background:var(--card2);color:var(--ink);border:1px solid va
   <div class="panel">
     <label id="gLbGrid"></label>
     <div id="gGrid"></div>
+    <div id="gGridLegend" class="mslegend"></div>
     <div class="note" id="gGridCap" style="margin-top:10px"></div>
     <div id="gGridWarn" class="sumwarn"></div>
     <div class="gio"><button type="button" class="chip" id="gExport"></button><button type="button" class="chip" id="gImport"></button><button type="button" class="chip" id="gApply"></button><button type="button" class="chip" id="gClear"></button><span class="note" id="gIoMsg"></span></div>

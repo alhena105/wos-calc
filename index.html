@@ -109,15 +109,41 @@ footer{margin-top:36px;color:var(--muted);font-size:12px;text-align:center;borde
 footer a{color:var(--accent);text-decoration:none}
 /* ── 장비 탭 ────────────────────────────────────────────────────────
    새 색을 만들지 않는다. 위의 CSS 변수만 쓴다. */
-.ggrid{width:100%;border-collapse:collapse;font-size:13px;margin-top:0}
-.ggrid th{background:var(--card2);color:var(--sub);padding:7px 8px;font-size:11px;font-weight:600;
- text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--line);text-align:center}
-.ggrid th:first-child{text-align:left}
-.ggrid td{padding:6px 5px;border-bottom:1px solid var(--line);background:var(--card)}
-.ggrid td:first-child{font-weight:700;color:#fff;white-space:nowrap;padding-left:9px}
-.gcell{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+/* 12조각 입력 — 병종 3줄(보→창→궁) × 슬롯 4장 카드.
+   행 순서는 화면 전용이다. 엔진 타이브레이크의 GEAR_TROOP_ORDER 와 별개다. */
+.gsec{margin-top:15px}
+.gsec:first-child{margin-top:6px}
+.gsec>h4{margin:0 0 8px;font-size:13.5px;display:flex;align-items:center;gap:8px;font-weight:700}
+.gsec>h4 .dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
+.gsec>h4 span{font-size:11px;color:var(--muted);font-weight:400;letter-spacing:.3px}
+.gcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(178px,1fr));gap:9px}
+.gcard{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px 11px 10px}
+.gcard.main{border-color:#3d4c72}
+.gcard>header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.gcard>header svg{width:21px;height:21px;flex:0 0 auto;color:var(--sub)}
+.gcard.main>header svg{color:var(--accent)}
+.gcard>header b{font-size:13px;font-weight:700}
+.sidep{margin-left:auto;font-size:10px;font-weight:700;padding:1px 7px;border-radius:20px;
+ border:1px solid var(--line);color:var(--sub);background:var(--card)}
+.sidep.l{color:var(--accent);border-color:#25467c}
+.sidep.r{color:var(--lance);border-color:#4a3a6b}
+.gcell{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .gcell input{padding:6px 4px;font-size:13px;text-align:center}
 .gcell input.over{border-color:var(--skip);color:var(--skip)}
+/* 마일스톤 트랙 — 원정(실전)과 탐험(통행료)을 눈금 색으로 갈라 놓는다 */
+.ms{position:relative;height:6px;border-radius:3px;background:var(--card);
+ border:1px solid var(--line);margin-top:10px}
+.ms.off{opacity:.4}
+.ms>i{display:block;height:100%;border-radius:3px;background:var(--accent)}
+.ms>b{position:absolute;top:-4px;width:2px;height:12px;border-radius:1px;
+ background:var(--muted);transform:translateX(-1px)}
+.ms>b.exp{background:var(--star);width:3px;transform:translateX(-1.5px)}
+.ms>b.on{opacity:.4}
+.msn{display:flex;justify-content:space-between;gap:6px;font-size:10.5px;color:var(--muted);margin-top:5px}
+.mslegend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:13px;font-size:11.5px;color:var(--muted)}
+.mstag{display:flex;align-items:center;gap:6px}
+.mstag i{width:3px;height:12px;border-radius:1px;flex:0 0 auto;background:var(--muted)}
+.mstag i.exp{background:var(--star)}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px}
 .tiles>div{background:var(--card2);border:1px solid var(--line);border-radius:11px;padding:11px 13px}
 .tiles b{display:block;font-size:20px;font-weight:800;color:var(--star);line-height:1.35}
@@ -131,11 +157,10 @@ input[type=range]{padding:0;accent-color:var(--accent);background:none;border:no
 .gio .chip{margin:0}
 .xscroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .xscroll>table{min-width:520px}
-.xscroll>.ggrid{min-width:420px}
 textarea{width:100%;background:var(--card2);color:var(--ink);border:1px solid var(--line);
  border-radius:9px;padding:9px 10px;font-size:12px;font-family:ui-monospace,Menlo,Consolas,monospace;
  min-height:120px;margin-top:8px}
-@media(max-width:700px){.ggrid{font-size:11.5px}.gcell{grid-template-columns:1fr}}
+@media(max-width:700px){.gcards{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}}
 @media(max-width:700px){table{font-size:12px}.ratio3{grid-template-columns:1fr}}
 </style>
 </head>
@@ -182,6 +207,7 @@ textarea{width:100%;background:var(--card2);color:var(--ink);border:1px solid va
   <div class="panel">
     <label id="gLbGrid"></label>
     <div id="gGrid"></div>
+    <div id="gGridLegend" class="mslegend"></div>
     <div class="note" id="gGridCap" style="margin-top:10px"></div>
     <div id="gGridWarn" class="sumwarn"></div>
     <div class="gio"><button type="button" class="chip" id="gExport"></button><button type="button" class="chip" id="gImport"></button><button type="button" class="chip" id="gApply"></button><button type="button" class="chip" id="gClear"></button><span class="note" id="gIoMsg"></span></div>
@@ -1452,35 +1478,103 @@ function gearInput(){
 
 /* ── 12조각 입력 그리드 ────────────────────────────────────────────────
    병종 3행 × 슬롯 4열. 칸마다 마스터리와 홍색 레벨 두 칸. */
+/* 화면 행 순서. GEAR_TROOP_ORDER 를 쓰지 않는 이유 — 그건 엔진의 마지막 타이브레이크라
+   바꾸면 골든 픽스처의 스텝 순서가 바뀐다. 보이는 순서와 정렬 기준은 별개다. */
+var GEAR_ROW_ORDER = ["infantry", "lancer", "marksman"];
+var GEAR_ROW_COLOR = {infantry:"var(--inf)", lancer:"var(--lance)", marksman:"var(--mk)"};
+
+/* 슬롯 아이콘. 외부 파일을 쓰지 않는다 — 단일 파일 산출물이라야 하고, 파일로 열어도
+   보여야 한다. currentColor 라서 색은 CSS 가 정한다. */
+var GEAR_ICON = {
+ helmet:'<path d="M4 18v-4a8 8 0 0 1 16 0v4"/><path d="M12 9v9"/><path d="M3 18h18"/>',
+ gauntlet:'<path d="M8 11V5.5a2 2 0 0 1 4 0V11"/><path d="M12 11V7.5a2 2 0 0 1 4 0V12"/>'+
+   '<path d="M16 12v-1a2 2 0 0 1 4 0v5a5 5 0 0 1-5 5h-3a5 5 0 0 1-5-5v-4.5a2 2 0 0 1 4 0"/>',
+ belt:'<rect x="2" y="8.4" width="20" height="7.2" rx="2"/><rect x="8.4" y="6.2" width="7.2" height="11.6" rx="2.2"/><path d="M15.6 12H19"/>',
+ boots:'<path d="M7 3h5v8c0 2 1.2 3 3 3.8S20 16.4 20 18.5V21H7z"/><path d="M7 17h13"/>'
+};
+function gearIcon(slot){
+ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" '+
+  'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'+
+  GEAR_ICON[slot]+"</svg>";
+}
+
+/* 마일스톤 트랙 — 이 조각이 0~100 중 어디까지 왔고, 다음 관문이 실전(원정)인지
+   통행료(탐험)인지를 한눈에 보여준다. 표에서 통행료를 설명하는 것보다 이게 빠르다. */
+function gearTrack(level,entered){
+ var max=GEAR_MS[GEAR_MS.length-1].level;
+ var pct=Math.max(0,Math.min(100,level/max*100));
+ var ticks=GEAR_MS.map(function(m){
+  return '<b class="'+(m.tier==="expedition"?"exp":"tol")+(level>=m.level?" on":"")+
+   '" style="left:'+(m.level/max*100)+'%" title="Lv.'+m.level+" · "+
+   (m.tier==="expedition"?L("원정 +"+m.bonus+"%","expedition +"+m.bonus+"%")
+                         :L("탐험 통행료 (실전 기여 0)","exploration toll (no combat value)"))+
+   " · "+L("미스릴 ","mithril ")+m.mithril+'"></b>';}).join("");
+ var next=GEAR_MS.filter(function(m){return m.level>level;})[0];
+ var right=!entered?L("미입력 — 계획에서 제외","not entered — left out")
+   :next?L("다음 Lv."+next.level+" · 미스릴 "+next.mithril,"next Lv."+next.level+" · "+next.mithril+" mithril")
+        :L("완주","complete");
+ return '<div class="ms'+(entered?"":" off")+'"><i style="width:'+pct.toFixed(0)+'%"></i>'+ticks+"</div>"+
+  '<div class="msn"><span>'+(entered?"Lv."+level:"—")+"</span><span>"+right+"</span></div>";
+}
+
+/* 12조각 입력 — 병종 3줄 × 슬롯 4장의 카드.
+   진짜 상태는 카드 안의 gm_<병종>_<슬롯> · gl_<병종>_<슬롯> 입력이 들고 있다.
+   calc 도 테스트도 그 id 만 읽으므로 카드는 화면 계층일 뿐이다.
+   (주석에 슬래시-별 조합을 쓰면 블록 주석이 거기서 닫힌다.) */
 function gearGrid(){
  var box=gEl("gGrid"); if(!box)return;
  var keep={};
  GEAR_CELLS.forEach(function(c){
   ["gm","gl"].forEach(function(p){var e=gEl(gid(p,c[0],c[1])); if(e)keep[gid(p,c[0],c[1])]=e.value;});});
- var h='<table class="ggrid"><thead><tr><th></th>'+
-  GEAR_SLOT_ORDER.map(function(s){return "<th>"+L(GEAR_SLOTS[s].ko,GEAR_SLOTS[s].en)+
-    '<div class="note" style="text-transform:none;letter-spacing:0">'+
-    (GEAR_SLOTS[s].side==="left"?L("좌","left"):L("우","right"))+"</div></th>";}).join("")+"</tr></thead><tbody>";
- GEAR_TROOP_ORDER.forEach(function(t){
-  h+="<tr><td>"+L(GEAR_TROOPS[t].ko,GEAR_TROOPS[t].en)+
-    '<div class="note" style="font-weight:400">'+
-    (GEAR_TROOPS[t].role==="tank"?L("탱커","tank"):L("딜러","dps"))+"</div></td>";
-  GEAR_SLOT_ORDER.forEach(function(s){
-   var nm=L(GEAR_TROOPS[t].ko+" "+GEAR_SLOTS[s].ko,GEAR_TROOPS[t].en+" "+GEAR_SLOTS[s].en);
-   // 스크린리더에는 placeholder 가 이름이 되지 않는다. 조각 이름까지 붙여 준다.
-   h+='<td><div class="gcell"><input id="'+gid("gm",t,s)+'" type="number" min="0" max="'+GEAR_MASTERY.max+
+ var h="";
+ GEAR_ROW_ORDER.forEach(function(t){
+  h+='<div class="gsec"><h4><i class="dot" style="background:'+GEAR_ROW_COLOR[t]+'"></i>'+
+   L(GEAR_TROOPS[t].ko,GEAR_TROOPS[t].en)+"<span>"+
+   (GEAR_TROOPS[t].role==="tank"?L("탱커","tank"):L("딜러","dps"))+" · "+
+   L("주 스탯 "+(GEAR_TROOPS[t].mainStat==="health"?"체력":"치명"),
+     "main stat "+GEAR_TROOPS[t].mainStat)+'</span></h4><div class="gcards">';
+  GEAR_SLOT_ORDER.forEach(function(sl){
+   var side=GEAR_SLOTS[sl].side;
+   var nm=L(GEAR_TROOPS[t].ko+" "+GEAR_SLOTS[sl].ko,GEAR_TROOPS[t].en+" "+GEAR_SLOTS[sl].en);
+   var main=GEAR_SLOTS[sl].stat===GEAR_TROOPS[t].mainStat;
+   h+='<div class="gcard'+(main?" main":"")+'"><header>'+gearIcon(sl)+"<b>"+
+     L(GEAR_SLOTS[sl].ko,GEAR_SLOTS[sl].en)+'</b><span class="sidep '+(side==="left"?"l":"r")+
+     '" title="'+(side==="left"?L("좌 계열 — 헬멧·벨트","Left — helmet and belt")
+                              :L("우 계열 — 장갑·신발","Right — gauntlet and boots"))+'">'+
+     (side==="left"?L("좌","L"):L("우","R"))+"</span></header>"+
+     '<div class="gcell"><input id="'+gid("gm",t,sl)+'" type="number" min="0" max="'+GEAR_MASTERY.max+
      '" placeholder="M" title="'+L("마스터리","Mastery")+'" aria-label="'+esc(nm)+" "+L("마스터리","mastery")+
-     '"><input id="'+gid("gl",t,s)+'" type="number" min="0" max="'+GEAR_MS[GEAR_MS.length-1].level+
+     '"><input id="'+gid("gl",t,sl)+'" type="number" min="0" max="'+GEAR_MS[GEAR_MS.length-1].level+
      '" placeholder="+" title="'+L("홍색 레벨","Red level")+'" aria-label="'+esc(nm)+" "+
-     L("홍색 레벨","red level")+'"></div></td>';});
-  h+="</tr>";});
- box.innerHTML='<div class="xscroll">'+h+"</tbody></table></div>";
+     L("홍색 레벨","red level")+'"></div><div id="'+gid("gt",t,sl)+'">'+gearTrack(0,false)+"</div></div>";
+  });
+  h+="</div></div>";
+ });
+ box.innerHTML=h;
  Object.keys(keep).forEach(function(k){var e=gEl(k); if(e)e.value=keep[k];});
+ var lg=gEl("gGridLegend");
+ if(lg)lg.innerHTML='<span class="mstag"><i class="exp"></i>'+
+   L("원정 Lv."+GEAR_MS.filter(function(m){return m.tier==="expedition";}).map(function(m){return m.level;}).join("·")+
+     " — 랠리·개리슨에 실제로 붙는 스탯",
+     "Expedition Lv."+GEAR_MS.filter(function(m){return m.tier==="expedition";}).map(function(m){return m.level;}).join(", ")+
+     " — the stats that actually apply to rallies and garrison")+'</span><span class="mstag"><i class="tol"></i>'+
+   L("탐험 Lv."+GEAR_MS.filter(function(m){return m.tier==="exploration";}).map(function(m){return m.level;}).join("·")+
+     " — 아레나 전용. 미스릴은 내지만 실전 기여 0 (통행료)",
+     "Exploration Lv."+GEAR_MS.filter(function(m){return m.tier==="exploration";}).map(function(m){return m.level;}).join(", ")+
+     " — arena only. Costs mithril, contributes nothing in combat (a toll)")+"</span>";
  var cap=gEl("gGridCap");
  if(cap)cap.innerHTML=L("<b>+1 은 아직 한 번도 돌파하지 않은 상태입니다.</b> 홍색은 Lv.1 에서 시작해 Lv."+
    GEAR_MS.map(function(m){return m.level;}).join("/")+" 에서 각각 미스릴을 냅니다 — 이걸 거꾸로 알면 비용이 두 배로 틀립니다. <b>두 칸을 다 비우면 그 조각은 계획에서 빠집니다</b>(미보유 조각).",
    "<b>'+1' means no breakthrough yet.</b> Red gear starts at Lv.1 and pays mithril at Lv."+
    GEAR_MS.map(function(m){return m.level;}).join("/")+" — getting this backwards doubles your cost estimate. <b>Leaving both boxes blank drops that piece from the plan</b> (pieces you do not own).");
+}
+
+/* 트랙만 다시 그린다. 카드를 통째로 다시 만들면 타이핑 중인 칸의 포커스가 날아간다. */
+function gearTracks(input){
+ GEAR_CELLS.forEach(function(c){
+  var el=gEl(gid("gt",c[0],c[1])); if(!el)return;
+  var cell=(input.gear[c[0]]||{})[c[1]];
+  el.innerHTML=gearTrack(cell?cell[1]:0,!!cell);});
 }
 
 /* ── localStorage · JSON 입출력 ────────────────────────────────────────
@@ -1532,6 +1626,7 @@ function gearCalc(){
  var input=gearInput();
  var plan=gearPlan(input);
  gearWarnLevels(input);
+ gearTracks(input);
  gearRender(plan,input);
 }
 

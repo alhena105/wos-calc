@@ -119,35 +119,103 @@ function gearInput(){
 
 /* ── 12조각 입력 그리드 ────────────────────────────────────────────────
    병종 3행 × 슬롯 4열. 칸마다 마스터리와 홍색 레벨 두 칸. */
+/* 화면 행 순서. GEAR_TROOP_ORDER 를 쓰지 않는 이유 — 그건 엔진의 마지막 타이브레이크라
+   바꾸면 골든 픽스처의 스텝 순서가 바뀐다. 보이는 순서와 정렬 기준은 별개다. */
+var GEAR_ROW_ORDER = ["infantry", "lancer", "marksman"];
+var GEAR_ROW_COLOR = {infantry:"var(--inf)", lancer:"var(--lance)", marksman:"var(--mk)"};
+
+/* 슬롯 아이콘. 외부 파일을 쓰지 않는다 — 단일 파일 산출물이라야 하고, 파일로 열어도
+   보여야 한다. currentColor 라서 색은 CSS 가 정한다. */
+var GEAR_ICON = {
+ helmet:'<path d="M4 18v-4a8 8 0 0 1 16 0v4"/><path d="M12 9v9"/><path d="M3 18h18"/>',
+ gauntlet:'<path d="M8 11V5.5a2 2 0 0 1 4 0V11"/><path d="M12 11V7.5a2 2 0 0 1 4 0V12"/>'+
+   '<path d="M16 12v-1a2 2 0 0 1 4 0v5a5 5 0 0 1-5 5h-3a5 5 0 0 1-5-5v-4.5a2 2 0 0 1 4 0"/>',
+ belt:'<rect x="2" y="8.4" width="20" height="7.2" rx="2"/><rect x="8.4" y="6.2" width="7.2" height="11.6" rx="2.2"/><path d="M15.6 12H19"/>',
+ boots:'<path d="M7 3h5v8c0 2 1.2 3 3 3.8S20 16.4 20 18.5V21H7z"/><path d="M7 17h13"/>'
+};
+function gearIcon(slot){
+ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" '+
+  'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'+
+  GEAR_ICON[slot]+"</svg>";
+}
+
+/* 마일스톤 트랙 — 이 조각이 0~100 중 어디까지 왔고, 다음 관문이 실전(원정)인지
+   통행료(탐험)인지를 한눈에 보여준다. 표에서 통행료를 설명하는 것보다 이게 빠르다. */
+function gearTrack(level,entered){
+ var max=GEAR_MS[GEAR_MS.length-1].level;
+ var pct=Math.max(0,Math.min(100,level/max*100));
+ var ticks=GEAR_MS.map(function(m){
+  return '<b class="'+(m.tier==="expedition"?"exp":"tol")+(level>=m.level?" on":"")+
+   '" style="left:'+(m.level/max*100)+'%" title="Lv.'+m.level+" · "+
+   (m.tier==="expedition"?L("원정 +"+m.bonus+"%","expedition +"+m.bonus+"%")
+                         :L("탐험 통행료 (실전 기여 0)","exploration toll (no combat value)"))+
+   " · "+L("미스릴 ","mithril ")+m.mithril+'"></b>';}).join("");
+ var next=GEAR_MS.filter(function(m){return m.level>level;})[0];
+ var right=!entered?L("미입력 — 계획에서 제외","not entered — left out")
+   :next?L("다음 Lv."+next.level+" · 미스릴 "+next.mithril,"next Lv."+next.level+" · "+next.mithril+" mithril")
+        :L("완주","complete");
+ return '<div class="ms'+(entered?"":" off")+'"><i style="width:'+pct.toFixed(0)+'%"></i>'+ticks+"</div>"+
+  '<div class="msn"><span>'+(entered?"Lv."+level:"—")+"</span><span>"+right+"</span></div>";
+}
+
+/* 12조각 입력 — 병종 3줄 × 슬롯 4장의 카드.
+   진짜 상태는 카드 안의 gm_<병종>_<슬롯> · gl_<병종>_<슬롯> 입력이 들고 있다.
+   calc 도 테스트도 그 id 만 읽으므로 카드는 화면 계층일 뿐이다.
+   (주석에 슬래시-별 조합을 쓰면 블록 주석이 거기서 닫힌다.) */
 function gearGrid(){
  var box=gEl("gGrid"); if(!box)return;
  var keep={};
  GEAR_CELLS.forEach(function(c){
   ["gm","gl"].forEach(function(p){var e=gEl(gid(p,c[0],c[1])); if(e)keep[gid(p,c[0],c[1])]=e.value;});});
- var h='<table class="ggrid"><thead><tr><th></th>'+
-  GEAR_SLOT_ORDER.map(function(s){return "<th>"+L(GEAR_SLOTS[s].ko,GEAR_SLOTS[s].en)+
-    '<div class="note" style="text-transform:none;letter-spacing:0">'+
-    (GEAR_SLOTS[s].side==="left"?L("좌","left"):L("우","right"))+"</div></th>";}).join("")+"</tr></thead><tbody>";
- GEAR_TROOP_ORDER.forEach(function(t){
-  h+="<tr><td>"+L(GEAR_TROOPS[t].ko,GEAR_TROOPS[t].en)+
-    '<div class="note" style="font-weight:400">'+
-    (GEAR_TROOPS[t].role==="tank"?L("탱커","tank"):L("딜러","dps"))+"</div></td>";
-  GEAR_SLOT_ORDER.forEach(function(s){
-   var nm=L(GEAR_TROOPS[t].ko+" "+GEAR_SLOTS[s].ko,GEAR_TROOPS[t].en+" "+GEAR_SLOTS[s].en);
-   // 스크린리더에는 placeholder 가 이름이 되지 않는다. 조각 이름까지 붙여 준다.
-   h+='<td><div class="gcell"><input id="'+gid("gm",t,s)+'" type="number" min="0" max="'+GEAR_MASTERY.max+
+ var h="";
+ GEAR_ROW_ORDER.forEach(function(t){
+  h+='<div class="gsec"><h4><i class="dot" style="background:'+GEAR_ROW_COLOR[t]+'"></i>'+
+   L(GEAR_TROOPS[t].ko,GEAR_TROOPS[t].en)+"<span>"+
+   (GEAR_TROOPS[t].role==="tank"?L("탱커","tank"):L("딜러","dps"))+" · "+
+   L("주 스탯 "+(GEAR_TROOPS[t].mainStat==="health"?"체력":"치명"),
+     "main stat "+GEAR_TROOPS[t].mainStat)+'</span></h4><div class="gcards">';
+  GEAR_SLOT_ORDER.forEach(function(sl){
+   var side=GEAR_SLOTS[sl].side;
+   var nm=L(GEAR_TROOPS[t].ko+" "+GEAR_SLOTS[sl].ko,GEAR_TROOPS[t].en+" "+GEAR_SLOTS[sl].en);
+   var main=GEAR_SLOTS[sl].stat===GEAR_TROOPS[t].mainStat;
+   h+='<div class="gcard'+(main?" main":"")+'"><header>'+gearIcon(sl)+"<b>"+
+     L(GEAR_SLOTS[sl].ko,GEAR_SLOTS[sl].en)+'</b><span class="sidep '+(side==="left"?"l":"r")+
+     '" title="'+(side==="left"?L("좌 계열 — 헬멧·벨트","Left — helmet and belt")
+                              :L("우 계열 — 장갑·신발","Right — gauntlet and boots"))+'">'+
+     (side==="left"?L("좌","L"):L("우","R"))+"</span></header>"+
+     '<div class="gcell"><input id="'+gid("gm",t,sl)+'" type="number" min="0" max="'+GEAR_MASTERY.max+
      '" placeholder="M" title="'+L("마스터리","Mastery")+'" aria-label="'+esc(nm)+" "+L("마스터리","mastery")+
-     '"><input id="'+gid("gl",t,s)+'" type="number" min="0" max="'+GEAR_MS[GEAR_MS.length-1].level+
+     '"><input id="'+gid("gl",t,sl)+'" type="number" min="0" max="'+GEAR_MS[GEAR_MS.length-1].level+
      '" placeholder="+" title="'+L("홍색 레벨","Red level")+'" aria-label="'+esc(nm)+" "+
-     L("홍색 레벨","red level")+'"></div></td>';});
-  h+="</tr>";});
- box.innerHTML='<div class="xscroll">'+h+"</tbody></table></div>";
+     L("홍색 레벨","red level")+'"></div><div id="'+gid("gt",t,sl)+'">'+gearTrack(0,false)+"</div></div>";
+  });
+  h+="</div></div>";
+ });
+ box.innerHTML=h;
  Object.keys(keep).forEach(function(k){var e=gEl(k); if(e)e.value=keep[k];});
+ var lg=gEl("gGridLegend");
+ if(lg)lg.innerHTML='<span class="mstag"><i class="exp"></i>'+
+   L("원정 Lv."+GEAR_MS.filter(function(m){return m.tier==="expedition";}).map(function(m){return m.level;}).join("·")+
+     " — 랠리·개리슨에 실제로 붙는 스탯",
+     "Expedition Lv."+GEAR_MS.filter(function(m){return m.tier==="expedition";}).map(function(m){return m.level;}).join(", ")+
+     " — the stats that actually apply to rallies and garrison")+'</span><span class="mstag"><i class="tol"></i>'+
+   L("탐험 Lv."+GEAR_MS.filter(function(m){return m.tier==="exploration";}).map(function(m){return m.level;}).join("·")+
+     " — 아레나 전용. 미스릴은 내지만 실전 기여 0 (통행료)",
+     "Exploration Lv."+GEAR_MS.filter(function(m){return m.tier==="exploration";}).map(function(m){return m.level;}).join(", ")+
+     " — arena only. Costs mithril, contributes nothing in combat (a toll)")+"</span>";
  var cap=gEl("gGridCap");
  if(cap)cap.innerHTML=L("<b>+1 은 아직 한 번도 돌파하지 않은 상태입니다.</b> 홍색은 Lv.1 에서 시작해 Lv."+
    GEAR_MS.map(function(m){return m.level;}).join("/")+" 에서 각각 미스릴을 냅니다 — 이걸 거꾸로 알면 비용이 두 배로 틀립니다. <b>두 칸을 다 비우면 그 조각은 계획에서 빠집니다</b>(미보유 조각).",
    "<b>'+1' means no breakthrough yet.</b> Red gear starts at Lv.1 and pays mithril at Lv."+
    GEAR_MS.map(function(m){return m.level;}).join("/")+" — getting this backwards doubles your cost estimate. <b>Leaving both boxes blank drops that piece from the plan</b> (pieces you do not own).");
+}
+
+/* 트랙만 다시 그린다. 카드를 통째로 다시 만들면 타이핑 중인 칸의 포커스가 날아간다. */
+function gearTracks(input){
+ GEAR_CELLS.forEach(function(c){
+  var el=gEl(gid("gt",c[0],c[1])); if(!el)return;
+  var cell=(input.gear[c[0]]||{})[c[1]];
+  el.innerHTML=gearTrack(cell?cell[1]:0,!!cell);});
 }
 
 /* ── localStorage · JSON 입출력 ────────────────────────────────────────
@@ -199,6 +267,7 @@ function gearCalc(){
  var input=gearInput();
  var plan=gearPlan(input);
  gearWarnLevels(input);
+ gearTracks(input);
  gearRender(plan,input);
 }
 

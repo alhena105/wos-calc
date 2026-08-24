@@ -238,6 +238,25 @@ await ko.fill("#ga2", "4");
 await ko.waitForTimeout(80);
 ok((await ko.textContent("#gaSum")).trim() === "", "합이 100이면 경고 없음");
 
+// 카드 그리드 — 화면 순서는 보 → 창 → 궁 (엔진 타이브레이크와 별개)
+{
+  const rows = await ko.evaluate(() =>
+    [...document.querySelectorAll(".gsec>h4")].map(h => h.firstElementChild.nextSibling.textContent.trim()));
+  ok(rows.join(",") === "보병,창병,궁병", "카드 행이 보 → 창 → 궁", rows.join(","));
+  const cards = await ko.evaluate(() => document.querySelectorAll(".gcard").length);
+  ok(cards === 12, "카드 12장", String(cards));
+  // 트랙이 입력을 따라 갱신되는가 — 카드를 다시 만들지 않고 트랙만 갈아끼운다
+  await ko.fill("#gl_lancer_belt", "85");
+  await ko.waitForTimeout(80);
+  const t85 = await ko.textContent("#gt_lancer_belt");
+  ok(/Lv\.85/.test(t85) && /Lv\.100/.test(t85), "레벨을 바꾸면 트랙이 따라간다", t85.replace(/\s+/g, " "));
+  // 타이핑 중 포커스가 유지돼야 한다 (카드를 통째로 다시 만들면 여기서 깨진다)
+  ok(await ko.evaluate(() => document.activeElement.id) === "gl_lancer_belt",
+     "트랙이 갱신돼도 입력 포커스가 유지된다", await ko.evaluate(() => document.activeElement.id));
+  await ko.fill("#gl_lancer_belt", "1");
+  await ko.waitForTimeout(80);
+}
+
 // 접근명 — 그리드 24칸과 체크박스에 이름이 붙어 있어야 한다
 {
   const noName = await ko.evaluate(() =>

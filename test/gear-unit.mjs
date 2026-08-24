@@ -351,6 +351,38 @@ section("렌더");
     .filter(w => !txt.includes(w.replace(/\s+/g, " ").slice(0, 20)));
   ok(missing.length === 0, "GEAR_WARNINGS · GEAR_CAVEATS 가 전부 화면에 있다", String(missing.length) + "건 누락");
 
+  // ── 12조각 카드 그리드 ──
+  // 화면 순서는 보→창→궁. 엔진 타이브레이크(GEAR_TROOP_ORDER)와 별개여야 한다 —
+  // 그걸 바꾸면 위의 28스텝 픽스처가 흔들린다.
+  {
+    const g = a.el("gGrid").innerHTML;
+    const rows = [...g.matchAll(/<h4>.*?<\/i>([^<]+)</g)].map(m => m[1].trim());
+    ok(rows.join(",") === "보병,창병,궁병", "카드 행이 보 → 창 → 궁 순서", rows.join(","));
+    ok(G.GEAR_TROOP_ORDER.join(",") === "infantry,marksman,lancer",
+       "GEAR_TROOP_ORDER 는 엔진 타이브레이크라 그대로다", G.GEAR_TROOP_ORDER.join(","));
+    const cards = g.match(/class="gcard[ "]/g) || [];   // gcards(컨테이너)와 헷갈리지 않게
+    ok(cards.length === 12, "카드 12장", String(cards.length));
+    ok((g.match(/<svg /g) || []).length === 12, "카드마다 슬롯 아이콘",
+       String((g.match(/<svg /g) || []).length));
+    // 주 스탯 = 슬롯 stat === 병종 mainStat. 보병은 체력(장갑·벨트), 딜러는 치명(헬멧·신발).
+    ok((g.match(/class="gcard main"/g) || []).length === 6, "주 스탯 카드 6장",
+       String((g.match(/class="gcard main"/g) || []).length));
+    // 마일스톤 눈금 — 원정 3 · 탐험 2 가 색으로 갈라져야 한다.
+    // 트랙은 gearTracks() 가 자식 노드에 직접 쓴다(카드를 다시 만들면 포커스가 날아가므로).
+    // dom.mjs 스텁은 진짜 트리가 아니라 자식 변경이 부모 문자열에 안 비친다 → 노드를 직접 읽는다.
+    const one = a.el("gt_infantry_gauntlet").innerHTML;
+    ok((one.match(/class="exp/g) || []).length >= 3 && (one.match(/class="tol/g) || []).length >= 2,
+       "트랙 눈금이 원정·탐험으로 갈라진다");
+    ok(/Lv\.61/.test(one) && /다음 Lv\.80/.test(one), "트랙이 현재 레벨과 다음 마일스톤을 적는다",
+       one.slice(0, 160));
+    // 입력이 없는 조각은 트랙도 제외라고 말해야 한다
+    const blankGrid = boot("ko");
+    blankGrid.tab("gear");
+    blankGrid.gearRender();
+    ok(/미입력 — 계획에서 제외/.test(blankGrid.el("gt_lancer_belt").innerHTML),
+       "미입력 조각의 트랙은 제외라고 적는다", blankGrid.el("gt_lancer_belt").innerHTML.slice(-60));
+  }
+
   // 아무것도 입력하지 않으면 가짜 계획 대신 안내가 나와야 한다.
   // (첫 화면에 36스텝·미스릴 1800 짜리 계획이 떠 있던 것을 Orca 브라우저에서 잡았다.)
   {
