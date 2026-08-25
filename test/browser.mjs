@@ -195,10 +195,22 @@ await ko.waitForTimeout(120);
   ok(/Lv\.40\(탐험\) → Lv\.60/.test(b.replace(/\s+/g, " ")), "통행료 표기 Lv.40(탐험) → Lv.60");
   // 스텝 수는 GEAR_AXIS_SUB 에 따라 바뀐다. 상수로 박지 말고 엔진과 화면이 맞는지를 본다.
   const {rows, want} = await ko.evaluate(() => ({
-    rows: document.querySelectorAll("#gSteps tbody tr").length,
+    rows: document.querySelectorAll("#gSteps tbody tr:not(.gband)").length,
     want: gearPlan(gearInput()).steps.length,
   }));
   ok(rows === want && rows > 12, "순서표 행 수가 엔진 스텝 수와 같다", rows + " vs " + want);
+  // 단계 띠 — 이 표의 1순위가 효율이 아니라 단계라는 걸 화면이 말해야 한다
+  {
+    const bands = await ko.evaluate(() =>
+      [...document.querySelectorAll("#gSteps tbody tr.gband")].map(e => e.textContent.trim()));
+    ok(bands.length >= 2 && bands[0].includes("+20"), "순서표에 단계 띠가 붙는다", bands.join(" / "));
+    const back = await ko.evaluate(() => {
+      const st = [...document.querySelectorAll("#gSteps tbody tr")].filter(r => r.classList.contains("gband"));
+      return st.map(e => e.textContent.trim());
+    });
+    const num = back.map(x => parseInt(x.replace(/[^0-9]/g, ""), 10)).filter(n => !isNaN(n));
+    ok(num.every((n, i) => !i || n > num[i - 1]), "단계 띠가 오름차순이다", back.join(" / "));
+  }
   const lo = await ko.evaluate(() => document.querySelectorAll("#gSteps tbody tr.dead").length);
   ok(lo === 4, "맨 뒤 완성용 4행이 흐리게 표시된다", String(lo));
   ok(/맨 마지막 — 완성용/.test(await ko.textContent("#gOutBot")), "완성용 안내가 붙는다");
@@ -220,7 +232,7 @@ await ko.waitForTimeout(120);
 await ko.evaluate(() => { const b = gBudget; b.value = "60"; b.dispatchEvent(new Event("input", {bubbles: true})); });
 await ko.waitForTimeout(80);
 {
-  const rows = await ko.evaluate(() => document.querySelectorAll("#gSteps tbody tr").length);
+  const rows = await ko.evaluate(() => document.querySelectorAll("#gSteps tbody tr:not(.gband)").length);
   ok(rows === 4, "예산 60 이면 4행만 남는다", String(rows));
   // 예산 슬라이더는 앞에서 자르는 게 아니라 그 예산 안 최선을 정확히 푼다
   ok(/최선의 조합/.test(await ko.textContent("#gBudgetN")), "예산 안내가 '최선의 조합'이라고 말한다",
@@ -237,7 +249,7 @@ await ko.waitForTimeout(80);
 await ko.evaluate(() => { const b = gBudget; b.value = b.max; b.dispatchEvent(new Event("input", {bubbles: true})); });
 await ko.waitForTimeout(80);
 // 체크박스 → 진행률
-await ko.click("#gSteps tbody tr:first-child .gchk");
+await ko.click("#gSteps tbody tr:not(.gband) .gchk");
 await ko.waitForTimeout(80);
 ok(/체크 완료/.test(await ko.textContent("#gOutTop")), "체크하면 진행률이 요약에 뜬다");
 // 마스터리 상한 경고 — 계산은 그대로 진행한다
@@ -262,7 +274,7 @@ await ko.waitForTimeout(80);
 // 스텝이 계속 감춰진다. Orca 브라우저에서 실제로 그렇게 잡혔다.
 {
   const back = await ko.evaluate(() => ({
-    rows: document.querySelectorAll("#gSteps tbody tr").length,
+    rows: document.querySelectorAll("#gSteps tbody tr:not(.gband)").length,
     want: gearPlan(gearInput()).steps.length,
   }));
   ok(back.rows === back.want, "총액이 회복되면 예산 슬라이더도 따라와 전체가 돌아온다",

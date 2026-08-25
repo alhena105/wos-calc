@@ -29,7 +29,7 @@ function note(t) { console.log("   " + t); }
 // ── 로더 ───────────────────────────────────────────────────────────────
 const EXPORTS = "GEAR_MS,GEAR_SLOTS,GEAR_SLOT_ORDER,GEAR_TROOPS,GEAR_TROOP_ORDER,GEAR_MASTERY," +
   "GEAR_XP_BANDS,GEAR_DEFAULTS,GEAR_CAVEATS,GEAR_WARNINGS,I18N_TABLES," +
-  "GEAR_AXIS,GEAR_AXIS_SUB,GEAR_ORDER,GEAR_ORDER_STAGES,gearBudgetPick,gearAtoms,gearHull,gearMasteryCost,gearLevelCap,gearTroopWeight,gearPlan";
+  "GEAR_AXIS,GEAR_AXIS_SUB,GEAR_ORDER,GEAR_ORDER_STAGES,gearBudgetPick,gearAtoms,gearCut,gearMasteryCost,gearLevelCap,gearTroopWeight,gearPlan";
 function load(lang) {
   const code = src("i18n.js") + src("gear-data.js") + src("gear-engine.js") +
     "\n;globalThis.__api={" + EXPORTS + "};\n";
@@ -115,13 +115,13 @@ const FREE_XP = [
   ["infantry", "gauntlet", 61, 79], ["infantry", "belt", 60, 79],
 ];
 
-// ── 1. 원자 · 껍질 자르기 ─────────────────────────────────────────────
-section("원자 · 껍질");
+// ── 1. 원자 · 청크 자르기 ─────────────────────────────────────────────
+section("원자 · 청크 자르기");
 {
-  // 역할 가중을 끄면 껍질은 예전의 "탐험 + 다음 원정" 자르기와 정확히 같아야 한다.
+  // 역할 가중을 끄면 자르기는 예전의 "탐험 + 다음 원정" 과 정확히 같아야 한다.
   const shape = (troop, slot, lv, axis) => {
     const atoms = G.gearAtoms(troop, G.GEAR_SLOTS[slot].side, lv, 0, axis);
-    return G.gearHull(atoms).map(h => atoms.slice(h.from, h.to + 1).map(a => a.level).join("+"));
+    return G.gearCut(atoms).map(h => atoms.slice(h.from, h.to + 1).map(a => a.level).join("+"));
   };
   ok(shape("marksman", "helmet", 1, FLAT).join(",") === "20,40+60,80+100",
      "가중 OFF · Lv.1 → 20 / 40+60 / 80+100", shape("marksman", "helmet", 1, FLAT).join(" · "));
@@ -133,24 +133,39 @@ section("원자 · 껍질");
   // 값이 0 인 마일스톤은 다음 값 있는 마일스톤에 흡수되고, 뒤에 값이 없으면 꼬리째 버린다.
   // 보병 고글(좌): Lv.20 공격은 보병이 안 쓰는 축 → Lv.60 방어에 흡수, Lv.100 공격은 버림.
   ok(shape("infantry", "helmet", 1, G.GEAR_AXIS).join(",") === "20+40+60",
-     "보병 고글은 Lv.20 공격을 흡수한다 (Lv.100 공격은 껍질 밖)", shape("infantry", "helmet", 1, G.GEAR_AXIS).join(" · "));
+     "보병 고글은 Lv.20 공격을 흡수한다 (Lv.100 공격은 청크 밖)", shape("infantry", "helmet", 1, G.GEAR_AXIS).join(" · "));
   // 창병 장갑(우): Lv.20 방어 흡수 → Lv.60 공격, Lv.100 방어는 버림.
   ok(shape("lancer", "gauntlet", 1, G.GEAR_AXIS).join(",") === "20+40+60",
-     "창병 장갑은 Lv.20 방어를 흡수한다 (Lv.100 방어는 껍질 밖)", shape("lancer", "gauntlet", 1, G.GEAR_AXIS).join(" · "));
+     "창병 장갑은 Lv.20 방어를 흡수한다 (Lv.100 방어는 청크 밖)", shape("lancer", "gauntlet", 1, G.GEAR_AXIS).join(" · "));
   // 궁병은 버리는 축이 없다 — 전부 산다.
   const mk = shape("marksman", "gauntlet", 1, G.GEAR_AXIS);
   ok(mk.join("+").split("+").map(Number).sort((a, b) => a - b).join(",") === "20,40,60,80,100",
      "궁병은 마일스톤을 하나도 버리지 않는다", mk.join(" · "));
 
-  // 껍질 구간의 효율은 반드시 단조 감소해야 한다 — 그리디 최적성의 전제다.
+  // 청크는 "통행료 여럿 + 값 있는 마일스톤 하나" 여야 한다. 값 있는 것끼리 합치면
+  // 한 조각에 미스릴이 몰려(예전 껍질) 임의 예산에서 손해가 커진다.
+  // ⚠️ 그 대가로 효율은 조각 안에서 단조가 아니다 — 여기서 단조를 요구하면 안 된다.
   const bad = [];
   for (const t of G.GEAR_TROOP_ORDER) for (const sl of G.GEAR_SLOT_ORDER) for (const lv of [0, 1, 20, 39, 40, 59, 60, 85]) {
     const a = G.gearAtoms(t, G.GEAR_SLOTS[sl].side, lv, 0.15, G.GEAR_AXIS);
-    const h = G.gearHull(a);
-    h.forEach((x, k) => { if (k && x.eff > h[k - 1].eff + 1e-9) bad.push(t + "/" + sl + "@" + lv); });
+    const h = G.gearCut(a);
+    h.forEach((x, k) => {
+      const part = a.slice(x.from, x.to + 1);
+      if (part.filter(y => y.value > 0).length !== 1) bad.push("값 여럿 " + t + "/" + sl + "@" + lv + "#" + k);
+      if (part[part.length - 1].value <= 0) bad.push("끝이 통행료 " + t + "/" + sl + "@" + lv + "#" + k);
+    });
     if (h.length && a.slice(h[h.length - 1].to + 1).some(x => x.value > 0)) bad.push("버린 꼬리에 값 " + t + "/" + sl + "@" + lv);
   }
-  ok(bad.length === 0, "껍질 구간 효율이 조각 안에서 단조 감소하고, 버린 꼬리에 값이 없다", bad.slice(0, 3).join(", "));
+  ok(bad.length === 0, "청크마다 값 있는 마일스톤이 정확히 하나(맨 끝)이고, 버린 꼬리에 값이 없다", bad.slice(0, 3).join(", "));
+
+  // 아레나를 챙기면 탐험 마일스톤에도 값이 붙으므로 "Lv.40 에서 멈춤"이 진짜 선택지가 된다.
+  ok(shape("marksman", "helmet", 1, G.GEAR_AXIS).join(",") === "20,40+60,80+100",
+     "아레나 0 이면 탐험은 통행료라 정차역이 아니다");
+  {
+    const a = G.gearAtoms("marksman", "left", 1, 0.15, G.GEAR_AXIS);
+    ok(G.gearCut(a).map(h => a.slice(h.from, h.to + 1).map(x => x.level).join("+")).join(",") === "20,40,60,80,100",
+       "아레나 가중이 있으면 탐험 마일스톤이 각자 정차역이 된다");
+  }
 }
 
 // ── 2. 마스터리 승급 비용 ──────────────────────────────────────────────
@@ -460,6 +475,38 @@ section("예산 해 vs 원본 표 순서");
   ok(G.gearBudgetPick(p0.steps, 300).value >= 270,
      "예산 300 에서 최소 +270%p (예전 순서 자르기는 210 이었다)",
      String(G.gearBudgetPick(p0.steps, 300).value));
+  // ── ④ 순서표를 위에서부터 그대로 따라갔을 때 ──────────────────────────
+  // 예전에는 껍질이 값 있는 마일스톤끼리 합쳐서 한 조각을 +20 → +100 까지 140 미스릴로
+  // 한 번에 올리는 스텝을 만들었다. 순서표를 그대로 따르는 사람은 그 자리에서 미스릴이
+  // 묶여 예산 300 에서 210 밖에 못 냈다(원본 표는 270). 사용자가 잡은 결함이다.
+  const roadAt = b => p0.steps.reduce((a, s) => s.cumMithril <= b ? a + s.useful : a, 0);
+  ok(roadAt(300) === 270, "④ 를 위에서부터 따라가도 예산 300 에서 270 (예전 껍질은 210)", String(roadAt(300)));
+  {
+    let worst = 0, where = 0;
+    for (let b = 0; b <= p0.totals.mithril; b += 10) {
+      const gap = chartAt(b) - roadAt(b);
+      if (gap > worst) { worst = gap; where = b; }
+    }
+    ok(worst <= 25, "④ 프리픽스가 원본 표 순서보다 25%p 넘게 뒤지는 예산이 없다", worst + "%p @" + where);
+  }
+  // 단계 우선 — +20 을 전부, 그다음 +60, 그다음 +100. 이게 이 표의 1순위다.
+  {
+    const bad = [];
+    p0.steps.forEach((s, i) => { if (i && s.stage < p0.steps[i - 1].stage) bad.push(i + 1); });
+    ok(bad.length === 0, "순서표의 단계가 되돌아가지 않는다", bad.slice(0, 5).join(" "));
+    const first60 = p0.steps.findIndex(s => s.toLevel > 20);
+    ok(p0.steps.slice(0, first60).every(s => s.toLevel === 20) && first60 === 8,
+       "빈 계정이면 12조각 중 값 있는 +20 여덟 개가 먼저 온다", String(first60));
+  }
+  // 아레나 정차역은 원정 단계 밖이다 — 단계에 끼우면 실전 기여 0 인 Lv.40 을
+  // 다른 조각의 Lv.60 보다 먼저 사게 된다.
+  {
+    const ar = G.gearPlan(Object.assign({}, FIXTURE, {gear: blank, arenaPriority: "high"}));
+    const expStages = G.GEAR_MS.filter(m => m.tier === "expedition").length;
+    ok(ar.steps.filter(s => s.exploration > 0).every(s => s.stage >= expStages),
+       "아레나 정차역은 원정 단계보다 뒤에 선다");
+  }
+
   // 고른 조합은 조각마다 앞에서부터 연속이어야 한다 (청크는 건너뛸 수 없다)
   {
     const set = G.gearBudgetPick(p0.steps, 500).set;
@@ -526,14 +573,24 @@ const GEAR_ALL = G.GEAR_TROOP_ORDER.flatMap(t => G.GEAR_SLOT_ORDER.map(s => [t, 
   ok(pAll.totals.mithril === 1800, "12조각 전부 [11,1] → 미스릴 1800 (12×150)", String(pAll.totals.mithril));
   ok(pAll.steps.length === 36, "12조각 × 청크 3개 = 36스텝", String(pAll.steps.length));
 
+  // 아레나를 챙기면 탐험 마일스톤에 값이 붙는다 → 통행료가 아니라 정차역이 되어
+  // 스텝이 늘고, 그 자리에서 멈추는 선택지가 생긴다. 비용과 원정 총합은 그대로다.
   const high = G.gearPlan(Object.assign({}, FIX_FLAT, {arenaPriority: "high"}));
-  const effs = high.tiers.map(t => t.eff);
-  ok(effs.join() === "2,1,0.675,0.639",
-     'arenaPriority "high" → 0.600→0.675 · 0.556→0.639', effs.join(" / "));
-  ok(high.totals.mithril === plan.totals.mithril, "아레나 가중은 비용을 바꾸지 않는다");
-
-  const low = G.gearPlan(Object.assign({}, FIX_FLAT, {arenaPriority: "low"}));
-  ok(low.tiers.every((t, i) => t.eff >= plan.tiers[i].eff), "아레나 low 는 none 보다 효율이 높거나 같다");
+  const low  = G.gearPlan(Object.assign({}, FIX_FLAT, {arenaPriority: "low"}));
+  const sumV = p => +p.steps.reduce((a, x) => a + x.value, 0).toFixed(6);
+  ok(high.totals.mithril === plan.totals.mithril && low.totals.mithril === plan.totals.mithril,
+     "아레나 가중은 비용을 바꾸지 않는다");
+  ok(high.totals.expedition === plan.totals.expedition && high.totals.useful === plan.totals.useful,
+     "아레나 가중은 원정 총합·실제 쓸모를 바꾸지 않는다");
+  ok(high.steps.length > plan.steps.length && low.steps.length > plan.steps.length,
+     "아레나 가중이 있으면 탐험이 별도 정차역으로 선다",
+     plan.steps.length + " → " + low.steps.length + " / " + high.steps.length);
+  ok(sumV(high) > sumV(low) && sumV(low) > sumV(plan),
+     "아레나 가중을 올릴수록 탐험 마일스톤의 값이 커진다",
+     [sumV(plan), sumV(low), sumV(high)].join(" / "));
+  // 탐험은 원정보다 효율이 낮다 → 순서표에서 원정 뒤로 밀린다.
+  ok(high.steps.filter(x => x.exploration > 0).every(x => x.eff < 1),
+     "탐험 정차역의 효율은 원정(≥1)보다 낮다");
 }
 
 // ── 8. 병종 가중 · 정렬 근거 ───────────────────────────────────────────

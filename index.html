@@ -174,6 +174,9 @@ input[type=range]{padding:0;accent-color:var(--accent);background:none;border:no
 #tab-gear table th,#tab-gear table td{white-space:nowrap}
 #gSteps td.work,#gSteps td.work .note{white-space:normal;min-width:190px}
 #tab-gear table .cap{white-space:normal;min-width:0}
+/* 단계 띠 — 이 표의 1순위가 효율이 아니라 단계라는 걸 줄 하나로 보인다 */
+#gSteps tr.gband td{background:var(--card2);color:var(--mut);font-size:11px;letter-spacing:.04em;
+ font-weight:700;padding:5px 10px;border-top:1px solid var(--line)}
 .pc{white-space:nowrap}
 .xscroll>table{min-width:520px}
 textarea{width:100%;background:var(--card2);color:var(--ink);border:1px solid var(--line);
@@ -1041,29 +1044,32 @@ function gearAtoms(troop,side,level,arenaWeight,axis){
  });
 }
 
-/* 청크 자르기 — 누적 (미스릴, 값) 점들의 위쪽 오목 껍질.
-   껍질의 각 구간은 효율이 단조 감소하므로, 효율 내림차순 그리디가 모든 예산 지점에서
-   최적이라는 성질이 그대로 유지된다(교환 논증). 값 0 짜리 마일스톤은 그다음 값 있는
-   마일스톤에 자동으로 흡수되고, 뒤에 값이 하나도 안 남으면 그 꼬리는 버려진다 —
-   "Lv.40 에서 멈춤"이 선택지로 나올 수 없다.
-   모든 방향의 가중이 1이면 이 껍질은 예전의 "탐험+다음 원정" 자르기와 정확히 같아진다.
+/* 청크 자르기 — <b>통행료 + 값 있는 마일스톤 하나</b>.
+   값 0 짜리 마일스톤(아레나 전용 탐험, 이 병종이 안 쓰는 축)은 건너뛸 수 없으므로 그다음
+   값 있는 마일스톤에 붙여 한 덩어리로 만든다. 그래서 "Lv.40 에서 멈춤"은 선택지가 아니다.
+   모든 방향의 가중이 1이면 이 자르기는 예전의 "탐험+다음 원정" 과 정확히 같다.
+
+   ⚠️ 값 있는 마일스톤끼리는 <b>합치지 않는다.</b> 예전에는 누적 (미스릴,값) 의 위쪽 오목
+      껍질로 잘랐다 — 효율이 단조 감소해서 그리디가 깔끔했지만, 값이 낮은 마일스톤이 뒤의
+      높은 것에 흡수되면서 <b>한 조각을 +20 에서 +100 까지 140 미스릴로 한 번에 올리는</b>
+      덩어리가 생겼다. 순서표를 위에서부터 따라가는 사람에게는 그 자리에서 미스릴이 통째로
+      묶인다 — 예산 300 에서 최적 270 대비 210 밖에 못 냈다(단일 청크는 270 로 최적).
+      원본 우선순위표가 단계별(+20 전부 → +60 전부 → +100)로 도는 것과도 어긋났다.
+      껍질을 버리고 값 있는 마일스톤마다 끊으면 순서표가 단계별로 돌고, 정차역이 살아나서
+      gearBudgetPick 의 DP 도 <b>모든 마일스톤 정차역</b>을 후보로 갖게 된다.
+
+   대가: 조각 안에서 효율이 단조가 아니다. 궁병 고글은 Lv.60(방어 0.75) 이 Lv.100(공격 1.0)
+   보다 효율이 낮아 순서표에서 효율이 한 번 도로 올라간다 — 60 을 지나야 100 에 닿기 때문이라
+   순서 자체는 옳다. 그 대신 순서표를 그대로 따라갔을 때의 손실이 최대 60%p 에서 25%p 로 줄었다.
+
    ⚠️ 값이 하나도 안 남은 꼬리는 여기서 빼지만 계획에서 지우지는 않는다 — gearPlan 이
       효율 0 짜리 "완성용" 청크로 맨 뒤에 붙인다. 원본 표의 회색 칸은 <b>금지</b>가 아니라
       <b>맨 마지막</b>이라는 뜻이다(번호 붙은 32칸을 다 하고 나서 하는 것). */
-function gearHull(atoms){
- const cum=[]; let m=0,v=0;
- atoms.forEach(function(a){m+=a.mithril; v+=a.value; cum.push({m,v});});
- const out=[]; let bm=0,bv=0,from=0;
- while(from<cum.length){
-  let best=-1,bestEff=0;
-  for(let k=from;k<cum.length;k++){
-   const dm=cum[k].m-bm; if(dm<=0)continue;
-   const e=(cum[k].v-bv)/dm;
-   if(e>bestEff+1e-12){bestEff=e;best=k;}
-  }
-  if(best<0)break;                       // 남은 게 전부 값 0 → 꼬리는 버린다
-  out.push({from,to:best,eff:bestEff});
-  bm=cum[best].m; bv=cum[best].v; from=best+1;
+function gearCut(atoms){
+ const out=[]; let from=0,m=0,v=0;
+ for(let i=0;i<atoms.length;i++){
+  m+=atoms[i].mithril; v+=atoms[i].value;
+  if(v>0){out.push({from,to:i,eff:v/m}); from=i+1; m=0; v=0;}
  }
  return out;
 }
@@ -1098,7 +1104,7 @@ function gearTroopWeight(troop,ratios,attackWeight){
 }
 
 /* 예산 안에서 최선인 조합을 정확히 고른다.
-   ⚠️ 효율 내림차순 그리디는 <b>청크 경계에서만</b> 최적이다. 임의 예산에서는 다음 청크가
+   ⚠️ 효율 내림차순 그리디(④ 순서표)는 <b>청크 경계에서만</b> 최적이다. 임의 예산에서는 다음 청크가
       너무 커서 안 들어가면 미스릴이 논다 — 실제로 예산 300 에서 원본 표보다 60%p 뒤졌다.
       조각마다 "앞에서 몇 청크까지 살까"만 고르면 되므로(청크는 순서를 못 건너뛴다)
       다중선택 배낭 문제이고, 미스릴이 전부 10 단위라 DP 로 정확히 푼다.
@@ -1142,6 +1148,10 @@ function gearBudgetPick(steps,budget){
             gear:{병종:{슬롯:[마스터리, 홍색레벨]}}, axis?}
    axis 를 주면 GEAR_AXIS 대신 쓴다 — 역할 가중을 끄고 예전 모델과 대조할 때 쓴다.
    반환 = {steps, freeXp, totals, tiers} */
+const EXPEDITION_LEVELS=GEAR_MS.filter(function(m){return m.tier==="expedition";})
+ .map(function(m){return m.level;});
+const LEFTOVER_STAGE=GEAR_MS.length+1;
+
 function gearPlan(input){
  const arenaWeight=GEAR_DEFAULTS.arenaWeight[input.arenaPriority]||0;
  const attackWeight=typeof input.attackWeight==="number"?input.attackWeight:GEAR_DEFAULTS.attackWeight;
@@ -1158,16 +1168,19 @@ function gearPlan(input){
   const mastery=Math.round(cell[0]||0), level=Math.round(cell[1]||0);
   const side=GEAR_SLOTS[slot].side;
   const atoms=gearAtoms(troop,side,level,arenaWeight,axis);
-  const hull=gearHull(atoms);
+  const cut=gearCut(atoms);
   // 값이 하나도 없는 꼬리는 "완성용" 한 덩어리로 맨 뒤에 붙인다. 효율 0 이라 다른 모든
   // 청크 뒤로 밀리고, 화면에는 별도 구간으로 뜬다 — 미스릴만 쓰고 얻는 게 없는 자리다.
-  const tail=hull.length?hull[hull.length-1].to+1:0;
-  if(tail<atoms.length)hull.push({from:tail,to:atoms.length-1,eff:0,leftover:true});
-  const chunks=hull.map(function(seg,seq){
+  const tail=cut.length?cut[cut.length-1].to+1:0;
+  if(tail<atoms.length)cut.push({from:tail,to:atoms.length-1,eff:0,leftover:true});
+  const chunks=cut.map(function(seg,seq){
    const part=atoms.slice(seg.from,seg.to+1);
    const sum=function(k){return part.reduce(function(a,x){return a+x[k];},0);};
    const last=part[part.length-1];
    return {troop,slot,side,seq,ti,si,
+    // 단계 = 이 청크가 여는 원정 마일스톤이 몇 번째인가(+20 → 0 · +60 → 1 · +100 → 2).
+    // 아레나 정차역은 그 뒤, 완성용 꼬리는 맨 뒤.
+    stage:seg.leftover?LEFTOVER_STAGE:(last.tier==="expedition"?EXPEDITION_LEVELS.indexOf(last.level):EXPEDITION_LEVELS.length),
     toLevel:last.level,
     tolls:part.filter(function(x){return x.value<=0;})
       .map(function(x){return {level:x.level,kind:x.tier==="exploration"?"arena":"axis"};}),
@@ -1183,12 +1196,22 @@ function gearPlan(input){
  }));
 
  // ── 정렬 기준 ──
- // 껍질 구간의 효율은 각 조각 안에서 단조 감소한다 → 효율 내림차순 그리디가 최적.
+ // 매번 조각들의 <b>맨 앞 청크</b>만 후보로 놓고 뽑는다. 앞을 내다보지 않는다 —
+ // 뒤 청크의 효율이 더 높다고 앞 청크를 끌어올리면(옛 껍질이 그랬다) 한 조각에 미스릴이
+ // 몰려 임의 예산에서 손해가 커진다. 실측으로 확인했다.
+ //
+ // 1순위가 <b>효율이 아니라 단계</b>다 — +20 을 전부 → +60 을 전부 → +100.
+ // 효율만 보면 궁병 좌 계열의 +60(방어 0.75 · eff .45)이 같은 조각의 +100(공격 1.0 · eff .556)
+ // 보다 낮아서, 그 조각만 +100 까지 올라가고 나머지가 +20 에 머무는 순서가 나온다.
+ // 원본 우선순위표는 단계별로 돌고(9~16 = +20 · 17~24 = +60 · 25~32 = +100), 실측해도
+ // 임의 예산 손실이 42.5 → 40%p 로 오히려 줄었다. 근거는 표와 실측이지 효율 정리가 아니다.
+ // ⚠️ 아레나 정차역(탐험)은 이 단계 밖이다 — 단계에 끼우면 실전 기여 0 짜리 Lv.40 을
+ //    다른 조각의 Lv.60 보다 먼저 사게 된다. 그래서 원정 단계 뒤로 따로 뺀다.
  const tw={}; GEAR_TROOP_ORDER.forEach(t=>{tw[t]=gearTroopWeight(t,input.ratios||{},attackWeight);});
  const isMain=c=>GEAR_SLOTS[c.slot].stat===GEAR_TROOPS[c.troop].mainStat?1:0;
  const dirFit=c=>{const role=GEAR_TROOPS[c.troop].role;
   return (role==="dps"&&c.gain==="attack")||(role==="tank"&&c.gain==="defense")?1:0;};
- const cmp=(a,b)=>(b.eff-a.eff)||(tw[b.troop]-tw[a.troop])||(isMain(b)-isMain(a))||
+ const cmp=(a,b)=>(a.stage-b.stage)||(b.eff-a.eff)||(tw[b.troop]-tw[a.troop])||(isMain(b)-isMain(a))||
    (dirFit(b)-dirFit(a))||(a.ti-b.ti)||(a.si-b.si)||(a.seq-b.seq);
 
  // 조각마다 포인터를 두고 매번 후보 중 최선을 뽑는다. 같은 조각의 청크가 원래
@@ -1213,7 +1236,7 @@ function gearPlan(input){
   }
   const fromLevel=curLevel[best]; curLevel[best]=c.toLevel;
   cumMithril+=c.mithril; cumExpedition+=c.expedition; cumUseful+=c.useful;
-  steps.push({troop:c.troop,slot:c.slot,side:c.side,seq:c.seq,
+  steps.push({troop:c.troop,slot:c.slot,side:c.side,seq:c.seq,stage:c.stage,
    fromLevel,toLevel:c.toLevel,tolls:c.tolls,gains:c.gains,leftover:c.leftover,
    mithril:c.mithril,expedition:c.expedition,exploration:c.exploration,
    useful:c.useful,value:c.value,eff:c.eff,gain:c.gain,masteryPre,
@@ -1660,6 +1683,16 @@ function gearIcon(slot){
   GEAR_ICON[slot]+"</svg>";
 }
 
+/* 순서표의 단계 이름 — 엔진의 chunk.stage 를 사람 말로. GEAR_MS 에서 유도한다. */
+var GEAR_EXP_LEVELS=GEAR_MS.filter(function(m){return m.tier==="expedition";})
+ .map(function(m){return m.level;});
+function gearStageName(st){
+ if(st<GEAR_EXP_LEVELS.length)
+  return L("+"+GEAR_EXP_LEVELS[st]+" 단계","+"+GEAR_EXP_LEVELS[st]+" tier");
+ if(st===GEAR_EXP_LEVELS.length)return L("아레나 정차역","Arena stops");
+ return L("완성용 — 맨 마지막","Completion — last");
+}
+
 var gearDirName=function(d){return{attack:L("공격","attack"),defense:L("방어","defense"),
  health:L("체력","health"),lethality:L("치명","lethality")}[d]||d;};
 /* 이 병종에게 이 마일스톤이 무엇인가 — 필요 / 보조 / 축이 안 맞는 통행료 / 탐험 통행료 */
@@ -1942,8 +1975,10 @@ function gearRender(plan,input){
        drop>=25?'<div class="tag t-bad">'+L("−"+drop+"%","−"+drop+"%")+"</div>":"")+
       "</td><td>"+t.steps+"</td><td>"+t.mithril+"</td><td>+"+Math.round(t.useful)+"%p</td><td>"+t.cumMithril+"</td></tr>";}).join("")+
    "</tbody></table></div>"+
-   '<p class="cap">'+L("효율 = (필요 축 가중 × 원정 보너스 + 아레나 가중 × 탐험 보너스) ÷ 미스릴. 청크 효율은 각 조각 안에서 <b>단조 감소</b>하므로 효율 내림차순이 장기 로드맵으로는 옳습니다. 다만 <b>임의 예산에서 최적은 아닙니다</b> — 다음 청크가 커서 안 들어가면 미스릴이 놉니다. 그래서 예산 슬라이더는 순서를 자르지 않고 <b>그 예산 안에서 최선인 조합을 따로 풉니다</b>.",
-     "Efficiency = (axis weight × expedition bonus + arena weight × exploration bonus) ÷ mithril. Chunk efficiency <b>decreases monotonically</b> within each piece, so descending efficiency is the right long-run roadmap. It is <b>not optimal at an arbitrary budget</b>, though — if the next chunk is too big, mithril sits idle. So the budget slider does not truncate the list; it <b>solves for the best combination</b> at that budget.")+"</p>";
+   '<p class="cap">'+L("효율 = (필요 축 가중 × 원정 보너스 + 아레나 가중 × 탐험 보너스) ÷ 미스릴. 순서는 <b>단계가 먼저</b>입니다 — 12조각의 +20 을 전부, 그다음 +60 을 전부, 그다음 +100. 단계 안에서만 효율 내림차순입니다. 원본 우선순위표가 그렇게 돌고, 한 조각만 계속 올리는 순서보다 실제로 손해가 적습니다.",
+     "Efficiency = (axis weight × expedition bonus + arena weight × exploration bonus) ÷ mithril. The order is <b>tier first</b> — every piece to +20, then every piece to +60, then +100 — and only within a tier is it sorted by efficiency. That is how the source chart runs, and it loses less than pushing one piece all the way up.")+"</p>"+
+   '<p class="cap">'+L("<b>임의 예산에서 최적인 순서는 없습니다</b> — 다음 단계가 커서 안 들어가면 미스릴이 놉니다. 그래서 예산 슬라이더는 이 목록을 자르지 않고 <b>그 예산 안에서 최선인 조합을 따로 풉니다</b>.",
+     "<b>No single ordering is optimal at every budget</b> — if the next step is too big, mithril sits idle. So the budget slider does not truncate this list; it <b>solves for the best combination</b> at that budget.")+"</p>";
  }
  o+="</div>";
  if(top)top.innerHTML=o;
@@ -1960,14 +1995,22 @@ function gearRender(plan,input){
    '</th><th>'+L("작업","Work")+'</th><th>'+L("쓸모","Usable")+'</th><th>'+L("효율","Eff")+'</th><th>'+
    L("미스릴","Mithril")+'</th><th>'+L("누적","Cumulative")+'</th><th>'+L("마스터리 선행","Mastery first")+
    "</th></tr></thead><tbody>"+
-   (function(){var cm=0;return shown.map(function(x,i){
+   (function(){var cm=0,st=null;return shown.map(function(x,i){
     var s=x.s, k=key(s), done=!!GEAR_DONE[k];
     cm+=s.mithril;
+    // 단계가 바뀌는 자리에 띠를 넣는다 — 이 표의 1순위가 효율이 아니라 단계라는 걸
+    // 문장으로 설명하는 것보다 줄 하나가 빠르다.
+    var band="";
+    if(s.stage!==st){st=s.stage;
+     band='<tr class="gband"><td colspan="10">'+esc(gearStageName(st))+"</td></tr>";}
     // 통행료를 지나는 스텝은 왜 미스릴이 더 드는지가 표기로 드러나야 한다
+    // 완성용 청크는 마지막 마일스톤 자체가 통행료라, 거르지 않으면
+    // "Lv.100(불필요) → Lv.100" 처럼 같은 레벨이 두 번 찍힌다.
     var work="Lv."+s.fromLevel+" → "+
-      s.tolls.map(function(t){return "Lv."+t.level+"("+(t.kind==="axis"?L("불필요","unused"):L("탐험","exploration"))+") → ";}).join("")+
+      s.tolls.filter(function(t){return t.level<s.toLevel;})
+       .map(function(t){return "Lv."+t.level+"("+(t.kind==="axis"?L("불필요","unused"):L("탐험","exploration"))+") → ";}).join("")+
       "Lv."+s.toLevel;
-    return "<tr"+(done?' class="done"':s.leftover?' class="dead"':"")+"><td>"+(x.i+1)+
+    return band+"<tr"+(done?' class="done"':s.leftover?' class="dead"':"")+"><td>"+(x.i+1)+
      '</td><td><input type="checkbox" class="gchk" data-k="'+k+'"'+(done?" checked":"")+
      ' aria-label="'+esc(pieceName(s.troop,s.slot)+" Lv."+s.toLevel)+" "+L("완료","done")+'"></td>'+
      '<td class="b pc">'+esc(pieceName(s.troop,s.slot))+"</td>"+

@@ -140,6 +140,16 @@ function gearIcon(slot){
   GEAR_ICON[slot]+"</svg>";
 }
 
+/* 순서표의 단계 이름 — 엔진의 chunk.stage 를 사람 말로. GEAR_MS 에서 유도한다. */
+var GEAR_EXP_LEVELS=GEAR_MS.filter(function(m){return m.tier==="expedition";})
+ .map(function(m){return m.level;});
+function gearStageName(st){
+ if(st<GEAR_EXP_LEVELS.length)
+  return L("+"+GEAR_EXP_LEVELS[st]+" 단계","+"+GEAR_EXP_LEVELS[st]+" tier");
+ if(st===GEAR_EXP_LEVELS.length)return L("아레나 정차역","Arena stops");
+ return L("완성용 — 맨 마지막","Completion — last");
+}
+
 var gearDirName=function(d){return{attack:L("공격","attack"),defense:L("방어","defense"),
  health:L("체력","health"),lethality:L("치명","lethality")}[d]||d;};
 /* 이 병종에게 이 마일스톤이 무엇인가 — 필요 / 보조 / 축이 안 맞는 통행료 / 탐험 통행료 */
@@ -422,8 +432,10 @@ function gearRender(plan,input){
        drop>=25?'<div class="tag t-bad">'+L("−"+drop+"%","−"+drop+"%")+"</div>":"")+
       "</td><td>"+t.steps+"</td><td>"+t.mithril+"</td><td>+"+Math.round(t.useful)+"%p</td><td>"+t.cumMithril+"</td></tr>";}).join("")+
    "</tbody></table></div>"+
-   '<p class="cap">'+L("효율 = (필요 축 가중 × 원정 보너스 + 아레나 가중 × 탐험 보너스) ÷ 미스릴. 청크 효율은 각 조각 안에서 <b>단조 감소</b>하므로 효율 내림차순이 장기 로드맵으로는 옳습니다. 다만 <b>임의 예산에서 최적은 아닙니다</b> — 다음 청크가 커서 안 들어가면 미스릴이 놉니다. 그래서 예산 슬라이더는 순서를 자르지 않고 <b>그 예산 안에서 최선인 조합을 따로 풉니다</b>.",
-     "Efficiency = (axis weight × expedition bonus + arena weight × exploration bonus) ÷ mithril. Chunk efficiency <b>decreases monotonically</b> within each piece, so descending efficiency is the right long-run roadmap. It is <b>not optimal at an arbitrary budget</b>, though — if the next chunk is too big, mithril sits idle. So the budget slider does not truncate the list; it <b>solves for the best combination</b> at that budget.")+"</p>";
+   '<p class="cap">'+L("효율 = (필요 축 가중 × 원정 보너스 + 아레나 가중 × 탐험 보너스) ÷ 미스릴. 순서는 <b>단계가 먼저</b>입니다 — 12조각의 +20 을 전부, 그다음 +60 을 전부, 그다음 +100. 단계 안에서만 효율 내림차순입니다. 원본 우선순위표가 그렇게 돌고, 한 조각만 계속 올리는 순서보다 실제로 손해가 적습니다.",
+     "Efficiency = (axis weight × expedition bonus + arena weight × exploration bonus) ÷ mithril. The order is <b>tier first</b> — every piece to +20, then every piece to +60, then +100 — and only within a tier is it sorted by efficiency. That is how the source chart runs, and it loses less than pushing one piece all the way up.")+"</p>"+
+   '<p class="cap">'+L("<b>임의 예산에서 최적인 순서는 없습니다</b> — 다음 단계가 커서 안 들어가면 미스릴이 놉니다. 그래서 예산 슬라이더는 이 목록을 자르지 않고 <b>그 예산 안에서 최선인 조합을 따로 풉니다</b>.",
+     "<b>No single ordering is optimal at every budget</b> — if the next step is too big, mithril sits idle. So the budget slider does not truncate this list; it <b>solves for the best combination</b> at that budget.")+"</p>";
  }
  o+="</div>";
  if(top)top.innerHTML=o;
@@ -440,14 +452,22 @@ function gearRender(plan,input){
    '</th><th>'+L("작업","Work")+'</th><th>'+L("쓸모","Usable")+'</th><th>'+L("효율","Eff")+'</th><th>'+
    L("미스릴","Mithril")+'</th><th>'+L("누적","Cumulative")+'</th><th>'+L("마스터리 선행","Mastery first")+
    "</th></tr></thead><tbody>"+
-   (function(){var cm=0;return shown.map(function(x,i){
+   (function(){var cm=0,st=null;return shown.map(function(x,i){
     var s=x.s, k=key(s), done=!!GEAR_DONE[k];
     cm+=s.mithril;
+    // 단계가 바뀌는 자리에 띠를 넣는다 — 이 표의 1순위가 효율이 아니라 단계라는 걸
+    // 문장으로 설명하는 것보다 줄 하나가 빠르다.
+    var band="";
+    if(s.stage!==st){st=s.stage;
+     band='<tr class="gband"><td colspan="10">'+esc(gearStageName(st))+"</td></tr>";}
     // 통행료를 지나는 스텝은 왜 미스릴이 더 드는지가 표기로 드러나야 한다
+    // 완성용 청크는 마지막 마일스톤 자체가 통행료라, 거르지 않으면
+    // "Lv.100(불필요) → Lv.100" 처럼 같은 레벨이 두 번 찍힌다.
     var work="Lv."+s.fromLevel+" → "+
-      s.tolls.map(function(t){return "Lv."+t.level+"("+(t.kind==="axis"?L("불필요","unused"):L("탐험","exploration"))+") → ";}).join("")+
+      s.tolls.filter(function(t){return t.level<s.toLevel;})
+       .map(function(t){return "Lv."+t.level+"("+(t.kind==="axis"?L("불필요","unused"):L("탐험","exploration"))+") → ";}).join("")+
       "Lv."+s.toLevel;
-    return "<tr"+(done?' class="done"':s.leftover?' class="dead"':"")+"><td>"+(x.i+1)+
+    return band+"<tr"+(done?' class="done"':s.leftover?' class="dead"':"")+"><td>"+(x.i+1)+
      '</td><td><input type="checkbox" class="gchk" data-k="'+k+'"'+(done?" checked":"")+
      ' aria-label="'+esc(pieceName(s.troop,s.slot)+" Lv."+s.toLevel)+" "+L("완료","done")+'"></td>'+
      '<td class="b pc">'+esc(pieceName(s.troop,s.slot))+"</td>"+
