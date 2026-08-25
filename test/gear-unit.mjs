@@ -131,9 +131,9 @@ section("원자 · 껍질");
   ok(shape("marksman", "helmet", 100, FLAT).length === 0, "Lv.100 은 남은 청크가 없다");
 
   // 값이 0 인 마일스톤은 다음 값 있는 마일스톤에 흡수되고, 뒤에 값이 없으면 꼬리째 버린다.
-  // 보병 헬멧(좌): Lv.20 공격은 보병이 안 쓰는 축 → Lv.60 방어에 흡수, Lv.100 공격은 버림.
+  // 보병 고글(좌): Lv.20 공격은 보병이 안 쓰는 축 → Lv.60 방어에 흡수, Lv.100 공격은 버림.
   ok(shape("infantry", "helmet", 1, G.GEAR_AXIS).join(",") === "20+40+60",
-     "보병 헬멧은 Lv.20 공격을 흡수한다 (Lv.100 공격은 껍질 밖)", shape("infantry", "helmet", 1, G.GEAR_AXIS).join(" · "));
+     "보병 고글은 Lv.20 공격을 흡수한다 (Lv.100 공격은 껍질 밖)", shape("infantry", "helmet", 1, G.GEAR_AXIS).join(" · "));
   // 창병 장갑(우): Lv.20 방어 흡수 → Lv.60 공격, Lv.100 방어는 버림.
   ok(shape("lancer", "gauntlet", 1, G.GEAR_AXIS).join(",") === "20+40+60",
      "창병 장갑은 Lv.20 방어를 흡수한다 (Lv.100 방어는 껍질 밖)", shape("lancer", "gauntlet", 1, G.GEAR_AXIS).join(" · "));
@@ -389,7 +389,7 @@ section("원본 우선순위표 대조");
      JSON.stringify([on.totals.mithril, off.totals.mithril, on.totals.mythic, off.totals.mythic]));
   // 쓸모는 달라진다. 매직넘버로 박으면 GEAR_AXIS_SUB 를 건드릴 때 뜻이 안 보이므로 유도한다:
   //   필수(가중 1)로 얻는 원정 510%p + 궁병 방어 180%p × SUB
-  //   (궁병 방어 180 = 헬멧 60:30 + 신발 100:50 + 장갑 20:20·100:50 + 벨트 60:30)
+  //   (궁병 방어 180 = 고글 60:30 + 신발 100:50 + 장갑 20:20·100:50 + 벨트 60:30)
   ok(off.totals.useful === 1020, "가중을 끄면 쓸모 = 원정 총량 1020", String(off.totals.useful));
   ok(Math.abs(on.totals.useful - (510 + 180 * G.GEAR_AXIS_SUB)) < 1e-9,
      "가중을 켜면 쓸모 = 510 + 궁병방어 180 × " + G.GEAR_AXIS_SUB,
@@ -628,7 +628,7 @@ section("렌더");
     ok(cards.length === 12, "카드 12장", String(cards.length));
     ok((g.match(/<svg /g) || []).length === 12, "카드마다 슬롯 아이콘",
        String((g.match(/<svg /g) || []).length));
-    // 주 스탯 = 슬롯 stat === 병종 mainStat. 보병은 체력(장갑·벨트), 딜러는 치명(헬멧·신발).
+    // 주 스탯 = 슬롯 stat === 병종 mainStat. 보병은 체력(장갑·벨트), 딜러는 치명(고글·신발).
     ok((g.match(/class="gcard main"/g) || []).length === 6, "주 스탯 카드 6장",
        String((g.match(/class="gcard main"/g) || []).length));
     // 마일스톤 눈금 — 원정 3 · 탐험 2 가 색으로 갈라져야 한다.

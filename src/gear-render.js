@@ -127,7 +127,8 @@ var GEAR_ROW_COLOR = {infantry:"var(--inf)", lancer:"var(--lance)", marksman:"va
 /* 슬롯 아이콘. 외부 파일을 쓰지 않는다 — 단일 파일 산출물이라야 하고, 파일로 열어도
    보여야 한다. currentColor 라서 색은 CSS 가 정한다. */
 var GEAR_ICON = {
- helmet:'<path d="M4 18v-4a8 8 0 0 1 16 0v4"/><path d="M12 9v9"/><path d="M3 18h18"/>',
+ helmet:'<rect x="2.6" y="8.2" width="7.4" height="7" rx="3.4"/><rect x="14" y="8.2" width="7.4" height="7" rx="3.4"/>'+
+   '<path d="M10 11.7h4"/><path d="M2.6 9.2C5.6 6 18.4 6 21.4 9.2"/>',
  gauntlet:'<path d="M8 11V5.5a2 2 0 0 1 4 0V11"/><path d="M12 11V7.5a2 2 0 0 1 4 0V12"/>'+
    '<path d="M16 12v-1a2 2 0 0 1 4 0v5a5 5 0 0 1-5 5h-3a5 5 0 0 1-5-5v-4.5a2 2 0 0 1 4 0"/>',
  belt:'<rect x="2" y="8.4" width="20" height="7.2" rx="2"/><rect x="8.4" y="6.2" width="7.2" height="11.6" rx="2.2"/><path d="M15.6 12H19"/>',
@@ -200,7 +201,7 @@ function gearGrid(){
    var main=GEAR_SLOTS[sl].stat===GEAR_TROOPS[t].mainStat;
    h+='<div class="gcard'+(main?" main":"")+'"><header>'+gearIcon(sl)+"<b>"+
      L(GEAR_SLOTS[sl].ko,GEAR_SLOTS[sl].en)+'</b><span class="sidep '+(side==="left"?"l":"r")+
-     '" title="'+(side==="left"?L("좌 계열 — 헬멧·벨트","Left — helmet and belt")
+     '" title="'+(side==="left"?L("좌 계열 — 고글·벨트","Left — goggles and belt")
                               :L("우 계열 — 장갑·신발","Right — gauntlet and boots"))+'">'+
      (side==="left"?L("좌","L"):L("우","R"))+"</span></header>"+
      '<div class="gcell"><input id="'+gid("gm",t,sl)+'" type="number" min="0" max="'+GEAR_MASTERY.max+
@@ -482,7 +483,7 @@ function gearCycleRef(now){
  var exp=GEAR_MS.filter(function(m){return m.tier==="expedition";});
  var gl={need:["t-ok",L("필수","Essential")],sub:["t-warn",L("추천","Recommended")],axis:["t-off",L("맨 마지막","Last")]};
  var b='<h2>'+L("⑤ 병종별 필수 축 — 원본 우선순위표","⑤ Which axis each troop needs")+' <span>'+
-  L("좌=헬멧·벨트 / 우=장갑·신발","left = helmet·belt / right = gauntlet·boots")+'</span></h2><div class="panel">'+
+  L("좌=고글·벨트 / 우=장갑·신발","left = goggles·belt / right = gauntlet·boots")+'</span></h2><div class="panel">'+
   '<p class="cap">'+L("아래 표는 커뮤니티 <b>HERO GEAR — UPGRADE ORDER</b> 표를 우리 데이터로 다시 그린 것입니다. 좌우 사이클과 골드 스탯 16칸이 그 표와 전부 일치했고, 표가 더해 준 것이 <b>병종마다 쓰는 축이 다르다</b>는 판정입니다.",
     "The table below is the community <b>HERO GEAR — UPGRADE ORDER</b> chart, redrawn from our own data. All 16 cells of the left/right cycle and the gold stats matched it; what the chart adds is the judgement that <b>each troop only uses one axis</b>.")+"</p>"+
   '<p class="cap">'+L("동그라미 숫자가 <b>원본 표의 우선순위</b>입니다 — 1~8 GOLD · 9~16 RED+20 · 17~24 RED+60 · 25~32 RED+100 로 단계마다 딱 8칸씩이고, 단계 안에서는 <b>보병 → 궁병(필수) → 창병(필수) → 궁병(추천)</b> 순입니다. <b>1~8 이 전부 골드 장비</b>라 표는 <b>홍색보다 골드가 먼저</b>라고 말하고 있습니다 — 이 계산기는 홍색만 계산하므로 그 여덟은 위 순서표에 안 들어갑니다. ✓ 는 지금 입력한 레벨이 이미 지난 칸입니다.",

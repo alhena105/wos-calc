@@ -290,7 +290,7 @@ ok((await ko.textContent("#gaSum")).trim() === "", "합이 100이면 경고 없�
   ok(rows.join(",") === "보병,창병,궁병", "카드 행이 보 → 창 → 궁", rows.join(","));
   const cards = await ko.evaluate(() => document.querySelectorAll(".gcard").length);
   ok(cards === 12, "카드 12장", String(cards));
-  // 병종 한 칸 안에서 2×2 — 헬멧·장갑 / 벨트·신발. 좌(헬멧·벨트)가 세로로 맞아야 한다.
+  // 병종 한 칸 안에서 2×2 — 고글·장갑 / 벨트·신발. 좌(고글·벨트)가 세로로 맞아야 한다.
   {
     const lay = await ko.evaluate(() => {
       const cs = [...document.querySelectorAll(".gsec")[0].querySelectorAll(".gcard")];
@@ -302,7 +302,7 @@ ok((await ko.textContent("#gaSum")).trim() === "", "합이 100이면 경고 없�
       };
     });
     ok(lay.cols === 2 && lay.row1 === 2, "병종 한 칸이 2열 × 2줄", JSON.stringify(lay));
-    ok(lay.leftAligned, "헬멧과 벨트(좌 계열)가 같은 열에 선다");
+    ok(lay.leftAligned, "고글과 벨트(좌 계열)가 같은 열에 선다");
   }
   // 트랙이 입력을 따라 갱신되는가 — 카드를 다시 만들지 않고 트랙만 갈아끼운다
   await ko.fill("#gl_lancer_belt", "85");
@@ -324,7 +324,7 @@ ok((await ko.textContent("#gaSum")).trim() === "", "합이 100이면 경고 없�
 }
 
 // 표 칸이 두 줄로 접히지 않는다.
-// 배포본에서 순서표의 "보병 헬멧" 이 접혔고(작업 칸이 폭을 다 먹어 조각 칸이 71px),
+// 배포본에서 순서표의 "보병 고글" 이 접혔고(작업 칸이 폭을 다 먹어 조각 칸이 71px),
 // 그걸 nowrap 으로 고치면서 예외를 .note 전체로 너무 넓게 줘서 이번엔 좌우 칸의 "방어" 가
 // 24px 안에서 방/어 로 쪼개졌다(한글은 음절 사이에서 끊긴다). 둘 다 여기서 잡는다.
 //
