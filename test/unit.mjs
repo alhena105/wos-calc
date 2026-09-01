@@ -472,7 +472,7 @@ section("시트 조이너 명단");
 section("조이너 추천 · T12 경고 (렌더)");
 {
   const a = boot("ko");
-  a.leaders("eleonora", "mia", "rufus").mine([48, 4, 48]);
+  a.leaders("gregory", "mia", "blanchette").mine([48, 4, 48]);   // 추천에 생존 칸(패트릭·엘레오노라)이 낀다
   a.el("gcap").value = "17";
   const html = a.render();
   const st = html.indexOf('id="rec"');
@@ -482,27 +482,38 @@ section("조이너 추천 · T12 경고 (렌더)");
   // 화면 값이 "칸에 다 넣고 다시 잰 값" 과 같은가
   const base = {};
   E.ORDER.forEach(sl => { base[sl] = 1; });
-  for (const lid of ["eleonora", "mia", "rufus"])
+  for (const lid of ["gregory", "mia", "blanchette"])
     for (const e of E.byId[lid].exp) {
       if (e.slot === "ECO" || e.slot === "X") continue;
       if (base[e.slot] !== undefined) base[e.slot] += e.v;
       if (e.also && base[e.also.slot] !== undefined) base[e.also.slot] += e.also.v;
     }
+  // 전투비를 양쪽 식으로 펴면 (내딜증 × 내감소) / (상대딜증 × 상대감소) 라
+  // 내 딜 칸과 내 감소 칸이 결과에 똑같이 곱해진다 → 모든 칸을 센다.
   const b = Object.assign({}, base);
   let cond = 1;
   for (const id of ids) {
     const e = E.byId[id].exp[0];
-    if (e.slot === "X") continue;
+    if (e.slot === "X") continue;                       // 아래에서 화면 배율로 곱한다
     if (e.slot === "An") { cond *= 1 + e.v * E.NA_SHARE; continue; }
     if (b[e.slot] !== undefined) b[e.slot] += e.v;
     if (e.also && b[e.also.slot] !== undefined) b[e.also.slot] += e.also.v;
   }
-  const want = E.ORDER.filter(sl => E.SLOTS[sl].k === "dmg")
+  const want = E.ORDER.reduce((x, sl) => x * (b[sl] / base[sl]), 1) * cond;
+  const dmgOnly = E.ORDER.filter(sl => E.SLOTS[sl].k === "dmg")
     .reduce((x, sl) => x * (b[sl] / base[sl]), 1) * cond;
   ok(ids.length === 4, "추천 4명이 네 명이다", ids.join(","));
   ok(Math.abs(shown - +want.toFixed(3)) < 5e-4,
-     "화면의 추천 4명 딜 배율이 칸 재계산과 일치",
+     "화면의 추천 4명 전투 배율이 모든 칸 재계산과 일치",
      "화면 " + shown + " / 칸 " + want.toFixed(3) + " · " + ids.join(","));
+  ok(ids.some(id => {
+       const e = E.byId[id].exp[0];
+       return e.slot !== "X" && E.SLOTS[e.slot] && E.SLOTS[e.slot].k === "sur";
+     }) ? want > dmgOnly + 1e-9 : true,
+     "생존 칸 조이너가 있으면 딜만 센 값보다 크다",
+     "전체 " + want.toFixed(3) + " vs 딜만 " + dmgOnly.toFixed(3));
+  ok(/전투 배율 ×/.test(html), "라벨이 '전투 배율' 이다");
+  ok(/생존 칸도 같은 무게로 셉니다/.test(html), "생존 칸을 같이 세는 근거가 화면에 있다");
   ok(/같은 칸에 겹치는 분을 합쳤을 때/.test(html),
      "단독 배율을 곱한 값이 아니라는 설명이 붙어 있다");
 

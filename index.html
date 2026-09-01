@@ -1432,20 +1432,23 @@ function render(d){
  // 네 명을 한 칸 묶음에 다 넣고 최종 칸으로 계산한다.
  // 각자의 한계 배율을 그냥 곱하면 같은 칸에 겹칠 때의 포화를 놓친다 —
  // Ton 시트 Rally Joiners 탭이 4×제시를 1.25⁴=2.441 이 아니라 2.0 으로 적어 둔다.
- // X(병종 한정)는 칸이 아니라 조건부라 예전처럼 딜 배율에서 뺀다.
- const comboDmg=list=>{
+ //
+ // 딜 칸만 곱하지 않는다. 전투비를 양쪽 식으로 펴면 분자/분모가 상쇄된다:
+ //   R = SkillMod(나)/SkillMod(상대) = (내딜증 × 내감소) / (상대딜증 × 상대감소)
+ // 내 딜 칸과 내 감소 칸이 R 에 **똑같이** 곱해지므로, 생존 칸도 같은 무게로 센다.
+ // X(병종 한정)는 칸이 아니지만 역시 R 에 곱해지는 계수라 자기 배율로 넣는다.
+ const comboAll=list=>{
   const b=Object.assign({},buck);let x=1;
   list.forEach(q=>{
-   if(q.e.slot==="X")return;
-   if(q.e.slot==="An"){x*=q.mul;return;}
+   if(q.e.slot==="X"||q.e.slot==="An"){x*=q.mul;return;}
    const put=(sl,v)=>{if(b[sl]!==undefined)b[sl]+=v;};
    put(q.e.slot,q.e.v);if(q.e.also)put(q.e.also.slot,q.e.also.v);});
-  return ORDER.filter(sl=>SLOTS[sl].k==="dmg").reduce((a,sl)=>a*(b[sl]/buck[sl]),1)*x;};
+  return ORDER.reduce((a,sl)=>a*(b[sl]/buck[sl]),1)*x;};
  o+='<div class="callout co-key" id="rec"><h3>'+L("⭐ 추천 조이너 4명","⭐ Recommended four joiners")+'</h3><p><b>'+top.map(x=>hpic(x.h,"sm")+esc(HN(x.h))).join(" · ")+
-  '</b></p><p class="cap">'+L("딜 배율 ×","Damage multiplier ×")+comboDmg(top).toFixed(3)+
+  '</b></p><p class="cap">'+L("전투 배율 ×","Combat multiplier ×")+comboAll(top).toFixed(3)+
   L(" · 리더와 겹치는 영웅은 자동 제외했습니다."," · heroes already used as leaders are excluded automatically.")+"</p>"+
-  '<p class="cap">'+L("위 배율은 네 명의 단독 배율을 곱한 값이 아니라 <b>같은 칸에 겹치는 분을 합쳤을 때</b>의 값입니다. 순위표의 배율을 넣는 순서대로 곱하면 더 크게 나오는데, 그건 포화를 빼먹은 숫자입니다.",
-     "This multiplier is not the product of the four individual figures — it is what you get after <b>adding up the parts that land in the same slot</b>. Multiplying the ranking figures together gives a larger number that ignores saturation.")+"</p>"+
+  '<p class="cap">'+L("위 배율은 네 명의 단독 배율을 곱한 값이 아니라 <b>같은 칸에 겹치는 분을 합쳤을 때</b>의 값입니다. 순위표의 배율을 넣는 순서대로 곱하면 더 크게 나오는데, 그건 포화를 빼먹은 숫자입니다. 그리고 <b>생존 칸도 같은 무게로 셉니다</b> — 전투비를 양쪽 식으로 펴면 <code>(내딜증 × 내감소) ÷ (상대딜증 × 상대감소)</code> 라, 내 딜 칸과 내 감소 칸이 결과에 똑같이 곱해집니다.",
+     "This multiplier is not the product of the four individual figures — it is what you get after <b>adding up the parts that land in the same slot</b>. Multiplying the ranking figures together gives a larger number that ignores saturation. <b>Survival slots count the same</b>: expand the kill ratio for both sides and it reduces to <code>(my damage-up × my reduction) ÷ (theirs × theirs)</code>, so your damage slots and your reduction slots multiply the outcome equally.")+"</p>"+
   (rank.filter(x=>x.dup).length?'<p class="cap">'+L("🚫 리더 중복 금지: ","🚫 Cannot double as joiners: ")+rank.filter(x=>x.dup).map(x=>esc(HN(x.h))).join(" · ")+"</p>":"")+"</div>"+
   (top.map(x=>x.h.id).join()!==tSheet.map(x=>x.h.id).join()?
    '<div class="callout co-tip"><h3>'+L("📋 Ton 시트 등재 영웅만","📋 Sheet-listed heroes only")+'</h3><p><b>'+tSheet.map(x=>hpic(x.h,"sm")+esc(HN(x.h))).join(" · ")+
