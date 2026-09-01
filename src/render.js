@@ -97,6 +97,8 @@ function render(d){
    (x.cond?'<div class="note">'+x.cond.split("|")[1]+"</div>":"")+'</td><td class="note">'+x.detail.map(esc).join("<br>")+
    '</td><td class="big">×'+x.mul.toFixed(3)+'<div class="note">'+(x.e.slot==="X"?L("조건부","conditional"):dmg?L("딜","damage"):L("생존","survival"))+"</div></td></tr>";});
  o+="</tbody></table>";
+ o+='<p class="cap">'+L("배율이 같으면 <b>투자 문턱</b>으로 가릅니다 — <b>시트 등재 → 에픽 → 낮은 세대</b> 순. 계산이 더 못 가르는 자리라, 실제로 Lv.5 까지 올라와 있을 가능성이 높은 쪽을 앞세웁니다. 값을 바꾸는 게 아니라 같은 값 안에서만 순서를 정합니다.",
+   "Equal multipliers are broken by the <b>investment threshold</b> — <b>sheet-listed first, then epics, then lower generations</b>. The model cannot separate them, so the tie goes to whoever is more likely to actually be maxed. This only orders within a tie; it never changes a value.")+"</p>";
  // 감소 계열이 왜 25% 증가에 지는지 — 근거는 볼트 「랠리 조이너 선정 규칙·개리슨 운영 (Ton)」 §5·§8.
  // 위 배율은 이미 그 나눗셈으로 계산돼 있다(감소 칸도 같은 buck 에 합산되므로 20% 는 ×1.200 이 된다).
  // 화면에 적어 두는 이유는 "×1.200 과 ×1.250 은 5%p 차이" 로 읽히기 때문이다.

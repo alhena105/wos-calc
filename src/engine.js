@@ -182,7 +182,17 @@ function calc(){
      step(e.slot,eVal(e,r)); if(e.also)step(e.also.slot,e.also.v);
    }
    return{h,e,mul,detail,cond,dup:lid.has(h.id)};
- }).filter(Boolean).sort((a,b)=>b.mul-a.mul);
+ }).filter(Boolean);
+ // 동률 타이브레이크 — 값이 같으면 모델은 더 못 가른다. 그래서 **투자 문턱**으로 가른다:
+ // 실제로 조이너로 들어오는 건 이론 순위가 아니라 "Lv.5 로 올라와 있는 영웅"이기 때문이다.
+ //   ① 시트 등재(s) → ② 에픽(만렙이 싸다) → ③ 낮은 세대(보유율이 높다) → ④ 데이터 순서
+ // 값 자체는 건드리지 않는다. 순위를 바꾸는 게 아니라 **같은 값 안에서만** 순서를 정한다.
+ // 예전에는 데이터 순서에 맡겨서 그웬(이론·G5)이 헨드릭(시트·G8)을 앞섰다.
+ // 부동소수 끝자리로 동률이 깨지지 않게 6자리에서 반올림해 비교한다.
+ // sort 는 ES2019 부터 안정 정렬이라 ④ 는 따로 안 적어도 지켜진다.
+ const tkey=x=>Math.round(x.mul*1e6);
+ rank.sort((a,b)=>(tkey(b)-tkey(a))||((b.h.s?1:0)-(a.h.s?1:0))||
+   ((b.h.rar==="epic")-(a.h.rar==="epic"))||(a.h.gen-b.h.gen));
 
  // ── 카운터 ──
  const ev=[+document.getElementById("e1").value||0,+document.getElementById("e2").value||0,+document.getElementById("e3").value||0];

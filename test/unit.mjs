@@ -624,6 +624,42 @@ section("감소 계열 나눗셈 안내");
   }
 }
 
+// ── N+6. 동률 타이브레이크 ─────────────────────────────────────────────
+section("조이너 동률 타이브레이크");
+{
+  const a = boot("ko").leaders("jeronimo", "", "greg").mine([48, 4, 48]);
+  a.el("gcap").value = "17";
+  const html = a.render();
+  const rows = [...html.matchAll(/<td>(\d+)<\/td><td class="b"><span class="hrow">[\s\S]*?heroes\/([a-z-]+)\.webp[\s\S]*?class="big">×([\d.]+)/g)]
+    .map(m => ({rank: +m[1], h: E.byId[m[2]], mul: m[3]}));
+  ok(rows.length >= 10, "순위표를 읽었다", rows.length + "행");
+
+  // 값이 같은 묶음 안에서 ① 시트 → ② 에픽 → ③ 낮은 세대 순서가 지켜지는가
+  const bad = [];
+  for (let i = 1; i < rows.length; i++) {
+    const p = rows[i - 1], c = rows[i];
+    if (p.mul !== c.mul) continue;                       // 동률 묶음 안에서만 본다
+    const key = x => [x.h.s ? 0 : 1, x.h.rar === "epic" ? 0 : 1, x.h.gen];
+    const [ps, pe, pg] = key(p), [cs, ce, cg] = key(c);
+    if (ps > cs || (ps === cs && pe > ce) || (ps === cs && pe === ce && pg > cg))
+      bad.push(p.h.kr + " → " + c.h.kr + " (×" + c.mul + ")");
+  }
+  ok(bad.length === 0, "동률 안에서 시트 → 에픽 → 낮은 세대 순서가 지켜진다", bad.slice(0, 3).join(" | "));
+
+  // 회귀 표식: 예전에는 데이터 순서에 맡겨 그웬(이론·G5)이 헨드릭(시트·G8)을 앞섰다
+  const at = id => rows.findIndex(x => x.h.id === id);
+  const hen = at("hendrik"), gwen = at("gwen");
+  ok(hen >= 0 && gwen >= 0 && rows[hen].mul === rows[gwen].mul && hen < gwen,
+     "같은 ×1.250 에서 헨드릭(시트)이 그웬(이론)보다 앞",
+     "헨드릭 " + (hen + 1) + "위 / 그웬 " + (gwen + 1) + "위");
+
+  // 타이브레이크는 값을 건드리지 않는다 — 배율은 여전히 내림차순이다
+  const desc = rows.every((x, i) => i === 0 || +rows[i - 1].mul >= +x.mul);
+  ok(desc, "배율 자체는 여전히 내림차순이다");
+
+  ok(/시트 등재 → 에픽 → 낮은 세대/.test(html), "타이브레이크 기준이 화면에 적혀 있다");
+}
+
 // ── 결과 ───────────────────────────────────────────────────────────────
 console.log("\n" + "=".repeat(62));
 console.log("통과 " + pass + " · 실패 " + fail + (known ? " · 알려진 결함 " + known + "건" : ""));
