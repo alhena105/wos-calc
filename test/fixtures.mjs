@@ -126,3 +126,68 @@ export const X_BUCKETED = [
   {id:"viveca",   n:"Children of the Mist", bk:"A", alsoBk:"D"},
   {id:"gordon",   n:"Chemical Terror",      bk:"A"},
 ];
+
+// ── 시트 세대별 행 — 조이너 순위 대조용 ────────────────────────────────
+//
+// Ton 시트 두 탭("Gen 1~9" · "Gen 10+")의 편성 행을 그대로 옮긴 것이다.
+//   lead = 리더 3영웅(슬래시 대안은 첫 번째) · r = 병비 · top = 시트 조이너 #1 칸
+//   all  = 그 행의 조이너·대체 칸 전부 (동치군은 펼치지 않은 원본 이름)
+// top 이 동치군(제시* = 제시/제셀/제로니모)이면 그 셋을 다 적었다.
+//
+// ⚠️ 이건 **정답지가 아니라 대조표다.** 시트는 최적해가 아니라 "실제로 들여보낼 수 있는
+// 영웅" 목록이라, 우리 계산과 어긋나는 자리가 구조적으로 있다:
+//   · 리더에 제로니모가 있어 A칸이 이미 찬 행에서도 시트는 제시를 1순위로 적는다
+//   · 10/52 행이 같은 영웅을 2~3장 겹쳐 쓴다(노라 9행) — 시트 지침 5번과 스스로 어긋난다
+//   · 가토·무명 같은 보병 전용 방어 영웅을 높게 치는데, 볼트 §8 은 그 분류가 틀렸다고 못박는다
+// 그래서 **100% 를 목표로 삼지 않는다.** 회귀 감시용 하한선만 지킨다.
+export const SHEET_ROWS = [
+  {gen:1, lead:["jeronimo","molly","zinman"], r:[60,40,0], top:["jessie","jasser","jeronimo"], all:["jessie","seoyoon","patrick","sergey","lingxue"]},
+  {gen:1, lead:["jeronimo","molly","zinman"], r:[50,20,30], top:["jessie","jasser","jeronimo"], all:["jessie","seoyoon","patrick","sergey","lingxue"]},
+  {gen:2, lead:["flint","philly","zinman"], r:[60,40,0], top:["patrick"], all:["patrick","jessie","seoyoon","sergey"]},
+  {gen:2, lead:["jeronimo","philly","alonso"], r:[50,20,30], top:["patrick"], all:["patrick","jessie","seoyoon","zinman"]},
+  {gen:3, lead:["logan","philly","zinman"], r:[60,40,0], top:["mia"], all:["mia","patrick","jessie","seoyoon"]},
+  {gen:3, lead:["jeronimo","mia","greg"], r:[50,20,30], top:["jessie","jasser","jeronimo"], all:["jessie","seoyoon","philly","patrick","zinman"]},
+  {gen:3, lead:["jeronimo","mia","greg"], r:[60,40,0], top:["jessie","jasser","jeronimo"], all:["jessie","seoyoon","philly","patrick","zinman"]},
+  {gen:3, lead:["logan","philly","greg"], r:[50,20,30], top:["mia"], all:["mia","patrick","jessie","seoyoon","zinman"]},
+  {gen:4, lead:["ahmose","reina","lynn"], r:[60,40,0], top:["mia"], all:["mia","patrick","jessie","seoyoon","zinman","philly"]},
+  {gen:4, lead:["jeronimo","reina","greg"], r:[50,20,30], top:["mia"], all:["mia","philly","patrick","zinman","jessie","seoyoon"]},
+  {gen:4, lead:["jeronimo","mia","greg"], r:[48,4,48], top:["patrick"], all:["patrick","philly","zinman","reina","jessie","seoyoon"]},
+  {gen:4, lead:["jeronimo","reina","greg"], r:[60,40,0], top:["patrick"], all:["patrick","philly","zinman","mia","reina","jessie","seoyoon"]},
+  {gen:4, lead:["ahmose","molly","lynn"], r:[50,2,48], top:["mia"], all:["mia","patrick","jessie","seoyoon","zinman"]},
+  {gen:5, lead:["hector","norah"], r:[60,40,0], top:["mia"], all:["mia","patrick","jessie","philly"]},
+  {gen:5, lead:["jeronimo","reina","gwen"], r:[50,20,30], top:["mia"], all:["mia","jessie","seoyoon","norah","patrick","philly"]},
+  {gen:5, lead:["jeronimo","mia","gwen"], r:[48,4,48], top:["norah"], all:["norah","patrick","philly"]},
+  {gen:5, lead:["jeronimo","norah","greg"], r:[60,40,0], top:["mia"], all:["mia","patrick","jessie","philly","zinman"]},
+  {gen:5, lead:["logan","norah","greg"], r:[60,40,0], top:["mia"], all:["mia","norah","jessie","philly"]},
+  {gen:6, lead:["wuming","norah","zinman"], r:[60,40,0], top:["renee"], all:["renee","mia","patrick","jessie","wuming"]},
+  {gen:6, lead:["jeronimo","renee","gwen"], r:[50,20,30], top:["jessie","jasser","jeronimo"], all:["jessie","seoyoon","mia","norah","patrick","wuming"]},
+  {gen:6, lead:["jeronimo","mia","wayne"], r:[48,4,48], top:["norah"], all:["norah","patrick"]},
+  {gen:6, lead:["jeronimo","renee","greg"], r:[60,40,0], top:["mia"], all:["mia","patrick","jessie","wuming"]},
+  {gen:6, lead:["logan","philly","wayne"], r:[45,5,50], top:["norah"], all:["norah","patrick","wuming"]},
+  {gen:7, lead:["edith","gordon","bradley"], r:[60,40,0], top:["renee"], all:["renee","mia","reina","jessie","wuming"]},
+  {gen:7, lead:["edith","molly","bradley"], r:[40,0,60], top:["mia"], all:["mia","norah","lynn"]},
+  {gen:7, lead:["jeronimo","mia","bradley"], r:[48,4,48], top:["norah"], all:["norah","patrick","philly"]},
+  {gen:8, lead:["gatot","sonya","bradley"], r:[60,40,0], top:["renee"], all:["renee","patrick","mia","hendrik","wuming"]},
+  {gen:8, lead:["gatot","molly","bradley"], r:[40,0,60], top:["mia"], all:["mia","patrick","norah","lynn"]},
+  {gen:8, lead:["edith","mia","hendrik"], r:[48,4,48], top:["norah"], all:["norah","jessie","seoyoon","wuming"]},
+  {gen:8, lead:["edith","sonya","bradley"], r:[60,40,0], top:["renee"], all:["renee","mia","hendrik","jessie","wuming"]},
+  {gen:8, lead:["jeronimo","gordon","bradley"], r:[60,40,0], top:["renee"], all:["renee","mia","hendrik","patrick","wuming"]},
+  {gen:9, lead:["magnus","sonya","bradley"], r:[60,40,0], top:["renee"], all:["renee","mia","patrick","hendrik","wuming","gatot"]},
+  {gen:9, lead:["magnus","molly","bradley"], r:[40,0,60], top:["mia"], all:["mia","patrick","norah","lynn","gatot"]},
+  {gen:9, lead:["magnus","mia","hendrik"], r:[48,4,48], top:["norah"], all:["norah","patrick","gatot"]},
+  {gen:9, lead:["magnus","fred","bradley"], r:[60,40,0], top:["renee"], all:["renee","mia","patrick","hendrik","wuming","gatot"]},
+  {gen:10, lead:["gregory","freya","bradley"], r:[60,40,0], top:["renee"], all:["renee","mia","patrick","hendrik","wuming","gatot"]},
+  {gen:10, lead:["gregory","molly","bradley"], r:[40,2,58], top:["mia"], all:["mia","norah","hendrik","patrick","gatot"]},
+  {gen:10, lead:["gregory","mia","blanchette"], r:[48,4,48], top:["norah"], all:["norah","hendrik","patrick","gatot"]},
+  {gen:10, lead:["gregory","fred","bradley"], r:[60,40,0], top:["renee"], all:["renee","mia","hendrik","patrick","wuming","gatot"]},
+  {gen:11, lead:["eleonora","lloyd","bradley"], r:[60,40,0], top:["renee"], all:["renee","mia","hendrik","reina","gatot"]},
+  {gen:11, lead:["eleonora","molly","rufus"], r:[40,2,58], top:["mia"], all:["mia","norah","hendrik","reina","gatot"]},
+  {gen:11, lead:["eleonora","mia","rufus"], r:[48,4,48], top:["norah"], all:["norah","reina","hendrik","gatot"]},
+  {gen:12, lead:["herbjorg","lloyd","bradley"], r:[60,40,0], top:["mia"], all:["mia","renee","patrick","hendrik","gatot"]},
+  {gen:12, lead:["herbjorg","lloyd","ligeia"], r:[60,20,20], top:["mia"], all:["mia","patrick","norah","seoyoon","gatot"]},
+  {gen:12, lead:["herbjorg","molly","ligeia"], r:[50,2,48], top:["mia"], all:["mia","patrick","norah","gatot"]},
+  {gen:12, lead:["herbjorg","lloyd","ligeia"], r:[50,10,40], top:["mia"], all:["mia","patrick","norah","gatot","seoyoon"]},
+  {gen:12, lead:["herbjorg","mia","rufus"], r:[48,4,48], top:["patrick"], all:["patrick","hendrik","norah","gatot"]},
+  {gen:12, lead:["herbjorg","karol","rufus"], r:[50,10,40], top:["mia"], all:["mia","patrick","hendrik","norah"]},
+  {gen:12, lead:["herbjorg","karol","bradley"], r:[60,40,0], top:["mia"], all:["mia","renee","gatot","hendrik","patrick"]},
+];

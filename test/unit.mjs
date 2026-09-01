@@ -9,7 +9,7 @@ import {fileURLToPath} from "node:url";
 import {dirname, join} from "node:path";
 import vm from "node:vm";
 import {SHEET_POINTS, QUIET_POINTS, GARRISON_POINTS, GARRISON_QUIET, EXPECTED_COUNTS,
-        JOINER_POINTS, SHEET_JOINERS, X_BUCKETED} from "./fixtures.mjs";
+        JOINER_POINTS, SHEET_JOINERS, X_BUCKETED, SHEET_ROWS} from "./fixtures.mjs";
 import {PARTS, bundle} from "../build.mjs";
 import {boot} from "./dom.mjs";
 import {existsSync, readdirSync, statSync} from "node:fs";
@@ -669,6 +669,33 @@ section("조이너 동률 타이브레이크");
   ok(desc, "배율 자체는 여전히 내림차순이다");
 
   ok(/시트 등재 → 에픽 → 낮은 세대/.test(html), "타이브레이크 기준이 화면에 적혀 있다");
+}
+
+// ── N+7. 시트 세대별 행과 조이너 순위 대조 ─────────────────────────────
+section("시트 행 대조 (조이너 순위)");
+{
+  // 목적은 만점이 아니다 — 시트는 최적해가 아니라 보유 가능 목록이다(fixtures.mjs 주석 참고).
+  // 모델을 건드렸을 때 시트와의 일치가 무너지지 않는지 보는 **하한선**이다.
+  const top4 = row => {
+    const a = boot("ko").leaders(row.lead[0] || "", row.lead[1] || "", row.lead[2] || "").mine(row.r);
+    a.el("gcap").value = String(row.gen);
+    const html = a.render();
+    return [...html.matchAll(/<td>\d+<\/td><td class="b"><span class="hrow">[\s\S]*?heroes\/([a-z-]+)\.webp/g)]
+      .map(m => m[1]).slice(0, 4);
+  };
+  let first = 0, any = 0, tot = 0;
+  const missed = [];
+  for (const row of SHEET_ROWS) {
+    const got = top4(row);
+    if (row.top.some(x => got.includes(x))) first++; else missed.push(row.lead[0] + "/" + row.r.join("/"));
+    for (const j of row.all) { tot++; if (got.includes(j)) any++; }
+  }
+  const fp = first / SHEET_ROWS.length * 100, ap = any / tot * 100;
+  note("시트 #1 조이너가 우리 상위 4에 든 행 " + first + "/" + SHEET_ROWS.length +
+       " (" + fp.toFixed(1) + "%) · 조이너 전체 겹침 " + any + "/" + tot + " (" + ap.toFixed(1) + "%)");
+  // 하한선은 실측(76.9% / 53.6%)에서 여유를 두고 잡았다. 떨어지면 모델이 시트에서 멀어진 것이다.
+  ok(fp >= 70, "시트 #1 조이너 재현이 70% 이상", fp.toFixed(1) + "% · 놓친 행: " + missed.slice(0, 3).join(", "));
+  ok(ap >= 45, "시트 조이너 전체 겹침이 45% 이상", ap.toFixed(1) + "%");
 }
 
 // ── 결과 ───────────────────────────────────────────────────────────────
