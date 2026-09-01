@@ -97,6 +97,16 @@ function render(d){
    (x.cond?'<div class="note">'+x.cond.split("|")[1]+"</div>":"")+'</td><td class="note">'+x.detail.map(esc).join("<br>")+
    '</td><td class="big">×'+x.mul.toFixed(3)+'<div class="note">'+(x.e.slot==="X"?L("조건부","conditional"):dmg?L("딜","damage"):L("생존","survival"))+"</div></td></tr>";});
  o+="</tbody></table>";
+ // 감소 계열이 왜 25% 증가에 지는지 — 근거는 볼트 「랠리 조이너 선정 규칙·개리슨 운영 (Ton)」 §5·§8.
+ // 위 배율은 이미 그 나눗셈으로 계산돼 있다(감소 칸도 같은 buck 에 합산되므로 20% 는 ×1.200 이 된다).
+ // 화면에 적어 두는 이유는 "×1.200 과 ×1.250 은 5%p 차이" 로 읽히기 때문이다.
+ o+='<div class="callout co-warn"><h3>'+L("⚠️ 감소 계열(20%)은 나눗셈이라 25% 증가에 진다","⚠️ Reduction skills (20%) divide — they lose to a 25% increase")+'</h3><p>'+
+  L("흔한 오해는 <b>25% 증가(×1.25)와 20% 감소(×0.8)가 상쇄된다</b>는 것입니다. 감소는 곱하는 게 아니라 <b>나눕니다</b> — <b>1.25 ÷ 1.2 = 1.0417</b> 로 증가 쪽이 4.17% 앞섭니다. 네 장씩 쌓으면 <b>2.0 ÷ 1.8 = 1.111</b> 로 11.1% 벌어집니다. 20% 계열이 \"25%보다 5%p 약한\" 게 아니라 <b>구조적으로</b> 약합니다.",
+    "The common misconception is that a 25% increase (×1.25) and a 20% reduction (×0.8) cancel out. Reductions <b>divide</b> rather than multiply — <b>1.25 ÷ 1.2 = 1.0417</b>, so the increase is 4.17% ahead. Stack four of each and it is <b>2.0 ÷ 1.8 = 1.111</b>, an 11.1% gap. A 20% reduction is not \"5pp weaker than 25%\" — it is <b>structurally</b> weaker.")+
+  '</p><p>'+L("위 순위의 배율은 <b>이미 이 나눗셈으로 계산돼 있습니다</b> — 20% 감소 스킬이 ×1.200 으로 나오는 게 그 값입니다. 그리고 <b>공격용·방어용 조이너 구분은 없습니다</b>: 데미지 공식이 공수 동일하고 갈리는 건 위젯뿐이라, <b>방어 상황에서도 25% 증가 계열을 쌓는 쪽</b>이 낫습니다.",
+    "The multipliers above already carry this division — a 20% reduction showing ×1.200 <em>is</em> that value. And there is no such thing as an offensive or defensive joiner: the damage formula is identical for both, only widgets differ, so <b>stacking 25% increases wins even on defense</b>.")+
+  '</p><p class="cap">'+L("예외 — 상대가 같은 영웅을 4스택하면 상대 칸이 이미 합연산으로 포화라 우리 감소가 상대적으로 크게 먹힙니다. 그때는 20% 계열도 쓸 만합니다. · 근거: 볼트 「랠리 조이너 선정 규칙·개리슨 운영 (Ton)」 §5·§8 (Ton 반복 테스트)",
+    "Exception — if the enemy stacks the same hero four times, their slot is already saturated by addition, so your reduction bites relatively harder; 20% skills are worth taking then. · Source: vault note “Rally joiner selection & garrison ops (Ton)”, §5 and §8.")+"</p></div>";
  const top=rank.filter(x=>!x.dup&&x.mul>1.001).slice(0,4);
  const tSheet=rank.filter(x=>!x.dup&&x.mul>1.001&&x.h.s).slice(0,4);
  // 네 명을 한 칸 묶음에 다 넣고 최종 칸으로 계산한다.

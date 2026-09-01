@@ -18,6 +18,12 @@ function dmgShare(t,r){
  const p=t==="infantry"?r.inf*DW.infantry:t==="lancer"?r.lan:t==="marksman"?r.mar:
    t==="inf+mar"?r.inf*DW.infantry+r.mar:t==="mar+lan"?r.mar+r.lan:tot;
  return p/tot;}
+// pc 스킬 — 확률이 병종마다 독립으로 굴러간다. 편성에 든 병종 수만큼 시행이 늘어난다.
+// v 는 1병종 기준값이므로 (1−(1−pc)^n)/pc 를 곱해 되돌린다 (n=1 이면 그대로).
+// 근거: 볼트 「랠리 조이너 선정 규칙·개리슨 운영 (Ton)」 §6 — 미아 3병종 기대값 43.75%.
+function nCls(r){return (r.inf>0?1:0)+(r.lan>0?1:0)+(r.mar>0?1:0);}
+function eVal(e,r){const n=nCls(r);
+ return e.pc&&n>0?e.v*(1-Math.pow(1-e.pc,n))/e.pc:e.v;}
 // X(병종 한정) 스킬의 환산 지분 — 딜은 딜 지분, 생존은 병력 지분
 function xShare(q,r){return q.k==="sur"?tgtRatio(q.tgt,r)/100:dmgShare(q.tgt,r);}
 const NA_SHARE=.8; // 일반공격이 총딜에서 차지하는 비중 가정
@@ -138,7 +144,7 @@ function calc(){
      const bk=q=>{if(q.bk)add(q.bk,q.v*xShare(q,r),L(" (병종 지분 환산)"," (class share)"));};
      bk(e); if(e.also&&e.also.slot==="X")bk(e.also);
      return;}
-   add(e.slot,e.v); if(e.also)add(e.also.slot,e.also.v);
+   add(e.slot,eVal(e,r)); if(e.also)add(e.also.slot,eVal(e.also,r));
  }));
 
  // ── 위젯 ──
@@ -171,7 +177,9 @@ function calc(){
    }else{
      const step=(sl,val)=>{const b=buck[sl];if(b===undefined)return;const m=(b+val)/b;mul*=m;
        detail.push(sl+" "+b.toFixed(2)+"→"+(b+val).toFixed(2)+" ×"+m.toFixed(3));};
-     step(e.slot,e.v); if(e.also)step(e.also.slot,e.also.v);
+     if(e.pc)detail.push(L("병종 "+nCls(r)+"종 → 발동 "+((1-Math.pow(1-e.pc,nCls(r)))*100).toFixed(1)+"% · 기대값 "+(eVal(e,r)*100).toFixed(2)+"%",
+                           nCls(r)+" troop types → fires "+((1-Math.pow(1-e.pc,nCls(r)))*100).toFixed(1)+"% · EV "+(eVal(e,r)*100).toFixed(2)+"%"));
+     step(e.slot,eVal(e,r)); if(e.also)step(e.also.slot,e.also.v);
    }
    return{h,e,mul,detail,cond,dup:lid.has(h.id)};
  }).filter(Boolean).sort((a,b)=>b.mul-a.mul);

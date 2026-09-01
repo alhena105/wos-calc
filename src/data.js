@@ -1,5 +1,9 @@
 // WOS 편성 계산기 — 영웅 데이터베이스
 // 출처: wosheroes.com / whiteoutsurvival-community.com / whiteoutsurvival.wiki (2026-08-15 수집)
+// pc:<확률> — 그 확률이 **병종마다 독립으로** 굴러가는 스킬. v 는 1병종 기준값이고,
+//   엔진이 편성 병종 수 n 으로 (1−(1−pc)^n)/pc 를 곱해 기대값을 다시 낸다.
+//   근거: 원문 "Grants all troops' attack a 50% chance of cursing the target" +
+//   볼트 「랠리 조이너 선정 규칙·개리슨 운영 (Ton)」 §6 — 3병종이면 87.5% 발동, 기대값 43.75%.
 // bk:"A"|"D" — slot:"X" 전용. 병종 한정이지만 원문이 "Damage Dealt / Damage Taken" 스탯을
 //   올리는(내리는) 스킬이라는 표시다. 이런 스킬은 일반 칸과 같은 스탯이므로 칸을 우회하면 안 되고,
 //   병종 딜 지분(dmg) 또는 병력 지분(sur)으로 환산해 그 칸에 합산한다. 근거는 wosheroes 원문이고,
@@ -85,7 +89,7 @@ const HEROES = [
       {n:"Leader Inspiration",slot:"C",v:.25,t:"전 부대 체력 +25%",te:"all troops health +25%"}],
  w:{side:"defender",stat:"Defense",name:"Strong Protection"}},
 {id:"mia",s:1,kr:"미야",en:"Mia",cls:"lancer",gen:3,rar:"leg",
- exp:[{n:"Bad Luck Streak",slot:"G",v:.25,p:"50%",pe:"50% chance",t:"50% 확률 적 받는 피해 +50%",te:"50% chance: enemy damage taken +50%"},
+ exp:[{n:"Bad Luck Streak",slot:"G",v:.25,p:"50%",pe:"50% chance",pc:.5,t:"병종마다 50% 확률 적 받는 피해 +50%",te:"each troop type: 50% chance, enemy damage taken +50%"},
       {n:"Lucky Charm",slot:"A",v:.25,p:"50%",pe:"50% chance",t:"50% 확률 피해량 +50%",te:"50% chance: damage +50%"},
       {n:"Ritual Deciphering",slot:"D",v:.20,p:"40%",pe:"40% chance",t:"40% 확률 받는 피해 −50%",te:"40% chance: damage taken −50%"}],
  w:{side:"rally",stat:"Attack",name:"Rally of Fate"}},

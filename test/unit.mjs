@@ -578,6 +578,52 @@ section("X 스킬의 칸 귀속 (bk)");
   }
 }
 
+// ── N+4. 병종마다 독립 시행하는 확률 스킬 (pc) ─────────────────────────
+section("병종별 독립 시행 (pc)");
+{
+  // 볼트 「랠리 조이너 선정 규칙·개리슨 운영 (Ton)」 §6 의 표 그대로:
+  //   1병종 50% → 25% · 2병종 75% → 37.5% · 3병종 87.5% → 43.75%
+  const want = [[[100, 0, 0], 1.250], [[60, 40, 0], 1.375], [[48, 4, 48], 1.4375]];
+  for (const [ratio, mul] of want) {
+    const a = boot("ko").leaders("jeronimo", "", "greg").mine(ratio);
+    a.el("gcap").value = "17";
+    const h = a.render();
+    const m = h.match(/heroes\/mia\.webp[\s\S]{0,1400}?class="big">×([\d.]+)/);
+    ok(m && Math.abs(+m[1] - +mul.toFixed(3)) < 5e-4,
+       "미야 조이너 배율 @" + ratio.join("/") + " = ×" + mul.toFixed(3),
+       "화면 ×" + (m && m[1]));
+  }
+  // pc 는 미야 S1 하나뿐이다 — 조용히 번지지 않게 못 박는다
+  const pcs = [];
+  for (const h of E.HEROES)
+    for (const e of h.exp) if (e.pc) pcs.push(h.id + "/" + e.n);
+  ok(pcs.join() === "mia/Bad Luck Streak", "pc 가 붙은 스킬은 미야 Bad Luck Streak 하나", pcs.join(" | "));
+
+  // 병종이 하나뿐이면 원래 값으로 돌아온다 (n=1 → 항등)
+  ok(Math.abs(0.25 * (1 - Math.pow(0.5, 1)) / 0.5 - 0.25) < 1e-12, "n=1 이면 pc 보정은 항등원");
+}
+
+// ── N+5. 감소 계열이 나눗셈이라는 안내 ─────────────────────────────────
+section("감소 계열 나눗셈 안내");
+{
+  const h = boot("ko").leaders("jeronimo", "mia", "greg").mine([50, 20, 30]).render();
+  ok(/1\.25 ÷ 1\.2 = 1\.0417/.test(h), "25% 대 20% 의 나눗셈 수치가 화면에 있다");
+  ok(/2\.0 ÷ 1\.8 = 1\.111/.test(h), "네 장씩 쌓았을 때 수치도 있다");
+  ok(/공격용·방어용 조이너 구분은 없습니다/.test(h), "공수 조이너 구분이 없다는 볼트 결론이 있다");
+  ok(/4스택/.test(h), "상대 4스택 예외가 같이 적혀 있다");
+  // 안내문이 가리키는 값이 실제 계산과 맞는가 — 20% 감소는 칸에 +0.20 으로 들어간다.
+  // 볼트 §5 의 "받피감 4장 = ÷(1+0.20×4) = ÷1.8" 이 우리 칸 모델과 같은 산수다.
+  {
+    const d = boot("ko").leaders("sergey", "", "").mine([60, 40, 0]).render();
+    const D = d.match(/받는 피해 감소[\s\S]{0,400}?class="big">([\d.]+)/);
+    ok(D && D[1] === "1.20", "세르게이 하나면 D 칸 = 1.20 (= ÷1.2)", D && D[1]);
+    // 네 장이면 1.80, 25% 딜 네 장이면 2.00 → 2.0/1.8 = 1.111 (볼트 수치)
+    const four = (v) => 1 + v * 4;
+    ok(Math.abs(four(0.25) / four(0.20) - 1.1111) < 1e-3,
+       "네 장씩 쌓으면 2.0 ÷ 1.8 = 1.111 이 나온다", (four(0.25) / four(0.20)).toFixed(4));
+  }
+}
+
 // ── 결과 ───────────────────────────────────────────────────────────────
 console.log("\n" + "=".repeat(62));
 console.log("통과 " + pass + " · 실패 " + fail + (known ? " · 알려진 결함 " + known + "건" : ""));
