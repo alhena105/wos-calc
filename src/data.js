@@ -1,5 +1,9 @@
 // WOS 편성 계산기 — 영웅 데이터베이스
 // 출처: wosheroes.com / whiteoutsurvival-community.com / whiteoutsurvival.wiki (2026-08-15 수집)
+// bk:"A"|"D" — slot:"X" 전용. 병종 한정이지만 원문이 "Damage Dealt / Damage Taken" 스탯을
+//   올리는(내리는) 스킬이라는 표시다. 이런 스킬은 일반 칸과 같은 스탯이므로 칸을 우회하면 안 되고,
+//   병종 딜 지분(dmg) 또는 병력 지분(sur)으로 환산해 그 칸에 합산한다. 근거는 wosheroes 원문이고,
+//   "extra damage / 추가피해" 처럼 타격에 붙는 것은 다른 기전이라 bk 를 달지 않는다.
 // slot 코드: A=피해량↑ An=일반공격피해↑ B=공격력↑ C=체력↑ D=받는피해↓ DEF=방어력↑
 //            E=파괴력↑ F=적방어↓ G=적받는피해↑ H=적공격↓ I=적파괴력↓ J=적피해량↓
 //            DODGE=회피 CRIT=치명률 X=병종한정/주기형 ECO=비전투
@@ -60,7 +64,7 @@ const HEROES = [
  w:{side:"defender",stat:"Attack",name:"Defend to Attack"}},
 // ── Gen 2 ──
 {id:"flint",kr:"플린트",en:"Flint",cls:"infantry",gen:2,rar:"leg",
- exp:[{n:"Pyromaniac",slot:"X",k:"dmg",v:1.0,tgt:"infantry",t:"보병 피해량 +100%",te:"infantry damage +100%"},
+ exp:[{n:"Pyromaniac",slot:"X",k:"dmg",v:1.0,tgt:"infantry",bk:"A",t:"보병 피해량 +100%",te:"infantry damage +100%"},
       {n:"Burning Resolve",slot:"B",v:.25,t:"전 부대 공격력 +25%",te:"all troops attack +25%"},
       {n:"Immolation",slot:"E",v:.25,t:"전 부대 파괴력 +25%",te:"all troops lethality +25%"}],
  w:{side:"defender",stat:"Attack",name:"Dragonbreath"}},
@@ -93,7 +97,7 @@ const HEROES = [
 // ── Gen 4 ──
 {id:"ahmose",kr:"아모세",en:"Ahmose",cls:"infantry",gen:4,rar:"leg",
  exp:[{n:"Viper Formation",slot:"X",k:"sur",v:.35,tgt:"infantry",t:"4공격마다 2턴 보병 받피 −70%, 창·궁 −30%",te:"every 4th attack, 2 turns: infantry damage taken −70%, lancer/marksman −30%"},
-      {n:"Prayer of Flame",slot:"X",k:"dmg",v:1.0,tgt:"infantry",t:"보병 피해량 +100%",te:"infantry damage +100%"},
+      {n:"Prayer of Flame",slot:"X",k:"dmg",v:1.0,tgt:"infantry",bk:"A",t:"보병 피해량 +100%",te:"infantry damage +100%"},
       {n:"Blade of Light",slot:"X",k:"dmg",v:.60,tgt:"infantry",t:"보병 공격당 피해 +60% & 대상 받피 +25%",te:"infantry, per attack: +60% damage & target takes +25% damage"}],
  w:{side:"defender",stat:"Health",name:"Oath of Guardian"}},
 {id:"reina",s:1,kr:"레이나",en:"Reina",cls:"lancer",gen:4,rar:"leg",
@@ -109,11 +113,11 @@ const HEROES = [
 // ── Gen 5 ──
 {id:"hector",kr:"헥터",en:"Hector",cls:"infantry",gen:5,rar:"leg",
  exp:[{n:"Survival Instincts",slot:"D",v:.20,p:"40%",pe:"40% chance",t:"40% 확률 받는 피해 −50%",te:"40% chance: damage taken −50%"},
-      {n:"Rampant",slot:"X",k:"dmg",v:1.07,tgt:"infantry",also:{slot:"X",k:"dmg",v:.535,tgt:"marksman"},t:"보병 피해량 +200% · 궁병 +100% (10회 동안 매 공격 85%로 감쇠 → 평균 0.535 환산)",te:"infantry damage +200%, marksmen +100% (decays over 10 procs)"},
+      {n:"Rampant",slot:"X",k:"dmg",v:1.07,tgt:"infantry",bk:"A",also:{slot:"X",k:"dmg",v:.535,tgt:"marksman",bk:"A"},t:"보병 피해량 +200% · 궁병 +100% (10회 동안 매 공격 85%로 감쇠 → 평균 0.535 환산)",te:"infantry damage +200%, marksmen +100% (decays over 10 procs)"},
       {n:"Blitz",slot:"A",v:.50,p:"25%",pe:"25% chance",t:"25% 확률 200% 피해",te:"25% chance: 200% damage"}],
  w:{side:"defender",stat:"Attack",name:"Goliath"}},
 {id:"norah",s:1,kr:"노라",en:"Norah",cls:"lancer",gen:5,rar:"leg",
- exp:[{n:"Combined Arms",slot:"X",k:"dmg",v:.15,tgt:"inf+mar",t:"보병·궁병 받피 −15% & 피해량 +15%",te:"infantry & marksmen: damage taken −15% and damage +15%"},
+ exp:[{n:"Combined Arms",slot:"X",k:"dmg",v:.15,tgt:"inf+mar",bk:"A",also:{slot:"X",k:"sur",v:.15,tgt:"inf+mar",bk:"D"},t:"보병·궁병 받피 −15% & 피해량 +15%",te:"infantry & marksmen: damage taken −15% and damage +15%"},
       {n:"Sneak Strike",slot:"X",k:"dmg",v:.20,tgt:"lancer",t:"창병 20% 확률 추가피해 +100%",te:"lancers, 20% chance: +100% extra damage"},
       {n:"Momentum",slot:"A",v:.25,p:"창병 5공격마다",pe:"lancers, every 5th attack",t:"피해량 +25% & 받피 −25% (2턴)",te:"damage +25% & damage taken −25% (2 turns)",also:{slot:"D",v:.25}}],
  w:{side:"defender",stat:"Defense",name:"True Grit"}},
@@ -146,7 +150,7 @@ const HEROES = [
  w:{side:"defender",stat:"Health",name:"Fortworks"}},
 {id:"gordon",kr:"고든",en:"Gordon",cls:"lancer",gen:7,rar:"leg",
  exp:[{n:"Venom Infusion",slot:"X",k:"dmg",v:.50,tgt:"lancer",t:"창병 2공격마다 추가딜 100% + 독(적 딜 −20%)",te:"lancers, every 2nd attack: +100% extra damage + poison (enemy damage −20%)"},
-      {n:"Chemical Terror",slot:"X",k:"dmg",v:.50,tgt:"lancer",t:"창병 피해량 +150% & 적 피해량 −30% (3턴마다)",te:"lancer damage +150% & enemy damage −30% (every 3 turns)"},
+      {n:"Chemical Terror",slot:"X",k:"dmg",v:.50,tgt:"lancer",bk:"A",t:"창병 피해량 +150% & 적 피해량 −30% (3턴마다)",te:"lancer damage +150% & enemy damage −30% (every 3 turns)"},
       {n:"Toxic Release",slot:"G",v:.30,p:"4턴마다 2턴",pe:"2 turns out of every 4",t:"적 보병 받피 +30% & 적 궁병 피해량 −30%",te:"enemy infantry damage taken +30% & enemy marksman damage −30%"}],
  w:{side:"rally",stat:"Lethality",name:"Bio Assault"}},
 {id:"bradley",kr:"브레들리",en:"Bradley",cls:"marksman",gen:7,rar:"leg",
@@ -184,7 +188,7 @@ const HEROES = [
 {id:"xura",kr:"쇠라",en:"Xura",cls:"marksman",gen:9,rar:"leg",
  exp:[{n:"Fungal Fog",slot:"D",v:.20,t:"전 부대 받는 피해 −20%",te:"all troops damage taken −20%"},
       {n:"Piercing Arrow",slot:"X",k:"dmg",v:.50,tgt:"marksman",t:"궁병 2격마다 추가피해 +100% & 대상 받피 +25%",te:"marksmen, every 2nd hit: +100% extra damage & target takes +25% damage"},
-      {n:"Unorthodoxy",slot:"X",k:"dmg",v:.15,tgt:"marksman",t:"궁병 피해량 +10% / 받피 −15%",te:"marksman damage +10% / damage taken −15%"}],
+      {n:"Unorthodoxy",slot:"X",k:"dmg",v:.10,tgt:"marksman",bk:"A",also:{slot:"X",k:"sur",v:.15,tgt:"marksman",bk:"D"},t:"궁병 피해량 +10% / 받피 −15%",te:"marksman damage +10% / damage taken −15%"}],
  w:{side:"defender",stat:"Attack",name:"Gaiac Hymn"}},
 // ── Gen 10 ──
 {id:"gregory",kr:"그레고리",en:"Gregory",cls:"infantry",gen:10,rar:"leg",
@@ -195,7 +199,7 @@ const HEROES = [
 {id:"freya",kr:"프레야",en:"Freya",cls:"lancer",gen:10,rar:"leg",
  exp:[{n:"Fog of War",slot:"H",v:.20,t:"적 전 부대 공격력 −20%",te:"all enemy troops attack −20%"},
       {n:"Blood Moon Scythe",slot:"X",k:"dmg",v:.50,tgt:"lancer",p:"50%",pe:"50% chance",t:"창병 50% 확률 100% 추가피해",te:"lancers, 50% chance: +100% extra damage"},
-      {n:"Night's Vengeance",slot:"X",k:"dmg",v:.15,tgt:"inf+mar",t:"보병·궁병 받피 −15% & 피해량 +15%",te:"infantry & marksmen: damage taken −15% and damage +15%"}],
+      {n:"Night's Vengeance",slot:"X",k:"dmg",v:.15,tgt:"inf+mar",bk:"A",also:{slot:"X",k:"sur",v:.15,tgt:"inf+mar",bk:"D"},t:"보병·궁병 받피 −15% & 피해량 +15%",te:"infantry & marksmen: damage taken −15% and damage +15%"}],
  w:{side:"defender",stat:"Defense",name:"Defender of the Watch"}},
 {id:"blanchette",kr:"블랑쉬",en:"Blanchette",cls:"marksman",gen:10,rar:"leg",
  exp:[{n:"Armed to the Teeth",slot:"E",v:.25,t:"전 부대 파괴력 +25%",te:"all troops lethality +25%"},
@@ -266,7 +270,7 @@ const HEROES = [
  exp:[{n:"Mystic Mechanism",slot:"A",v:.20,t:"전 부대 피해량 +20%",te:"all troops damage +20%"},
       {n:"Spiky Assault",slot:"X",k:"dmg",v:.60,tgt:"lancer",
        t:"창병 공격당 피해 +60% · 중독 대상 받는 피해 +25%",te:"lancers: +60% damage per attack; poisoned targets take +25% damage"},
-      {n:"Mirror Maze",slot:"X",k:"sur",v:.15,tgt:"inf+mar",also:{slot:"X",k:"dmg",v:.15,tgt:"inf+mar"},
+      {n:"Mirror Maze",slot:"X",k:"sur",v:.15,tgt:"inf+mar",bk:"D",also:{slot:"X",k:"dmg",v:.15,tgt:"inf+mar",bk:"A"},
        t:"보병·궁병 받는 피해 −15% · 피해량 +15%",te:"infantry & marksmen: damage taken −15%, damage dealt +15%"}],
  w:{side:"rally",stat:"Lethality",name:"Grand Fantasy"}},
 {id:"elif",kr:"엘리프",en:"Elif",cls:"infantry",gen:14,rar:"leg",
@@ -278,7 +282,7 @@ const HEROES = [
 {id:"estrella",kr:"에스텔라",en:"Estrella",cls:"lancer",gen:15,rar:"leg",
  exp:[{n:"Corrosive Color",slot:"F",v:.25,t:"적 전 부대 방어력 −25%",te:"all enemy troops defense −25%"},
       {n:"Dawn Canvas",slot:"B",v:.15,t:"전 부대 공격력 +15% / 방어력 +10%",te:"all troops attack +15% / defense +10%",also:{slot:"DEF",v:.10}},
-      {n:"Splendid Scene",slot:"X",k:"dmg",v:.25,tgt:"lancer",also:{slot:"X",k:"sur",v:.25,tgt:"infantry"},
+      {n:"Splendid Scene",slot:"X",k:"dmg",v:.25,tgt:"lancer",bk:"A",also:{slot:"X",k:"sur",v:.25,tgt:"infantry",bk:"D"},
        t:"창병 피해량 +25% · 보병 받는 피해 −25%",te:"lancers deal +25% damage; infantry take −25% damage"}],
  w:{side:"defender",stat:"Attack",name:"Homeland Defense"}},
 {id:"hank",kr:"행크",en:"Hank",cls:"infantry",gen:15,rar:"leg",
@@ -292,7 +296,7 @@ const HEROES = [
  exp:[{n:"Nightfall Legion",slot:"B",v:.25,t:"전 부대 공격력 +25%",te:"all troops attack +25%"},
       {n:"Shadow World",slot:"X",k:"dmg",v:.20,tgt:"marksman",p:"20%",pe:"20% chance",
        t:"궁병 공격 20% 확률로 추가피해 +100%",te:"marksmen: 20% chance of +100% extra damage"},
-      {n:"Children of the Mist",slot:"X",k:"dmg",v:.10,tgt:"marksman",also:{slot:"X",k:"sur",v:.10,tgt:"infantry"},
+      {n:"Children of the Mist",slot:"X",k:"dmg",v:.10,tgt:"marksman",bk:"A",also:{slot:"X",k:"sur",v:.10,tgt:"infantry",bk:"D"},
        t:"궁병 피해량 +10% · 보병 받는 피해 −10%",te:"marksmen deal +10% damage; infantry take −10% damage"}],
  w:{side:"rally",stat:"Lethality",name:"Song of Dawn"}},
 {id:"aisling",kr:"애슐린",en:"Aisling",cls:"marksman",gen:16,rar:"leg",

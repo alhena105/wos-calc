@@ -9,7 +9,7 @@ import {fileURLToPath} from "node:url";
 import {dirname, join} from "node:path";
 import vm from "node:vm";
 import {SHEET_POINTS, QUIET_POINTS, GARRISON_POINTS, GARRISON_QUIET, EXPECTED_COUNTS,
-        JOINER_POINTS, SHEET_JOINERS} from "./fixtures.mjs";
+        JOINER_POINTS, SHEET_JOINERS, X_BUCKETED} from "./fixtures.mjs";
 import {PARTS, bundle} from "../build.mjs";
 import {boot} from "./dom.mjs";
 import {existsSync, readdirSync, statSync} from "node:fs";
@@ -517,6 +517,64 @@ section("조이너 추천 · T12 경고 (렌더)");
     c.leaders("gregory", "", "blanchette").mine([40, 0, 60]);
     c.el("gcap").value = "9";
     ok(!warn(c.render()), "서버 세대가 Gen 9 이하면 T12 경고가 안 뜬다");
+  }
+}
+
+// ── N+3. 병종 한정 "스탯" X 스킬은 칸에 들어간다 (bk) ──────────────────
+section("X 스킬의 칸 귀속 (bk)");
+{
+  // (1) 표시가 픽스처와 정확히 일치하는가 — 픽스처는 wosheroes 원문에서 유도했다
+  const got = [];
+  for (const h of E.HEROES)
+    for (const e of h.exp) {
+      if (e.bk) got.push({id: h.id, n: e.n, bk: e.bk, alsoBk: e.also && e.also.bk});
+      else if (e.also && e.also.bk) got.push({id: h.id, n: e.n, bk: undefined, alsoBk: e.also.bk});
+    }
+  const norm = a => a.map(x => x.id + "/" + x.n + "/" + (x.bk || "-") + "/" + (x.alsoBk || "-")).sort().join(" ");
+  ok(norm(got) === norm(X_BUCKETED), "bk 표시가 X_BUCKETED " + X_BUCKETED.length + "건과 일치",
+     norm(got) === norm(X_BUCKETED) ? "" : "코드 " + norm(got) + " / 픽스처 " + norm(X_BUCKETED));
+
+  // (2) bk 는 X 슬롯에만, 그리고 실재하는 일반 칸을 가리켜야 한다
+  const bad = [];
+  for (const h of E.HEROES)
+    for (const e of h.exp)
+      for (const q of [e, e.also].filter(Boolean)) {
+        if (!q.bk) continue;
+        if ((q.slot || e.slot) !== "X") bad.push(h.id + "/" + e.n + ": bk 인데 X 가 아니다");
+        if (!E.SLOTS[q.bk] || q.bk === "X") bad.push(h.id + "/" + e.n + ": bk=" + q.bk + " 는 없는 칸");
+        if (q.k === "dmg" && E.SLOTS[q.bk].k !== "dmg") bad.push(h.id + "/" + e.n + ": 딜인데 생존 칸");
+        if (q.k === "sur" && E.SLOTS[q.bk].k !== "sur") bad.push(h.id + "/" + e.n + ": 생존인데 딜 칸");
+      }
+  ok(bad.length === 0, "bk 는 X 슬롯에만 붙고 같은 계열의 실재 칸을 가리킨다", bad.slice(0, 3).join(" | "));
+
+  // (3) 리더의 bk 스킬이 칸에 실제로 들어가는가 — 플린트 보병 100% @ 60/40
+  //     보병 딜 지분 = 60*0.3 / (60*0.3 + 40) = 18/58 = 0.3103 → A 에 +0.31
+  {
+    const a = boot("ko").leaders("flint", "", "").mine([60, 40, 0]);
+    const html = a.render();
+    const m = html.match(/피해량 증가[\s\S]{0,400}?class="big">([\d.]+)/);
+    const want = 1 + 1.0 * (60 * E.DW.infantry) / (60 * E.DW.infantry + 40);
+    ok(m && Math.abs(+m[1] - +want.toFixed(2)) < 5e-3,
+       "리더 플린트의 보병 피해량이 A 칸에 지분 환산으로 들어간다",
+       "화면 " + (m && m[1]) + " / 기대 " + want.toFixed(2));
+    ok(/Pyromaniac \+31% \(병종 지분 환산\)/.test(html),
+       "② 구성 칸에 환산됐다는 표시가 남는다");
+  }
+
+  // (4) 조이너의 bk 스킬은 칸에서 잰다 → 포화를 겪는다
+  //     예전에는 1 + v×지분 (=1.310) 으로 혼자 1.00 에서 출발해 상위권에 올라왔다.
+  {
+    const a = boot("ko").leaders("magnus", "sonya", "bradley").mine([60, 40, 0]);
+    a.el("gcap").value = "17";
+    const html = a.render();
+    const sh = (60 * E.DW.infantry) / (60 * E.DW.infantry + 40);
+    const A = +html.match(/피해량 증가[\s\S]{0,400}?class="big">([\d.]+)/)[1];
+    const bucketed = (A + 1.0 * sh) / A, old = 1 + 1.0 * sh;
+    ok(bucketed < old, "칸에서 재면 플린트 배율이 예전보다 낮다",
+       bucketed.toFixed(3) + " < " + old.toFixed(3) + " (A칸 " + A + ")");
+    const rec = html.slice(html.indexOf('id="rec"'));
+    ok(!/heroes\/flint\.webp/.test(rec.slice(0, rec.indexOf("</b>"))),
+       "60/40 리더 팀에서 플린트가 추천 4명에 들지 않는다");
   }
 }
 

@@ -18,6 +18,8 @@ function dmgShare(t,r){
  const p=t==="infantry"?r.inf*DW.infantry:t==="lancer"?r.lan:t==="marksman"?r.mar:
    t==="inf+mar"?r.inf*DW.infantry+r.mar:t==="mar+lan"?r.mar+r.lan:tot;
  return p/tot;}
+// X(병종 한정) 스킬의 환산 지분 — 딜은 딜 지분, 생존은 병력 지분
+function xShare(q,r){return q.k==="sur"?tgtRatio(q.tgt,r)/100:dmgShare(q.tgt,r);}
 const NA_SHARE=.8; // 일반공격이 총딜에서 차지하는 비중 가정
 const tgtName=i18nFill({},function(){return{infantry:L("보병","infantry"),lancer:L("창병","lancers"),marksman:L("궁병","marksmen"),"inf+mar":L("보병+궁병","infantry+marksmen"),"mar+lan":L("궁병+창병","marksmen+lancers")};});
 function tgtStat(t,r){const v=tgtRatio(t,r);return v<5?["dead",L("사망","dead"),v]:v<20?["weak",L("약함","weak"),v]:["ok",L("정상","ok"),v];}
@@ -124,13 +126,18 @@ function calc(){
  ORDER.forEach(s=>{buck[s]=1;src[s]=[];});
  leaders.forEach(({hero})=>hero.exp.forEach(e=>{
    if(e.slot==="ECO")return;
-   // X 는 칸(buck)에 안 들어가고 병종 전용 판정으로 빠진다.
+   const add=(sl,val,note)=>{if(buck[sl]===undefined)return;buck[sl]+=val;
+     src[sl].push(HN(hero)+" "+e.n+" +"+(val*100).toFixed(0)+"%"+(note||""));};
+   // X 는 병종 전용 판정(cls)으로 빠진다.
    // 한 스킬이 두 병종에 다르게 걸리면(예: 보병 받피↓ + 창병 딜↑) also 로 둘 다 단다.
+   // 다만 bk 가 붙은 것은 원문이 "Damage Dealt / Damage Taken" 스탯이라 일반 칸과 같은 스탯이다 →
+   // 병종 지분으로 환산해 그 칸에도 합산한다. 칸을 우회하면 그 스킬만 포화를 안 겪는다.
    if(e.slot==="X"){const[st,lbl,v]=tgtStat(e.tgt,r);cls.push({hero,e,st,lbl,v});
      if(e.also&&e.also.slot==="X"){const[st2,lbl2,v2]=tgtStat(e.also.tgt,r);
        cls.push({hero,e:Object.assign({},e,e.also),st:st2,lbl:lbl2,v:v2});}
+     const bk=q=>{if(q.bk)add(q.bk,q.v*xShare(q,r),L(" (병종 지분 환산)"," (class share)"));};
+     bk(e); if(e.also&&e.also.slot==="X")bk(e.also);
      return;}
-   const add=(sl,val)=>{if(buck[sl]===undefined)return;buck[sl]+=val;src[sl].push(HN(hero)+" "+e.n+" +"+(val*100).toFixed(0)+"%");};
    add(e.slot,e.v); if(e.also)add(e.also.slot,e.also.v);
  }));
 
@@ -151,9 +158,12 @@ function calc(){
    if(e.slot==="X"){const[st,lbl,v]=tgtStat(e.tgt,r);cond=st+"|"+tgtName[e.tgt]+" "+v.toFixed(0)+"% ("+lbl+")";
      if(st==="dead")return{h,e,mul:1,detail:[L("병종 비중 부족 → 사망","class share too low → dead")],cond,dup:lid.has(h.id)};
      // 한 스킬이 두 병종에 걸리면 각각 지분을 곱한다 — 서로 다른 축이라 곱연산이다
-     const part=x=>{const sh=x.k==="sur"?tgtRatio(x.tgt,r)/100:dmgShare(x.tgt,r);
+     const part=x=>{const sh=xShare(x,r);
        detail.push(L(tgtName[x.tgt]+" "+(x.k==="sur"?"병력":"딜")+" 지분 "+(sh*100).toFixed(0)+"% 환산",
                      tgtName[x.tgt]+" "+(x.k==="sur"?"headcount":"damage")+" share "+(sh*100).toFixed(0)+"%"));
+       // bk 가 있으면 같은 스탯이라 칸에서 잰다 — 안 그러면 이 스킬만 1.00 에서 출발해 부풀려진다
+       if(x.bk&&buck[x.bk]!==undefined){const b=buck[x.bk],m=(b+x.v*sh)/b;
+         detail.push(x.bk+" "+b.toFixed(2)+"→"+(b+x.v*sh).toFixed(2)+" ×"+m.toFixed(3));return m;}
        return 1+x.v*sh;};
      mul=part(e); if(e.also&&e.also.slot==="X")mul*=part(e.also);
    }else if(e.slot==="An"){

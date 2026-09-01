@@ -91,3 +91,38 @@ export const SHEET_JOINERS = [
   "bahiti","gatot","hendrik","jasser","jeronimo","jessie","lingxue","lumak","lynn",
   "mia","norah","patrick","philly","reina","renee","seoyoon","sergey","wuming","zinman",
 ];
+
+// ── 병종 한정이지만 "스탯"인 X 스킬 (bk) ────────────────────────────────
+//
+// wosheroes 원문이 "Damage Dealt / Damage Taken" 을 올린다(내린다)고 적은 것만 담는다.
+// 이런 스킬은 일반 칸과 **같은 스탯**이라 칸을 우회하면 그것만 포화를 안 겪는다
+// (플린트가 리더 A칸 1.60 을 무시하고 1.00 에서 재어 3위로 올라오던 문제).
+// "extra damage / 추가피해" 처럼 타격에 붙는 것은 다른 기전이라 여기 없다.
+//
+// 원문 확인 (2026-09-01, https://wosheroes.com/heroes/<슬러그>):
+//   flint  Pyromaniac           "increases his Infantry's Damage Dealt by 20-100%"
+//   ahmose Prayer of Flame      "increasing their damage dealt by 20-100%" (Infantry)
+//   hector Rampant              "increasing Infantry's Damage Dealt ... and Marksmen's Damage Dealt"
+//   norah  Combined Arms        "decreasing Damage Taken ... and boosting Damage Dealt ... for Infantry and Marksman"
+//   xura   Unorthodoxy          "increasing Marksmen's damage dealt by 2-10% while reducing their damage taken by 3-15%"
+//   freya  Night's Vengeance    "decreasing damage taken ... and increasing damage dealt ... for her Infantries and Marksmen"
+//   dominic Mirror Maze         "reducing damage taken by Infantry and Marksmen ... and increasing their damage dealt"
+//   estrella Splendid Scene     "reducing the damage taken by Infantry ... increasing the damage dealt by Lancers"
+//   viveca Children of the Mist "reducing damage taken by allied Infantry ... increasing damage dealt by allied Marksmen"
+//   gordon Chemical Terror      "increasing Lancers' Damage Dealt by 30-150% ... every 3 turns" (v 는 3턴 환산)
+//
+// 일부러 뺀 것: renee Dreamcatcher. 원문은 "increasing her Lancers' damage dealt to marked
+// targets" 로 분명 스탯이지만, **표식 유지율을 아직 환산하지 않아** v 가 원값(1.5)이다.
+// 환산 안 된 값을 칸에 넣으면 오히려 더 부풀려진다 → 환산부터 하고 붙일 것.
+export const X_BUCKETED = [
+  {id:"flint",    n:"Pyromaniac",           bk:"A"},
+  {id:"ahmose",   n:"Prayer of Flame",      bk:"A"},
+  {id:"hector",   n:"Rampant",              bk:"A", alsoBk:"A"},
+  {id:"norah",    n:"Combined Arms",        bk:"A", alsoBk:"D"},
+  {id:"xura",     n:"Unorthodoxy",          bk:"A", alsoBk:"D"},
+  {id:"freya",    n:"Night's Vengeance",    bk:"A", alsoBk:"D"},
+  {id:"dominic",  n:"Mirror Maze",          bk:"D", alsoBk:"A"},
+  {id:"estrella", n:"Splendid Scene",       bk:"A", alsoBk:"D"},
+  {id:"viveca",   n:"Children of the Mist", bk:"A", alsoBk:"D"},
+  {id:"gordon",   n:"Chemical Terror",      bk:"A"},
+];
