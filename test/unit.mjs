@@ -8,7 +8,8 @@ import {readFileSync} from "node:fs";
 import {fileURLToPath} from "node:url";
 import {dirname, join} from "node:path";
 import vm from "node:vm";
-import {SHEET_POINTS, QUIET_POINTS, GARRISON_POINTS, GARRISON_QUIET, EXPECTED_COUNTS} from "./fixtures.mjs";
+import {SHEET_POINTS, QUIET_POINTS, GARRISON_POINTS, GARRISON_QUIET, EXPECTED_COUNTS,
+        JOINER_POINTS, SHEET_JOINERS} from "./fixtures.mjs";
 import {PARTS, bundle} from "../build.mjs";
 import {boot} from "./dom.mjs";
 import {existsSync, readdirSync, statSync} from "node:fs";
@@ -422,6 +423,101 @@ section("초상 픽커");
   const left = [...new Set((enHtml.match(/[가-힣][가-힣 ·]*/g) || []))].slice(0, 3);
   ok(!/[가-힣]/.test(enHtml), "언어를 바꾸면 픽커 이름도 영어가 된다", left.join(" | "));
   ok(/Jeronimo/.test(a.el("sInf").innerHTML), "요약도 같이 바뀐다", a.el("sInf").innerHTML.slice(0, 60));
+}
+
+// ── N. 조이너 스택 규칙 (Ton 시트 Rally Joiners 탭) ────────────────────
+section("조이너 스택 규칙");
+{
+  // 시트가 적은 규칙 그대로 계산한다 — 같은 칸은 합, 다른 칸은 곱.
+  // 리더가 없으므로 모든 칸이 1 에서 출발한다.
+  const combo = ids => {
+    const b = {};
+    E.ORDER.forEach(sl => { b[sl] = 1; });
+    for (const id of ids) {
+      const e = E.byId[id].exp[0];
+      b[e.slot] += e.v;
+      if (e.also && b[e.also.slot] !== undefined) b[e.also.slot] += e.also.v;
+    }
+    return E.ORDER.filter(sl => E.SLOTS[sl].k === "dmg").reduce((a, sl) => a * b[sl], 1);
+  };
+  for (const p of JOINER_POINTS) {
+    const got = combo(p.ids);
+    ok(Math.abs(got - p.mul) < 1e-9,
+       "시트 조이너 표: " + p.ids.map(i => E.byId[i].kr).join("+") + " = " + p.mul,
+       "우리 " + got.toFixed(4) + " / 시트 " + p.mul + " — " + p.why);
+  }
+  // 예전 방식(각자의 한계 배율을 그냥 곱하기)이 왜 틀렸는지도 같이 박아 둔다.
+  const naive = JOINER_POINTS[0].ids.reduce(a => a * 1.25, 1);
+  ok(Math.abs(naive - 2.4414) < 1e-3 && naive > JOINER_POINTS[0].mul,
+     "단독 배율을 곱하면 시트보다 부풀려진다 (4×제시 1.25⁴ vs 2.0)",
+     naive.toFixed(4) + " vs " + JOINER_POINTS[0].mul);
+}
+
+// ── N+1. 시트 조이너 명단(s:1) ─────────────────────────────────────────
+section("시트 조이너 명단");
+{
+  const got = E.HEROES.filter(h => h.s).map(h => h.id).sort();
+  const want = [...SHEET_JOINERS].sort();
+  const miss = want.filter(x => !got.includes(x)), extra = got.filter(x => !want.includes(x));
+  ok(miss.length === 0 && extra.length === 0,
+     "s:1 이 시트 조이너 칸 " + want.length + "명과 정확히 일치",
+     (miss.length ? "빠짐: " + miss.join(",") : "") + (extra.length ? " 잉여: " + extra.join(",") : ""));
+  // 조이너 명단은 Gen 8 이하 그대로다 — Gen 10+ 탭이 늘린 것은 리더뿐이다.
+  ok(E.HEROES.filter(h => h.s).every(h => h.gen <= 8),
+     "시트 조이너는 전부 Gen 8 이하",
+     E.HEROES.filter(h => h.s && h.gen > 8).map(h => h.id).join(","));
+}
+
+// ── N+2. 렌더: 추천 4명 배율과 T12 경고 ────────────────────────────────
+section("조이너 추천 · T12 경고 (렌더)");
+{
+  const a = boot("ko");
+  a.leaders("eleonora", "mia", "rufus").mine([48, 4, 48]);
+  a.el("gcap").value = "17";
+  const html = a.render();
+  const st = html.indexOf('id="rec"');
+  const ids = [...html.slice(st, html.indexOf("</b>", st)).matchAll(/img\/heroes\/([a-z-]+)\.webp/g)].map(m => m[1]);
+  const shown = +(html.slice(st, st + 1400).match(/배율 ×([\d.]+)/) || [0, 0])[1];
+
+  // 화면 값이 "칸에 다 넣고 다시 잰 값" 과 같은가
+  const base = {};
+  E.ORDER.forEach(sl => { base[sl] = 1; });
+  for (const lid of ["eleonora", "mia", "rufus"])
+    for (const e of E.byId[lid].exp) {
+      if (e.slot === "ECO" || e.slot === "X") continue;
+      if (base[e.slot] !== undefined) base[e.slot] += e.v;
+      if (e.also && base[e.also.slot] !== undefined) base[e.also.slot] += e.also.v;
+    }
+  const b = Object.assign({}, base);
+  let cond = 1;
+  for (const id of ids) {
+    const e = E.byId[id].exp[0];
+    if (e.slot === "X") continue;
+    if (e.slot === "An") { cond *= 1 + e.v * E.NA_SHARE; continue; }
+    if (b[e.slot] !== undefined) b[e.slot] += e.v;
+    if (e.also && b[e.also.slot] !== undefined) b[e.also.slot] += e.also.v;
+  }
+  const want = E.ORDER.filter(sl => E.SLOTS[sl].k === "dmg")
+    .reduce((x, sl) => x * (b[sl] / base[sl]), 1) * cond;
+  ok(ids.length === 4, "추천 4명이 네 명이다", ids.join(","));
+  ok(Math.abs(shown - +want.toFixed(3)) < 5e-4,
+     "화면의 추천 4명 딜 배율이 칸 재계산과 일치",
+     "화면 " + shown + " / 칸 " + want.toFixed(3) + " · " + ids.join(","));
+  ok(/같은 칸에 겹치는 분을 합쳤을 때/.test(html),
+     "단독 배율을 곱한 값이 아니라는 설명이 붙어 있다");
+
+  // T12 창병 경고 — 시트 "Gen 10+" 탭의 T12 CHANGES 줄
+  const warn = t => /창병 T12 스킬 미발동/.test(t);
+  ok(warn(boot("ko").leaders("gregory", "", "blanchette").mine([40, 0, 60]).render()),
+     "Gen 10+ 서버에서 창병 0 이면 T12 경고가 뜬다");
+  ok(!warn(boot("ko").leaders("gregory", "mia", "blanchette").mine([48, 4, 48]).render()),
+     "창병이 있으면 T12 경고가 안 뜬다");
+  {
+    const c = boot("ko");
+    c.leaders("gregory", "", "blanchette").mine([40, 0, 60]);
+    c.el("gcap").value = "9";
+    ok(!warn(c.render()), "서버 세대가 Gen 9 이하면 T12 경고가 안 뜬다");
+  }
 }
 
 // ── 결과 ───────────────────────────────────────────────────────────────

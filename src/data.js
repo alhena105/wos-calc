@@ -3,6 +3,11 @@
 // slot 코드: A=피해량↑ An=일반공격피해↑ B=공격력↑ C=체력↑ D=받는피해↓ DEF=방어력↑
 //            E=파괴력↑ F=적방어↓ G=적받는피해↑ H=적공격↓ I=적파괴력↓ J=적피해량↓
 //            DODGE=회피 CRIT=치명률 X=병종한정/주기형 ECO=비전투
+// s:1 = Ton 시트의 **조이너 명단**에 오른 영웅 (19명). 리더로만 나오는 영웅은 붙이지 않는다 —
+//       이 플래그를 쓰는 곳이 ⑤ 의 "시트 등재 영웅만" 조이너 추천 하나뿐이기 때문이다.
+//       2026-09-01 갱신(시트 Gen 10+ 탭 신설): 범례의 "Sergey = Bahiti, Lumak Bokan" 과
+//       Gen 1 행 대체 조이너 Ling Xue 를 반영해 룸 보겐·료우키를 넣고,
+//       시트에 리더로만 나오는 몰리·알론소·그렉을 뺐다. 조이너 명단 자체는 Gen 8 이하 그대로다.
 const HEROES = [
 // ── Epic (원정스킬 2개, 전용무기 없음) ──
 {id:"jessie",s:1,kr:"제시",en:"Jessie",cls:"lancer",gen:0,rar:"epic",
@@ -23,13 +28,13 @@ const HEROES = [
 {id:"bahiti",s:1,kr:"바히티",en:"Bahiti",cls:"marksman",gen:0,rar:"epic",
  exp:[{n:"Sixth Sense",slot:"D",v:.20,t:"전 부대 받는 피해 −20%",te:"all troops damage taken −20%"},
       {n:"Fluorescence",slot:"A",v:.25,p:"50%",pe:"50% chance",t:"50% 확률 피해량 +50%",te:"50% chance: damage +50%"}],w:null},
-{id:"lumak",kr:"룸 보겐",en:"Lumak Bokan",cls:"lancer",gen:0,rar:"epic",
+{id:"lumak",s:1,kr:"룸 보겐",en:"Lumak Bokan",cls:"lancer",gen:0,rar:"epic",
  exp:[{n:"Tactical Deception",slot:"J",v:.20,t:"적 전 부대 피해량 −20%",te:"all enemy troops damage −20%"},
       {n:"Emerald Warrior",slot:"ECO",v:0,t:"사냥 행군 속도 +100%",te:"hunting march speed +100%"}],w:null},
 {id:"gina",kr:"지나",en:"Gina",cls:"marksman",gen:0,rar:"epic",
  exp:[{n:"Endurance Training",slot:"ECO",v:0,t:"체력 소모 −20%",te:"stamina cost −20%"},
       {n:"Quick Paced",slot:"ECO",v:0,t:"사냥 행군 속도 +100%",te:"hunting march speed +100%"}],w:null},
-{id:"lingxue",kr:"료우키",en:"Ling Xue",cls:"lancer",gen:0,rar:"epic",
+{id:"lingxue",s:1,kr:"료우키",en:"Ling Xue",cls:"lancer",gen:0,rar:"epic",
  exp:[{n:"Fearsome Aura",slot:"H",v:.20,t:"적 전 부대 공격력 −20%",te:"all enemy troops attack −20%"},
       {n:"Total Control",slot:"ECO",v:0,t:"훈련 속도 +20%",te:"training speed +20%"}],w:null},
 // ── Gen 1 ──
@@ -43,7 +48,7 @@ const HEROES = [
       {n:"Queen of the Wild",slot:"B",v:.25,t:"전 부대 공격력 +25%",te:"all troops attack +25%"},
       {n:"Call of the Wild",slot:"A",v:.25,t:"전 부대 피해량 +25%",te:"all troops damage +25%"}],
  w:{side:"rally",stat:"Lethality",name:"Invincibles"}},
-{id:"molly",s:1,kr:"몰리",en:"Molly",cls:"lancer",gen:1,rar:"leg",
+{id:"molly",kr:"몰리",en:"Molly",cls:"lancer",gen:1,rar:"leg",
  exp:[{n:"Snow's Grace",slot:"D",v:.20,p:"40%",pe:"40% chance",t:"40% 확률 받는 피해 −50%",te:"40% chance: damage taken −50%"},
       {n:"Ice Dominion",slot:"A",v:.25,p:"50%",pe:"50% chance",t:"50% 확률 피해량 +50%",te:"50% chance: damage +50%"},
       {n:"Youthful Rage",slot:"A",v:.25,t:"전 부대 피해량 +25%",te:"all troops damage +25%"}],
@@ -64,7 +69,7 @@ const HEROES = [
       {n:"Dosage Boost",slot:"A",v:.50,p:"25%",pe:"25% chance",t:"25% 확률 200% 피해",te:"25% chance: 200% damage"},
       {n:"Energizing Shot",slot:"D",v:.20,p:"40%",pe:"40% chance",t:"40% 확률 받는 피해 −50%",te:"40% chance: damage taken −50%"}],
  w:{side:"defender",stat:"Health",name:"First Aid Training"}},
-{id:"alonso",s:1,kr:"알론소",en:"Alonso",cls:"marksman",gen:2,rar:"leg",
+{id:"alonso",kr:"알론소",en:"Alonso",cls:"marksman",gen:2,rar:"leg",
  exp:[{n:"Onslaught",slot:"E",v:.20,p:"40%",pe:"40% chance",t:"40% 확률 파괴력 +50%",te:"40% chance: lethality +50%"},
       {n:"Iron Strength",slot:"J",v:.10,p:"20%",pe:"20% chance",t:"20% 확률 적 피해량 −50%",te:"20% chance: enemy damage −50%"},
       {n:"Poison Harpoon",slot:"A",v:.25,p:"50%",pe:"50% chance",t:"50% 확률 추가피해 +50%",te:"50% chance: +50% extra damage"}],
@@ -80,7 +85,7 @@ const HEROES = [
       {n:"Lucky Charm",slot:"A",v:.25,p:"50%",pe:"50% chance",t:"50% 확률 피해량 +50%",te:"50% chance: damage +50%"},
       {n:"Ritual Deciphering",slot:"D",v:.20,p:"40%",pe:"40% chance",t:"40% 확률 받는 피해 −50%",te:"40% chance: damage taken −50%"}],
  w:{side:"rally",stat:"Attack",name:"Rally of Fate"}},
-{id:"greg",s:1,kr:"그렉",en:"Greg",cls:"marksman",gen:3,rar:"leg",
+{id:"greg",kr:"그렉",en:"Greg",cls:"marksman",gen:3,rar:"leg",
  exp:[{n:"Sword of Justice",slot:"A",v:.08,p:"20%",pe:"20% chance",t:"20% 확률 피해량 +40%(3턴)",te:"20% chance: damage +40% (3 turns)"},
       {n:"Deterrence of Law",slot:"J",v:.10,p:"20%",pe:"20% chance",t:"20% 확률 적 피해량 −50%",te:"20% chance: enemy damage −50%"},
       {n:"Law and Order",slot:"C",v:.25,t:"전 부대 체력 +25%",te:"all troops health +25%"}],

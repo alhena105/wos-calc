@@ -22,6 +22,17 @@ function render(d){
   o+='<tr><td class="b">'+c+'</td><td class="b"><span class="hrow">'+hpic(p.hero,"lg")+"<span>"+esc(HN(p.hero))+"</span></span>"+'<div class="note">'+(LANG==="en"?"":esc(p.hero.en)+" · ")+"Gen "+p.hero.gen+"</div></td><td>"+sk+"</td><td>Lv."+p.wl+"</td></tr>";});
  o+="</tbody></table></div>";
 
+ // Gen 10+ 서버에서 창병이 0 면 창병 T12 가 아예 안 켜진다.
+ // 근거는 Ton 시트 "Gen 10+" 탭 머리의 T12 CHANGES 줄 하나다 — 임계값을
+ // 지어내지 않고 "창병이 0 인가" 만 본다. 시트의 48/4/48 · 40/2/58 · 50/2/48 이
+ // 창병을 조금씩 끼워 둔 이유가 이것이다.
+ if(gcap>=10&&r.lan===0&&r.inf+r.mar>0)
+  o+='<div class="callout co-warn"><h3>'+L("⚠️ 창병 0 — 창병 T12 스킬 미발동","⚠️ No lancers — lancer T12 skills never fire")+'</h3><p>'+
+   L("Gen 10 이상 서버에서는 궁병 위주 편성이라도 <b>창병을 조금은 반드시 넣으라</b>고 시트가 적어 두었습니다. 시트의 궁병 편성이 <b>48/4/48 · 40/2/58 · 50/2/48</b> 처럼 창병을 조금씩 끼우는 이유가 이것입니다.",
+     "From Gen 10 on, the sheet says to keep <b>at least a sliver of lancers</b> even in marksman comps. That is why its marksman ratios read <b>48/4/48, 40/2/58, 50/2/48</b> rather than dropping lancers entirely.")+
+   '</p><p class="cap">'+L("근거: Ton 시트 “Gen 10+” 탭 — T12 CHANGES. 서버 최대 세대를 Gen 9 이하로 내리면 이 경고는 사라집니다.",
+     "Source: the Ton sheet, “Gen 10+” tab, T12 CHANGES. Set the server generation cap to 9 or below and this warning goes away.")+"</p></div>";
+
  // 칸 진단
  o+='<h2>'+L("② SkillMod 칸 진단","② SkillMod slot diagnosis")+' <span>'+L("포화도","saturation")+'</span></h2><div class="panel"><table><thead><tr><th>'+L("칸","Slot")+'</th><th>'+L("이름","Name")+'</th><th>'+L("값","Value")+'</th><th>'+L("포화","Saturation")+'</th><th>'+L("구성","Sources")+'</th></tr></thead><tbody>';
  const used=ORDER.filter(s=>buck[s]>1);
@@ -88,9 +99,23 @@ function render(d){
  o+="</tbody></table>";
  const top=rank.filter(x=>!x.dup&&x.mul>1.001).slice(0,4);
  const tSheet=rank.filter(x=>!x.dup&&x.mul>1.001&&x.h.s).slice(0,4);
+ // 네 명을 한 칸 묶음에 다 넣고 최종 칸으로 계산한다.
+ // 각자의 한계 배율을 그냥 곱하면 같은 칸에 겹칠 때의 포화를 놓친다 —
+ // Ton 시트 Rally Joiners 탭이 4×제시를 1.25⁴=2.441 이 아니라 2.0 으로 적어 둔다.
+ // X(병종 한정)는 칸이 아니라 조건부라 예전처럼 딜 배율에서 뺀다.
+ const comboDmg=list=>{
+  const b=Object.assign({},buck);let x=1;
+  list.forEach(q=>{
+   if(q.e.slot==="X")return;
+   if(q.e.slot==="An"){x*=q.mul;return;}
+   const put=(sl,v)=>{if(b[sl]!==undefined)b[sl]+=v;};
+   put(q.e.slot,q.e.v);if(q.e.also)put(q.e.also.slot,q.e.also.v);});
+  return ORDER.filter(sl=>SLOTS[sl].k==="dmg").reduce((a,sl)=>a*(b[sl]/buck[sl]),1)*x;};
  o+='<div class="callout co-key" id="rec"><h3>'+L("⭐ 추천 조이너 4명","⭐ Recommended four joiners")+'</h3><p><b>'+top.map(x=>hpic(x.h,"sm")+esc(HN(x.h))).join(" · ")+
-  '</b></p><p class="cap">'+L("딜 배율 ×","Damage multiplier ×")+top.filter(x=>x.e.slot!=="X"&&SLOTS[x.e.slot]&&SLOTS[x.e.slot].k==="dmg").reduce((a,x)=>a*x.mul,1).toFixed(3)+
+  '</b></p><p class="cap">'+L("딜 배율 ×","Damage multiplier ×")+comboDmg(top).toFixed(3)+
   L(" · 리더와 겹치는 영웅은 자동 제외했습니다."," · heroes already used as leaders are excluded automatically.")+"</p>"+
+  '<p class="cap">'+L("위 배율은 네 명의 단독 배율을 곱한 값이 아니라 <b>같은 칸에 겹치는 분을 합쳤을 때</b>의 값입니다. 순위표의 배율을 넣는 순서대로 곱하면 더 크게 나오는데, 그건 포화를 빼먹은 숫자입니다.",
+     "This multiplier is not the product of the four individual figures — it is what you get after <b>adding up the parts that land in the same slot</b>. Multiplying the ranking figures together gives a larger number that ignores saturation.")+"</p>"+
   (rank.filter(x=>x.dup).length?'<p class="cap">'+L("🚫 리더 중복 금지: ","🚫 Cannot double as joiners: ")+rank.filter(x=>x.dup).map(x=>esc(HN(x.h))).join(" · ")+"</p>":"")+"</div>"+
   (top.map(x=>x.h.id).join()!==tSheet.map(x=>x.h.id).join()?
    '<div class="callout co-tip"><h3>'+L("📋 Ton 시트 등재 영웅만","📋 Sheet-listed heroes only")+'</h3><p><b>'+tSheet.map(x=>hpic(x.h,"sm")+esc(HN(x.h))).join(" · ")+

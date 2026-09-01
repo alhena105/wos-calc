@@ -66,3 +66,28 @@ export const GARRISON_QUIET = [
 // 코드의 COUNTERS 시트 행에서 센 값이 가이드 표와 맞는지 교차 검증한다.
 // labels 는 가이드의 카운터 칸 항목 수(7), counters 는 그중 벡터가 있는 것(6).
 export const EXPECTED_COUNTS = {rows:5, labels:7, counters:6, bans:5, total:11};
+
+// ── Ton 시트 "Rally Joiners" 탭 (2026-09-01 신설) ────────────────────────
+//
+// 시트가 조이너 스택 규칙을 처음으로 숫자로 적었다:
+//   같은 스킬끼리는 합연산(+), 다른 스킬끼리는 곱연산(×).
+// 아래는 그 탭의 "리더와 겹치지 않는" 네 행을 그대로 옮긴 것이다. 리더 중복이 있는
+// 블록(제로니모 리더 등)은 시트가 리더의 스킬 3개 중 2개만 세는 단순화라 픽스처로 쓰지 않는다.
+//
+// 조이너는 S1(첫 원정스킬)만 기여한다 — 시트도 같은 전제로 계산한다.
+// mul 은 딜 계열 칸만 곱한 값이고, 리더가 없으므로 모든 칸이 1에서 출발한다.
+export const JOINER_POINTS = [
+  {ids:["jessie","jessie","jessie","jessie"],   mul:2.0,    why:"4×제시 — 전부 A 칸이라 합연산. 1.25⁴=2.441 이 아니다"},
+  {ids:["jessie","jessie","jasser","jasser"],   mul:2.0,    why:"제시와 제셀은 다른 영웅이지만 같은 A 칸이라 4×제시와 같다"},
+  {ids:["jessie","jessie","seoyoon","seoyoon"], mul:2.25,   why:"A 두 명 + B 두 명 — 칸이 갈리면 곱연산이라 더 크다"},
+  {ids:["jessie","jeronimo","jasser","seoyoon"],mul:2.1875, why:"A 세 명 + B 한 명"},
+];
+
+// 시트의 조이너 칸(대체 포함)에 실제로 이름이 오르는 영웅 = data.js 의 s:1.
+// 범례 "*Jessie = Jessie, Jasser or Jeronimo" 와 "**Sergey = Bahiti, Lumak Bokan" 을 펼친 결과다.
+// 리더로만 나오는 영웅(몰리·알론소·그렉 등)은 여기 없다 — 이 플래그를 쓰는 곳이
+// ⑤ 의 "시트 등재 영웅만" 조이너 추천 하나뿐이기 때문이다.
+export const SHEET_JOINERS = [
+  "bahiti","gatot","hendrik","jasser","jeronimo","jessie","lingxue","lumak","lynn",
+  "mia","norah","patrick","philly","reina","renee","seoyoon","sergey","wuming","zinman",
+];
