@@ -9,7 +9,7 @@ import {fileURLToPath} from "node:url";
 import {dirname, join} from "node:path";
 import vm from "node:vm";
 import {SHEET_POINTS, QUIET_POINTS, GARRISON_POINTS, GARRISON_QUIET, EXPECTED_COUNTS,
-        JOINER_POINTS, SHEET_JOINERS, X_BUCKETED, SHEET_ROWS} from "./fixtures.mjs";
+        JOINER_POINTS, JOINER_DUP_POINTS, SHEET_JOINERS, X_BUCKETED, SHEET_ROWS} from "./fixtures.mjs";
 import {PARTS, bundle} from "../build.mjs";
 import {boot} from "./dom.mjs";
 import {existsSync, readdirSync, statSync} from "node:fs";
@@ -453,6 +453,37 @@ section("조이너 스택 규칙");
      naive.toFixed(4) + " vs " + JOINER_POINTS[0].mul);
 }
 
+// ── N+0b. 리더가 칸을 채운 상태의 조이너 포화 (같은 탭 12행) ─────────────
+section("조이너 포화 — 리더 중복 (시트 12행)");
+{
+  // 시트가 리더 기준값(a0·b0)에서 다시 계산해 둔 블록이다. 우리 칸 규칙이 같은 값을 내는지,
+  // 그리고 **한계 배율**(= total / 기준값 곱)이 맞는지 둘 다 본다.
+  // 리더 파싱은 쓰지 않는다 — 시트가 리더 스킬 3개 중 납작한 둘만 세기 때문이다(fixtures 주석).
+  const V = 0.25;
+  for (const p of JOINER_DUP_POINTS) {
+    const a = p.a0 + V * p.nA, b = p.b0 + V * p.nB, total = a * b;
+    ok(Math.abs(total - p.total) < 1e-9,
+       "시트 중복 표: " + p.lead + " 리더 · A" + p.nA + "/B" + p.nB + " = " + p.total,
+       "우리 " + total.toFixed(4) + " / 시트 " + p.total + " — " + p.why);
+    ok(Math.abs((total - 1) * 100 - p.boost) < 1e-6,
+       "시트의 Damage boost % 가 total−1 이다 (" + p.lead + " A" + p.nA + "/B" + p.nB + ")",
+       ((total - 1) * 100).toFixed(2) + "% / 시트 " + p.boost + "%");
+    // 한계 배율 = 리더 기준값에 대한 비. 엔진의 comboAll 이 내는 값이 이것이다.
+    const marg = total / (p.a0 * p.b0);
+    ok(marg > 1 && marg <= 2.26, "한계 배율이 1 과 2.26 사이다 (" + p.lead + ")", marg.toFixed(4));
+  }
+  // 이 블록의 요점: 리더가 채운 칸에 몰아넣으면 손해다.
+  const g = (lead, nA, nB) => JOINER_DUP_POINTS.find(x => x.lead === lead && x.nA === nA && x.nB === nB);
+  ok(g("제로니모", 2, 2).total > g("제로니모", 4, 0).total,
+     "제로니모 리더에서 2:2 가 4:0 보다 크다 (칸을 쪼개는 쪽이 이긴다)",
+     g("제로니모", 2, 2).total + " vs " + g("제로니모", 4, 0).total);
+  // 단, 어느 칸이 비었는지에 따라 최적 배분이 달라진다 — 시트가 세 리더로 그걸 보여준다.
+  ok(g("마그누스+브레들리", 3, 1).total > g("마그누스+브레들리", 2, 2).total,
+     "A칸이 빈 리더에서는 3:1 이 2:2 보다 크다 (최적 배분은 고정이 아니다)",
+     g("마그누스+브레들리", 3, 1).total + " vs " + g("마그누스+브레들리", 2, 2).total);
+  note("시트 12행 전부 일치 — 리더가 채운 칸에 겹치면 깎인다는 우리 모델의 주장을 시트가 숫자로 적었다");
+}
+
 // ── N+1. 시트 조이너 명단(s:1) ─────────────────────────────────────────
 section("시트 조이너 명단");
 {
@@ -496,6 +527,8 @@ section("조이너 추천 · T12 경고 (렌더)");
     const e = E.byId[id].exp[0];
     if (e.slot === "X") continue;                       // 아래에서 화면 배율로 곱한다
     if (e.slot === "An") { cond *= 1 + e.v * E.NA_SHARE; continue; }
+    // AH(타격 계열)는 칸이 아니다 — 합연산에 들어가지 않고 자기 계수로 곱한다
+    if (e.slot === "AH") { cond *= 1 + e.v; continue; }
     if (b[e.slot] !== undefined) b[e.slot] += e.v;
     if (e.also && b[e.also.slot] !== undefined) b[e.also.slot] += e.also.v;
   }
@@ -676,26 +709,35 @@ section("시트 행 대조 (조이너 순위)");
 {
   // 목적은 만점이 아니다 — 시트는 최적해가 아니라 보유 가능 목록이다(fixtures.mjs 주석 참고).
   // 모델을 건드렸을 때 시트와의 일치가 무너지지 않는지 보는 **하한선**이다.
-  const top4 = row => {
+  //
+  // ⚠️ ⑤ 순위표를 긁지 말 것. 순위표는 **리더 중복 영웅까지 그대로 싣는다**(x.dup 행) —
+  // 실제 추천은 그걸 빼고 고르는데 검사가 안 빼서 2026-09-12 까지 재현율이 낮게 찍혔다
+  // (49행 기준 73.5% 로 나왔는데 추천 패널로 재면 같은 엔진이 81.5% 였다).
+  // 화면에서 사람이 읽는 것도 추천 패널이므로 거기를 본다.
+  const recOf = row => {
     const a = boot("ko").leaders(row.lead[0] || "", row.lead[1] || "", row.lead[2] || "").mine(row.r);
     a.el("gcap").value = String(row.gen);
     const html = a.render();
-    return [...html.matchAll(/<td>\d+<\/td><td class="b"><span class="hrow">[\s\S]*?heroes\/([a-z-]+)\.webp/g)]
-      .map(m => m[1]).slice(0, 4);
+    const after = html.slice(html.indexOf('id="rec"'));
+    const b = /<p><b>([\s\S]*?)<\/b><\/p>/.exec(after);
+    return b ? [...b[1].matchAll(/heroes\/([a-z-]+)\.webp/g)].map(m => m[1]) : [];
   };
-  let first = 0, any = 0, tot = 0;
+  let first = 0, anyP = 0, totP = 0, anyA = 0, totA = 0;
   const missed = [];
   for (const row of SHEET_ROWS) {
-    const got = top4(row);
-    if (row.top.some(x => got.includes(x))) first++; else missed.push(row.lead[0] + "/" + row.r.join("/"));
-    for (const j of row.all) { tot++; if (got.includes(j)) any++; }
+    const got = recOf(row);
+    ok(got.length === 4, "추천 4명이 네 명이다 — G" + row.gen + " " + row.r.join("/"), got.join(","));
+    if (row.top.some(x => got.includes(x))) first++; else missed.push("G" + row.gen + " " + row.r.join("/"));
+    for (const j of row.pri) { totP++; if (got.includes(j)) anyP++; }
+    for (const j of row.all) { totA++; if (got.includes(j)) anyA++; }
   }
-  const fp = first / SHEET_ROWS.length * 100, ap = any / tot * 100;
-  note("시트 #1 조이너가 우리 상위 4에 든 행 " + first + "/" + SHEET_ROWS.length +
-       " (" + fp.toFixed(1) + "%) · 조이너 전체 겹침 " + any + "/" + tot + " (" + ap.toFixed(1) + "%)");
-  // 하한선은 실측(76.9% / 53.6%)에서 여유를 두고 잡았다. 떨어지면 모델이 시트에서 멀어진 것이다.
-  ok(fp >= 70, "시트 #1 조이너 재현이 70% 이상", fp.toFixed(1) + "% · 놓친 행: " + missed.slice(0, 3).join(", "));
-  ok(ap >= 45, "시트 조이너 전체 겹침이 45% 이상", ap.toFixed(1) + "%");
+  const fp = first / SHEET_ROWS.length * 100, pp = anyP / totP * 100, ap = anyA / totA * 100;
+  note("시트 #1 조이너가 추천 4명에 든 행 " + first + "/" + SHEET_ROWS.length + " (" + fp.toFixed(1) + "%)");
+  note("시트 #1~#4 겹침 " + anyP + "/" + totP + " (" + pp.toFixed(1) + "%) · 대체 칸까지 " +
+       anyA + "/" + totA + " (" + ap.toFixed(1) + "%)");
+  // 하한선은 실측에서 여유를 두고 잡았다. 떨어지면 모델이 시트에서 멀어진 것이다.
+  ok(fp >= 80, "시트 #1 조이너 재현이 80% 이상", fp.toFixed(1) + "% · 놓친 행: " + missed.slice(0, 4).join(", "));
+  ok(pp >= 48, "시트 #1~#4 조이너 겹침이 48% 이상", pp.toFixed(1) + "%");
 }
 
 // ── 결과 ───────────────────────────────────────────────────────────────

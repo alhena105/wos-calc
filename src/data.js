@@ -8,7 +8,12 @@
 //   올리는(내리는) 스킬이라는 표시다. 이런 스킬은 일반 칸과 같은 스탯이므로 칸을 우회하면 안 되고,
 //   병종 딜 지분(dmg) 또는 병력 지분(sur)으로 환산해 그 칸에 합산한다. 근거는 wosheroes 원문이고,
 //   "extra damage / 추가피해" 처럼 타격에 붙는 것은 다른 기전이라 bk 를 달지 않는다.
-// slot 코드: A=피해량↑ An=일반공격피해↑ B=공격력↑ C=체력↑ D=받는피해↓ DEF=방어력↑
+// slot:"AH" — 위 규칙의 짝이다. 원문이 "extra damage / extra attack / N% damage" 처럼
+//   **타격에 붙는** 것은 Damage Dealt 스탯이 아니므로 A칸(합연산)에 넣지 않는다.
+//   어느 칸인지는 자료가 없으니 칸을 만들지도 않는다 — 자기 계수로만 곱한다(포화 없음).
+//   X 스킬에서 extra damage 계열에 bk 를 달지 않는 것과 **같은 규칙**이고, 예전에는
+//   이 둘이 어긋나 있었다(X 는 칸을 피하는데 일반 칸은 A 에 합산). 2026-09-12 정정.
+// slot 코드: A=피해량↑ AH=타격 추가피해(칸 아님) An=일반공격피해↑ B=공격력↑ C=체력↑ D=받는피해↓ DEF=방어력↑
 //            E=파괴력↑ F=적방어↓ G=적받는피해↑ H=적공격↓ I=적파괴력↓ J=적피해량↓
 //            DODGE=회피 CRIT=치명률 X=병종한정/주기형 ECO=비전투
 // s:1 = Ton 시트의 **조이너 명단**에 오른 영웅 (19명). 리더로만 나오는 영웅은 붙이지 않는다 —
@@ -74,13 +79,13 @@ const HEROES = [
  w:{side:"defender",stat:"Attack",name:"Dragonbreath"}},
 {id:"philly",s:1,kr:"필리",en:"Philly",cls:"lancer",gen:2,rar:"leg",
  exp:[{n:"Vigor Tactics",slot:"B",v:.15,t:"공격력 +15% / 방어력 +10%",te:"attack +15% / defense +10%",also:{slot:"DEF",v:.10}},
-      {n:"Dosage Boost",slot:"A",v:.50,p:"25%",pe:"25% chance",t:"25% 확률 200% 피해",te:"25% chance: 200% damage"},
+      {n:"Dosage Boost",slot:"AH",v:.50,p:"25%",pe:"25% chance",t:"25% 확률 200% 피해",te:"25% chance: 200% damage"},
       {n:"Energizing Shot",slot:"D",v:.20,p:"40%",pe:"40% chance",t:"40% 확률 받는 피해 −50%",te:"40% chance: damage taken −50%"}],
  w:{side:"defender",stat:"Health",name:"First Aid Training"}},
 {id:"alonso",kr:"알론소",en:"Alonso",cls:"marksman",gen:2,rar:"leg",
  exp:[{n:"Onslaught",slot:"E",v:.20,p:"40%",pe:"40% chance",t:"40% 확률 파괴력 +50%",te:"40% chance: lethality +50%"},
       {n:"Iron Strength",slot:"J",v:.10,p:"20%",pe:"20% chance",t:"20% 확률 적 피해량 −50%",te:"20% chance: enemy damage −50%"},
-      {n:"Poison Harpoon",slot:"A",v:.25,p:"50%",pe:"50% chance",t:"50% 확률 추가피해 +50%",te:"50% chance: +50% extra damage"}],
+      {n:"Poison Harpoon",slot:"AH",v:.25,p:"50%",pe:"50% chance",t:"50% 확률 추가피해 +50%",te:"50% chance: +50% extra damage"}],
  w:{side:"rally",stat:"Lethality",name:"Harpoon Enhancement"}},
 // ── Gen 3 ──
 {id:"logan",kr:"로건",en:"Logan",cls:"infantry",gen:3,rar:"leg",
@@ -118,7 +123,7 @@ const HEROES = [
 {id:"hector",kr:"헥터",en:"Hector",cls:"infantry",gen:5,rar:"leg",
  exp:[{n:"Survival Instincts",slot:"D",v:.20,p:"40%",pe:"40% chance",t:"40% 확률 받는 피해 −50%",te:"40% chance: damage taken −50%"},
       {n:"Rampant",slot:"X",k:"dmg",v:1.07,tgt:"infantry",bk:"A",also:{slot:"X",k:"dmg",v:.535,tgt:"marksman",bk:"A"},t:"보병 피해량 +200% · 궁병 +100% (10회 동안 매 공격 85%로 감쇠 → 평균 0.535 환산)",te:"infantry damage +200%, marksmen +100% (decays over 10 procs)"},
-      {n:"Blitz",slot:"A",v:.50,p:"25%",pe:"25% chance",t:"25% 확률 200% 피해",te:"25% chance: 200% damage"}],
+      {n:"Blitz",slot:"AH",v:.50,p:"25%",pe:"25% chance",t:"25% 확률 200% 피해",te:"25% chance: 200% damage"}],
  w:{side:"defender",stat:"Attack",name:"Goliath"}},
 {id:"norah",s:1,kr:"노라",en:"Norah",cls:"lancer",gen:5,rar:"leg",
  exp:[{n:"Combined Arms",slot:"X",k:"dmg",v:.15,tgt:"inf+mar",bk:"A",also:{slot:"X",k:"sur",v:.15,tgt:"inf+mar",bk:"D"},t:"보병·궁병 받피 −15% & 피해량 +15%",te:"infantry & marksmen: damage taken −15% and damage +15%"},
@@ -127,7 +132,7 @@ const HEROES = [
  w:{side:"defender",stat:"Defense",name:"True Grit"}},
 {id:"gwen",kr:"그웬",en:"Gwen",cls:"marksman",gen:5,rar:"leg",
  exp:[{n:"Eagle Vision",slot:"G",v:.25,t:"적 받는 피해 +25%",te:"enemy damage taken +25%"},
-      {n:"Air Dominance",slot:"A",v:.20,p:"5공격마다",pe:"every 5th attack",t:"5공격마다 추가피해 +100%",te:"every 5th attack: +100% extra damage"},
+      {n:"Air Dominance",slot:"AH",v:.20,p:"5공격마다",pe:"every 5th attack",t:"5공격마다 추가피해 +100%",te:"every 5th attack: +100% extra damage"},
       {n:"Blastmaster",slot:"X",k:"dmg",v:.125,tgt:"marksman",t:"궁병 4공격마다 추가피해 +50%",te:"marksmen, every 4th attack: +50% extra damage"}],
  w:{side:"rally",stat:"Lethality",name:"Marauder"}},
 // ── Gen 6 ──
@@ -142,7 +147,7 @@ const HEROES = [
       {n:"Dreamslice",slot:"A",v:.35,t:"표식 대상 전 부대 피해량 +75%",te:"vs marked targets: all troops damage +75%"}],
  w:{side:"rally",stat:"Lethality",name:"Wistful Enchantment"}},
 {id:"wayne",kr:"웨인",en:"Wayne",cls:"marksman",gen:6,rar:"leg",
- exp:[{n:"Thunder Strike",slot:"A",v:.25,p:"4턴마다",pe:"every 4 turns",t:"4턴마다 전 부대 추가공격 100%",te:"every 4 turns: all troops deal a 100% extra attack"},
+ exp:[{n:"Thunder Strike",slot:"AH",v:.25,p:"4턴마다",pe:"every 4 turns",t:"4턴마다 전 부대 추가공격 100%",te:"every 4 turns: all troops deal a 100% extra attack"},
       {n:"Roundabout Hit",slot:"X",k:"dmg",v:.40,tgt:"marksman",t:"궁병 격턴 적 창병 +40%/궁병 +20% 추가피해",te:"marksmen, every other turn: +40% extra vs enemy lancers, +20% vs marksmen"},
       {n:"Fleet",slot:"CRIT",v:.25,t:"전 부대 치명률 +25%",te:"all troops crit rate +25%"}],
  w:{side:"defender",stat:"Lethality",name:"Offensive Defense"}},
@@ -159,7 +164,7 @@ const HEROES = [
  w:{side:"rally",stat:"Lethality",name:"Bio Assault"}},
 {id:"bradley",kr:"브레들리",en:"Bradley",cls:"marksman",gen:7,rar:"leg",
  exp:[{n:"Veteran's Might",slot:"B",v:.25,t:"전 부대 공격력 +25%",te:"all troops attack +25%"},
-      {n:"Power Shot",slot:"A",v:.25,t:"적 창병에 +30% / 적 보병에 +25% 피해",te:"+30% damage vs enemy lancers / +25% vs enemy infantry"},
+      {n:"Power Shot",slot:"AH",v:.25,t:"적 창병에 +30% / 적 보병에 +25% 피해",te:"+30% damage vs enemy lancers / +25% vs enemy infantry"},
       {n:"Tactical Assistance",slot:"A",v:.15,p:"4턴중 2턴",pe:"2 turns out of 4",t:"4턴마다 2턴 피해량 +30%",te:"2 turns out of every 4: damage +30%"}],
  w:{side:"defender",stat:"Attack",name:"Siege Insight"}},
 // ── Gen 8 ──
@@ -234,7 +239,7 @@ const HEROES = [
  w:{side:"defender",stat:"Defense",name:"Fort of Rock"}},
 {id:"karol",kr:"가로얼",en:"Karol",cls:"lancer",gen:12,rar:"leg",
  exp:[{n:"In the Wings",slot:"D",v:.20,t:"전 부대 받는 피해 −20%",te:"all troops damage taken −20%"},
-      {n:"Shieldbreaker",slot:"A",v:.25,t:"적 창병에 +30% / 적 보병에 +25% 피해",te:"+30% damage vs enemy lancers / +25% vs enemy infantry"},
+      {n:"Shieldbreaker",slot:"AH",v:.25,t:"적 창병에 +30% / 적 보병에 +25% 피해",te:"+30% damage vs enemy lancers / +25% vs enemy infantry"},
       {n:"Standard of Ages",slot:"B",v:.15,t:"공격력 +15% / 방어력 +10%",te:"attack +15% / defense +10%",also:{slot:"DEF",v:.10}}],
  w:{side:"rally",stat:"Attack",name:"Triumphant March"}},
 {id:"ligeia",kr:"리지아",en:"Ligeia",cls:"marksman",gen:12,rar:"leg",
@@ -244,7 +249,7 @@ const HEROES = [
  w:{side:"defender",stat:"Lethality",name:"Trap Nest"}},
 {id:"vulcanus",kr:"올카누스",en:"Vulcanus",cls:"marksman",gen:13,rar:"leg",
  exp:[{n:"Raging Storm",slot:"H",v:.20,t:"적 전 부대 공격력 −20%",te:"all enemy troops attack −20%"},
-      {n:"Breaker Steel",slot:"A",v:.20,p:"5공격마다",pe:"every 5th attack",t:"5공격마다 추가피해 +100%",te:"every 5th attack: +100% extra damage"},
+      {n:"Breaker Steel",slot:"AH",v:.20,p:"5공격마다",pe:"every 5th attack",t:"5공격마다 추가피해 +100%",te:"every 5th attack: +100% extra damage"},
       {n:"True Strike",slot:"X",k:"dmg",v:.60,tgt:"marksman",t:"적 보·창 방어력 −60% & 궁병 공격력 +60%",te:"enemy infantry & lancer defense −60% and marksman attack +60%"}],
  w:{side:"rally",stat:"Attack",name:"Born King"}},
 {id:"flora",kr:"플로라",en:"Flora",cls:"lancer",gen:13,rar:"leg",

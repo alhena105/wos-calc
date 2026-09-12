@@ -6,7 +6,7 @@ const sTag=s=>'<span class="slot s-'+(["A","B","E","F","G","C","D"].includes(s)?
 const statKr=i18nFill({},function(){return{Attack:L("공격력","Attack"),Defense:L("방어력","Defense"),Lethality:L("파괴력","Lethality"),Health:L("체력","Health")};});
 
 function render(d){
- const {mode,leaders,picks,r,buck,src,cls,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap}=d;
+ const {mode,leaders,picks,r,buck,src,cls,hits,hitMul,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap}=d;
  let o="";
  const modeKr=mode==="rally"?L("공성(랠리)","Rally (offense)"):L("수성(개리슨)","Garrison (defense)");
  o+='<h2>'+L("① 리더 구성","① Leaders")+' <span>'+modeKr+L(" · 병비 "," · ratio ")+r.inf.toFixed(0)+"/"+r.lan.toFixed(0)+"/"+r.mar.toFixed(0)+'</span></h2>';
@@ -45,6 +45,14 @@ function render(d){
  o+="</tbody></table>";
  if(empty.length)o+='<div class="callout co-ok"><h3>'+L("🟢 빈 칸 — 조이너 1순위 후보","🟢 Empty slots — top joiner targets")+'</h3><p>'+
    empty.map(s=>'<span class="pill">'+s+" "+SLOTS[s].n+"</span>").join("")+"</p></div>";
+ // AH(타격 계열)는 칸이 아니라 위 표에 안 나온다. 안 보이면 "왜 이 스킬이 표에 없나" 가 되므로
+ // 따로 적고, 칸이 아닌 이유까지 같이 둔다 — 이게 A칸 포화와 갈리는 자리다.
+ if(hits.length)o+='<div class="callout co-tip"><h3>'+L("🎯 타격 계열 — 칸이 아닙니다","🎯 Hit-type skills — not a slot")+'</h3><p>'+
+   hits.map(x=>'<span class="pill">'+sTag("AH")+esc(HN(x.hero))+" "+esc(x.e.n)+" ×"+(1+x.v).toFixed(3)+"</span>").join("")+
+   '</p><p>'+L("합쳐서 <b>×"+hitMul.toFixed(3)+"</b> 입니다. 원문이 <b>extra damage · extra attack · N% damage</b> 처럼 <b>타격에 붙는</b> 것은 피해량(Damage Dealt) 스탯이 아니라 다른 기전이고, 어느 칸인지 <b>자료가 없습니다</b>. 그래서 A칸에 합산하지 않고 각자 곱합니다 — <b>포화를 겪지 않습니다</b>.",
+     "Together <b>×"+hitMul.toFixed(3)+"</b>. When the source text reads <b>extra damage, extra attack or N% damage</b>, it rides on a hit rather than raising the Damage Dealt stat, and <b>we have no source</b> for which slot it would occupy. So these never enter the A slot — each multiplies on its own and <b>never saturates</b>.")+
+   '</p><p class="cap">'+L("X(병종 한정) 스킬에서 extra damage 계열에 <code>bk</code> 를 달지 않는 것과 <b>같은 규칙</b>입니다. 2026-09-12 까지는 이 둘이 어긋나 있었습니다 — X 는 칸을 피하는데 일반 칸은 A 에 합산하고 있었고, 그래서 A칸이 부풀어 노라처럼 <code>bk</code> 가 붙은 조이너가 시트보다 과소평가됐습니다.",
+     "This is the <b>same rule</b> that keeps <code>bk</code> off extra-damage X skills. Until 2026-09-12 the two disagreed — X skills bypassed the slot while ordinary ones were added to A — which inflated the A slot and undervalued <code>bk</code> joiners such as Norah relative to the sheet.")+"</p></div>";
  o+="</div>";
 
  // 위젯
@@ -122,7 +130,8 @@ function render(d){
  const comboAll=list=>{
   const b=Object.assign({},buck);let x=1;
   list.forEach(q=>{
-   if(q.e.slot==="X"||q.e.slot==="An"){x*=q.mul;return;}
+   // X · An · AH 는 칸이 아니라 계수다 → 자기 배율을 그대로 곱한다.
+   if(q.e.slot==="X"||q.e.slot==="An"||q.e.slot==="AH"){x*=q.mul;return;}
    const put=(sl,v)=>{if(b[sl]!==undefined)b[sl]+=v;};
    put(q.e.slot,q.e.v);if(q.e.also)put(q.e.also.slot,q.e.also.v);});
   return ORDER.reduce((a,sl)=>a*(b[sl]/buck[sl]),1)*x;};

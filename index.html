@@ -301,8 +301,8 @@ var STR={
  lbEnD:["들어오는 랠리 병비 (선택)","Incoming rally ratio (optional)"],
  phInf:["보","inf"], phLan:["창","lan"], phMar:["궁","mar"],
  lbGcap:["서버 최대 세대 (조이너 풀 제한)","Server's highest generation (limits the joiner pool)"],
- assump:['<b>계산 가정</b> — 원정스킬은 전부 Lv.5(4성 이상)로 간주 · 확률·주기 스킬은 <b>기대값</b>으로 환산 · 병종 전용 딜 스킬은 보병 가중치 0.3을 적용한 <b>딜 지분</b>으로 환산(보병은 탱커라 병력 비중 대비 딜이 적음) · 일반공격 한정 스킬은 총딜의 80%를 일반공격으로 가정 · "확률로 N% 피해" 계열은 "피해량 증가"와 같은 칸으로 묶었습니다(effect_op 미확정).<br>전무 레벨 0 = 미보유 · 숫자 옆 칸이 전무 레벨입니다. 병비 합이 100이 아니면 자동으로 정규화합니다.',
-   '<b>Assumptions</b> — every expedition skill is treated as Lv.5 (4★ or above) · chance-based and periodic skills are converted to <b>expected value</b> · class-locked damage skills are converted to a <b>damage share</b> with infantry weighted 0.3 (infantry tanks, so it contributes less damage than its headcount) · normal-attack-only skills assume 80% of total damage is normal attacks · "N% damage on a chance" is grouped into the same slot as "damage bonus" (effect_op unconfirmed).<br>Exclusive-gear level 0 = not owned; the box beside each hero is its level. If the ratio does not add to 100 it is normalised automatically.'],
+ assump:['<b>계산 가정</b> — 원정스킬은 전부 Lv.5(4성 이상)로 간주 · 확률·주기 스킬은 <b>기대값</b>으로 환산 · 병종 전용 딜 스킬은 보병 가중치 0.3을 적용한 <b>딜 지분</b>으로 환산(보병은 탱커라 병력 비중 대비 딜이 적음) · 일반공격 한정 스킬은 총딜의 80%를 일반공격으로 가정 · "확률로 N% <b>피해량</b>" 계열은 "피해량 증가"와 같은 칸으로 묶고, 원문이 "<b>추가피해·추가공격·N% 피해</b>"인 것은 칸이 아니라 따로 곱합니다(어느 칸인지 자료 없음).<br>전무 레벨 0 = 미보유 · 숫자 옆 칸이 전무 레벨입니다. 병비 합이 100이 아니면 자동으로 정규화합니다.',
+   '<b>Assumptions</b> — every expedition skill is treated as Lv.5 (4★ or above) · chance-based and periodic skills are converted to <b>expected value</b> · class-locked damage skills are converted to a <b>damage share</b> with infantry weighted 0.3 (infantry tanks, so it contributes less damage than its headcount) · normal-attack-only skills assume 80% of total damage is normal attacks · "N% <b>damage dealt</b> on a chance" is grouped into the same slot as "damage bonus", while wording such as "<b>extra damage, extra attack or N% damage</b>" multiplies on its own instead of entering a slot (no source says which slot it would occupy).<br>Exclusive-gear level 0 = not owned; the box beside each hero is its level. If the ratio does not add to 100 it is normalised automatically.'],
  srcData:['데이터 출처: <a href="https://wosheroes.com/">wosheroes</a> · <a href="https://www.whiteoutsurvival-community.com/">whiteoutsurvival-community</a> · <a href="https://www.whiteoutsurvival.wiki/">whiteoutsurvival.wiki</a> (2026-08-15 수집 · Gen14~17 2026-08-22 보강) · 영웅 초상: <a href="https://www.whiteoutsurvival.wiki/">whiteoutsurvival.wiki</a> (© Century Games)',
    'Data: <a href="https://wosheroes.com/">wosheroes</a> · <a href="https://www.whiteoutsurvival-community.com/">whiteoutsurvival-community</a> · <a href="https://www.whiteoutsurvival.wiki/">whiteoutsurvival.wiki</a> (collected 2026-08-15; Gen 14-17 added 2026-08-22) · Hero portraits: <a href="https://www.whiteoutsurvival.wiki/">whiteoutsurvival.wiki</a> (© Century Games)'],
  srcModel:['계산 모델: <a href="https://blog.astris.kr/posts/f7a87706-3c2f-40c0-b282-d77a311ab4e3">랠리 편성 × 조이너 스킬 × 데미지 공식 통합 해설</a> · 확률/주기 스킬은 기대값으로 환산한 근사치입니다.',
@@ -345,7 +345,12 @@ function setLang(l){
 //   올리는(내리는) 스킬이라는 표시다. 이런 스킬은 일반 칸과 같은 스탯이므로 칸을 우회하면 안 되고,
 //   병종 딜 지분(dmg) 또는 병력 지분(sur)으로 환산해 그 칸에 합산한다. 근거는 wosheroes 원문이고,
 //   "extra damage / 추가피해" 처럼 타격에 붙는 것은 다른 기전이라 bk 를 달지 않는다.
-// slot 코드: A=피해량↑ An=일반공격피해↑ B=공격력↑ C=체력↑ D=받는피해↓ DEF=방어력↑
+// slot:"AH" — 위 규칙의 짝이다. 원문이 "extra damage / extra attack / N% damage" 처럼
+//   **타격에 붙는** 것은 Damage Dealt 스탯이 아니므로 A칸(합연산)에 넣지 않는다.
+//   어느 칸인지는 자료가 없으니 칸을 만들지도 않는다 — 자기 계수로만 곱한다(포화 없음).
+//   X 스킬에서 extra damage 계열에 bk 를 달지 않는 것과 **같은 규칙**이고, 예전에는
+//   이 둘이 어긋나 있었다(X 는 칸을 피하는데 일반 칸은 A 에 합산). 2026-09-12 정정.
+// slot 코드: A=피해량↑ AH=타격 추가피해(칸 아님) An=일반공격피해↑ B=공격력↑ C=체력↑ D=받는피해↓ DEF=방어력↑
 //            E=파괴력↑ F=적방어↓ G=적받는피해↑ H=적공격↓ I=적파괴력↓ J=적피해량↓
 //            DODGE=회피 CRIT=치명률 X=병종한정/주기형 ECO=비전투
 // s:1 = Ton 시트의 **조이너 명단**에 오른 영웅 (19명). 리더로만 나오는 영웅은 붙이지 않는다 —
@@ -411,13 +416,13 @@ const HEROES = [
  w:{side:"defender",stat:"Attack",name:"Dragonbreath"}},
 {id:"philly",s:1,kr:"필리",en:"Philly",cls:"lancer",gen:2,rar:"leg",
  exp:[{n:"Vigor Tactics",slot:"B",v:.15,t:"공격력 +15% / 방어력 +10%",te:"attack +15% / defense +10%",also:{slot:"DEF",v:.10}},
-      {n:"Dosage Boost",slot:"A",v:.50,p:"25%",pe:"25% chance",t:"25% 확률 200% 피해",te:"25% chance: 200% damage"},
+      {n:"Dosage Boost",slot:"AH",v:.50,p:"25%",pe:"25% chance",t:"25% 확률 200% 피해",te:"25% chance: 200% damage"},
       {n:"Energizing Shot",slot:"D",v:.20,p:"40%",pe:"40% chance",t:"40% 확률 받는 피해 −50%",te:"40% chance: damage taken −50%"}],
  w:{side:"defender",stat:"Health",name:"First Aid Training"}},
 {id:"alonso",kr:"알론소",en:"Alonso",cls:"marksman",gen:2,rar:"leg",
  exp:[{n:"Onslaught",slot:"E",v:.20,p:"40%",pe:"40% chance",t:"40% 확률 파괴력 +50%",te:"40% chance: lethality +50%"},
       {n:"Iron Strength",slot:"J",v:.10,p:"20%",pe:"20% chance",t:"20% 확률 적 피해량 −50%",te:"20% chance: enemy damage −50%"},
-      {n:"Poison Harpoon",slot:"A",v:.25,p:"50%",pe:"50% chance",t:"50% 확률 추가피해 +50%",te:"50% chance: +50% extra damage"}],
+      {n:"Poison Harpoon",slot:"AH",v:.25,p:"50%",pe:"50% chance",t:"50% 확률 추가피해 +50%",te:"50% chance: +50% extra damage"}],
  w:{side:"rally",stat:"Lethality",name:"Harpoon Enhancement"}},
 // ── Gen 3 ──
 {id:"logan",kr:"로건",en:"Logan",cls:"infantry",gen:3,rar:"leg",
@@ -455,7 +460,7 @@ const HEROES = [
 {id:"hector",kr:"헥터",en:"Hector",cls:"infantry",gen:5,rar:"leg",
  exp:[{n:"Survival Instincts",slot:"D",v:.20,p:"40%",pe:"40% chance",t:"40% 확률 받는 피해 −50%",te:"40% chance: damage taken −50%"},
       {n:"Rampant",slot:"X",k:"dmg",v:1.07,tgt:"infantry",bk:"A",also:{slot:"X",k:"dmg",v:.535,tgt:"marksman",bk:"A"},t:"보병 피해량 +200% · 궁병 +100% (10회 동안 매 공격 85%로 감쇠 → 평균 0.535 환산)",te:"infantry damage +200%, marksmen +100% (decays over 10 procs)"},
-      {n:"Blitz",slot:"A",v:.50,p:"25%",pe:"25% chance",t:"25% 확률 200% 피해",te:"25% chance: 200% damage"}],
+      {n:"Blitz",slot:"AH",v:.50,p:"25%",pe:"25% chance",t:"25% 확률 200% 피해",te:"25% chance: 200% damage"}],
  w:{side:"defender",stat:"Attack",name:"Goliath"}},
 {id:"norah",s:1,kr:"노라",en:"Norah",cls:"lancer",gen:5,rar:"leg",
  exp:[{n:"Combined Arms",slot:"X",k:"dmg",v:.15,tgt:"inf+mar",bk:"A",also:{slot:"X",k:"sur",v:.15,tgt:"inf+mar",bk:"D"},t:"보병·궁병 받피 −15% & 피해량 +15%",te:"infantry & marksmen: damage taken −15% and damage +15%"},
@@ -464,7 +469,7 @@ const HEROES = [
  w:{side:"defender",stat:"Defense",name:"True Grit"}},
 {id:"gwen",kr:"그웬",en:"Gwen",cls:"marksman",gen:5,rar:"leg",
  exp:[{n:"Eagle Vision",slot:"G",v:.25,t:"적 받는 피해 +25%",te:"enemy damage taken +25%"},
-      {n:"Air Dominance",slot:"A",v:.20,p:"5공격마다",pe:"every 5th attack",t:"5공격마다 추가피해 +100%",te:"every 5th attack: +100% extra damage"},
+      {n:"Air Dominance",slot:"AH",v:.20,p:"5공격마다",pe:"every 5th attack",t:"5공격마다 추가피해 +100%",te:"every 5th attack: +100% extra damage"},
       {n:"Blastmaster",slot:"X",k:"dmg",v:.125,tgt:"marksman",t:"궁병 4공격마다 추가피해 +50%",te:"marksmen, every 4th attack: +50% extra damage"}],
  w:{side:"rally",stat:"Lethality",name:"Marauder"}},
 // ── Gen 6 ──
@@ -479,7 +484,7 @@ const HEROES = [
       {n:"Dreamslice",slot:"A",v:.35,t:"표식 대상 전 부대 피해량 +75%",te:"vs marked targets: all troops damage +75%"}],
  w:{side:"rally",stat:"Lethality",name:"Wistful Enchantment"}},
 {id:"wayne",kr:"웨인",en:"Wayne",cls:"marksman",gen:6,rar:"leg",
- exp:[{n:"Thunder Strike",slot:"A",v:.25,p:"4턴마다",pe:"every 4 turns",t:"4턴마다 전 부대 추가공격 100%",te:"every 4 turns: all troops deal a 100% extra attack"},
+ exp:[{n:"Thunder Strike",slot:"AH",v:.25,p:"4턴마다",pe:"every 4 turns",t:"4턴마다 전 부대 추가공격 100%",te:"every 4 turns: all troops deal a 100% extra attack"},
       {n:"Roundabout Hit",slot:"X",k:"dmg",v:.40,tgt:"marksman",t:"궁병 격턴 적 창병 +40%/궁병 +20% 추가피해",te:"marksmen, every other turn: +40% extra vs enemy lancers, +20% vs marksmen"},
       {n:"Fleet",slot:"CRIT",v:.25,t:"전 부대 치명률 +25%",te:"all troops crit rate +25%"}],
  w:{side:"defender",stat:"Lethality",name:"Offensive Defense"}},
@@ -496,7 +501,7 @@ const HEROES = [
  w:{side:"rally",stat:"Lethality",name:"Bio Assault"}},
 {id:"bradley",kr:"브레들리",en:"Bradley",cls:"marksman",gen:7,rar:"leg",
  exp:[{n:"Veteran's Might",slot:"B",v:.25,t:"전 부대 공격력 +25%",te:"all troops attack +25%"},
-      {n:"Power Shot",slot:"A",v:.25,t:"적 창병에 +30% / 적 보병에 +25% 피해",te:"+30% damage vs enemy lancers / +25% vs enemy infantry"},
+      {n:"Power Shot",slot:"AH",v:.25,t:"적 창병에 +30% / 적 보병에 +25% 피해",te:"+30% damage vs enemy lancers / +25% vs enemy infantry"},
       {n:"Tactical Assistance",slot:"A",v:.15,p:"4턴중 2턴",pe:"2 turns out of 4",t:"4턴마다 2턴 피해량 +30%",te:"2 turns out of every 4: damage +30%"}],
  w:{side:"defender",stat:"Attack",name:"Siege Insight"}},
 // ── Gen 8 ──
@@ -571,7 +576,7 @@ const HEROES = [
  w:{side:"defender",stat:"Defense",name:"Fort of Rock"}},
 {id:"karol",kr:"가로얼",en:"Karol",cls:"lancer",gen:12,rar:"leg",
  exp:[{n:"In the Wings",slot:"D",v:.20,t:"전 부대 받는 피해 −20%",te:"all troops damage taken −20%"},
-      {n:"Shieldbreaker",slot:"A",v:.25,t:"적 창병에 +30% / 적 보병에 +25% 피해",te:"+30% damage vs enemy lancers / +25% vs enemy infantry"},
+      {n:"Shieldbreaker",slot:"AH",v:.25,t:"적 창병에 +30% / 적 보병에 +25% 피해",te:"+30% damage vs enemy lancers / +25% vs enemy infantry"},
       {n:"Standard of Ages",slot:"B",v:.15,t:"공격력 +15% / 방어력 +10%",te:"attack +15% / defense +10%",also:{slot:"DEF",v:.10}}],
  w:{side:"rally",stat:"Attack",name:"Triumphant March"}},
 {id:"ligeia",kr:"리지아",en:"Ligeia",cls:"marksman",gen:12,rar:"leg",
@@ -581,7 +586,7 @@ const HEROES = [
  w:{side:"defender",stat:"Lethality",name:"Trap Nest"}},
 {id:"vulcanus",kr:"올카누스",en:"Vulcanus",cls:"marksman",gen:13,rar:"leg",
  exp:[{n:"Raging Storm",slot:"H",v:.20,t:"적 전 부대 공격력 −20%",te:"all enemy troops attack −20%"},
-      {n:"Breaker Steel",slot:"A",v:.20,p:"5공격마다",pe:"every 5th attack",t:"5공격마다 추가피해 +100%",te:"every 5th attack: +100% extra damage"},
+      {n:"Breaker Steel",slot:"AH",v:.20,p:"5공격마다",pe:"every 5th attack",t:"5공격마다 추가피해 +100%",te:"every 5th attack: +100% extra damage"},
       {n:"True Strike",slot:"X",k:"dmg",v:.60,tgt:"marksman",t:"적 보·창 방어력 −60% & 궁병 공격력 +60%",te:"enemy infantry & lancer defense −60% and marksman attack +60%"}],
  w:{side:"rally",stat:"Attack",name:"Born King"}},
 {id:"flora",kr:"플로라",en:"Flora",cls:"lancer",gen:13,rar:"leg",
@@ -855,11 +860,16 @@ const GEAR_WARNINGS = i18nFill([], function () { return [
 ]; });
 const SLOTS=i18nFill({},function(){return{
  A:{n:L("피해량 증가","Damage bonus"),k:"dmg"},An:{n:L("일반공격 피해","Normal-attack damage"),k:"dmg"},B:{n:L("공격력 증가","Attack bonus"),k:"dmg"},
+ AH:{n:L("타격 추가피해","Extra hit damage"),k:"dmg"},
  E:{n:L("파괴력 증가","Lethality bonus"),k:"dmg"},F:{n:L("적 방어력 감소","Enemy defense down"),k:"dmg"},G:{n:L("적 받는 피해 증가","Enemy damage taken up"),k:"dmg"},
  CRIT:{n:L("치명률","Crit rate"),k:"dmg"},
  C:{n:L("체력 증가","Health bonus"),k:"sur"},D:{n:L("받는 피해 감소","Damage taken down"),k:"sur"},DEF:{n:L("방어력 증가","Defense bonus"),k:"sur"},
  H:{n:L("적 공격력 감소","Enemy attack down"),k:"sur"},I:{n:L("적 파괴력 감소","Enemy lethality down"),k:"sur"},J:{n:L("적 피해량 감소","Enemy damage down"),k:"sur"},
  DODGE:{n:L("회피","Dodge"),k:"sur"}};});
+// AH 는 일부러 ORDER 에 없다 — 칸이 아니기 때문이다. 원문이 "extra damage / extra attack /
+// N% damage" 인 스킬은 Damage Dealt 스탯이 아니라 타격에 붙는 다른 기전이고, 어느 칸인지
+// 자료가 없다. 그래서 합연산 칸을 만들지 않고 자기 계수로만 곱한다(포화를 겪지 않는다).
+// X 스킬에서 extra damage 계열에 bk 를 달지 않는 것과 같은 규칙이다.
 const ORDER=["A","An","B","E","F","G","CRIT","C","D","DEF","H","I","J","DODGE"];
 const byId=Object.fromEntries(HEROES.map(h=>[h.id,h]));
 const wpct=l=>l<2?0:5+(Math.floor(l/2)-1)*2.5;
@@ -983,7 +993,8 @@ function calc(){
  if(leaders.length===0){out.innerHTML='<div class="callout co-tip"><p>'+S("needLeader")+'</p></div>';return;}
 
  // ── 칸 집계 ──
- const buck={},src={},cls=[];
+ const buck={},src={},cls=[],hits=[];
+ let hitMul=1;
  ORDER.forEach(s=>{buck[s]=1;src[s]=[];});
  leaders.forEach(({hero})=>hero.exp.forEach(e=>{
    if(e.slot==="ECO")return;
@@ -999,6 +1010,8 @@ function calc(){
      const bk=q=>{if(q.bk)add(q.bk,q.v*xShare(q,r),L(" (병종 지분 환산)"," (class share)"));};
      bk(e); if(e.also&&e.also.slot==="X")bk(e.also);
      return;}
+   // AH(타격 계열)는 칸이 아니다 — 합연산 대신 자기 계수로 곱해서 따로 모은다.
+   if(e.slot==="AH"){const v=eVal(e,r);hits.push({hero,e,v});hitMul*=1+v;return;}
    add(e.slot,eVal(e,r)); if(e.also)add(e.also.slot,eVal(e.also,r));
  }));
 
@@ -1029,6 +1042,11 @@ function calc(){
      mul=part(e); if(e.also&&e.also.slot==="X")mul*=part(e.also);
    }else if(e.slot==="An"){
      mul=1+e.v*NA_SHARE;detail.push(L("일반공격 비중 "+(NA_SHARE*100)+"% 가정","assumes normal attacks are "+(NA_SHARE*100)+"% of damage"));
+   }else if(e.slot==="AH"){
+     // 칸이 아니라 자기 계수다 → 리더가 A칸을 얼마나 채웠든 포화를 겪지 않는다.
+     mul=1+eVal(e,r);
+     detail.push(L("타격 계열 — 칸이 아니라 자기 계수로 곱합니다 (포화 없음)",
+                   "hit-type — multiplies on its own, not through a slot (no saturation)"));
    }else{
      const step=(sl,val)=>{const b=buck[sl];if(b===undefined)return;const m=(b+val)/b;mul*=m;
        detail.push(sl+" "+b.toFixed(2)+"→"+(b+val).toFixed(2)+" ×"+m.toFixed(3));};
@@ -1059,7 +1077,7 @@ function calc(){
    ctr=Object.assign({mode,en:ea},
      mode==="defender"?garrisonVerdict(mine,ea):sheetVerdict(ea,mine));
  }
- render({mode,leaders,picks,r,buck,src,cls,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap});
+ render({mode,leaders,picks,r,buck,src,cls,hits,hitMul,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap});
 }
 /* =============================================================================
    gear-engine.js — 홍색 장비 업그레이드 순서 계산. 순수 함수만 있다.
@@ -1324,7 +1342,7 @@ const sTag=s=>'<span class="slot s-'+(["A","B","E","F","G","C","D"].includes(s)?
 const statKr=i18nFill({},function(){return{Attack:L("공격력","Attack"),Defense:L("방어력","Defense"),Lethality:L("파괴력","Lethality"),Health:L("체력","Health")};});
 
 function render(d){
- const {mode,leaders,picks,r,buck,src,cls,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap}=d;
+ const {mode,leaders,picks,r,buck,src,cls,hits,hitMul,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap}=d;
  let o="";
  const modeKr=mode==="rally"?L("공성(랠리)","Rally (offense)"):L("수성(개리슨)","Garrison (defense)");
  o+='<h2>'+L("① 리더 구성","① Leaders")+' <span>'+modeKr+L(" · 병비 "," · ratio ")+r.inf.toFixed(0)+"/"+r.lan.toFixed(0)+"/"+r.mar.toFixed(0)+'</span></h2>';
@@ -1363,6 +1381,14 @@ function render(d){
  o+="</tbody></table>";
  if(empty.length)o+='<div class="callout co-ok"><h3>'+L("🟢 빈 칸 — 조이너 1순위 후보","🟢 Empty slots — top joiner targets")+'</h3><p>'+
    empty.map(s=>'<span class="pill">'+s+" "+SLOTS[s].n+"</span>").join("")+"</p></div>";
+ // AH(타격 계열)는 칸이 아니라 위 표에 안 나온다. 안 보이면 "왜 이 스킬이 표에 없나" 가 되므로
+ // 따로 적고, 칸이 아닌 이유까지 같이 둔다 — 이게 A칸 포화와 갈리는 자리다.
+ if(hits.length)o+='<div class="callout co-tip"><h3>'+L("🎯 타격 계열 — 칸이 아닙니다","🎯 Hit-type skills — not a slot")+'</h3><p>'+
+   hits.map(x=>'<span class="pill">'+sTag("AH")+esc(HN(x.hero))+" "+esc(x.e.n)+" ×"+(1+x.v).toFixed(3)+"</span>").join("")+
+   '</p><p>'+L("합쳐서 <b>×"+hitMul.toFixed(3)+"</b> 입니다. 원문이 <b>extra damage · extra attack · N% damage</b> 처럼 <b>타격에 붙는</b> 것은 피해량(Damage Dealt) 스탯이 아니라 다른 기전이고, 어느 칸인지 <b>자료가 없습니다</b>. 그래서 A칸에 합산하지 않고 각자 곱합니다 — <b>포화를 겪지 않습니다</b>.",
+     "Together <b>×"+hitMul.toFixed(3)+"</b>. When the source text reads <b>extra damage, extra attack or N% damage</b>, it rides on a hit rather than raising the Damage Dealt stat, and <b>we have no source</b> for which slot it would occupy. So these never enter the A slot — each multiplies on its own and <b>never saturates</b>.")+
+   '</p><p class="cap">'+L("X(병종 한정) 스킬에서 extra damage 계열에 <code>bk</code> 를 달지 않는 것과 <b>같은 규칙</b>입니다. 2026-09-12 까지는 이 둘이 어긋나 있었습니다 — X 는 칸을 피하는데 일반 칸은 A 에 합산하고 있었고, 그래서 A칸이 부풀어 노라처럼 <code>bk</code> 가 붙은 조이너가 시트보다 과소평가됐습니다.",
+     "This is the <b>same rule</b> that keeps <code>bk</code> off extra-damage X skills. Until 2026-09-12 the two disagreed — X skills bypassed the slot while ordinary ones were added to A — which inflated the A slot and undervalued <code>bk</code> joiners such as Norah relative to the sheet.")+"</p></div>";
  o+="</div>";
 
  // 위젯
@@ -1440,7 +1466,8 @@ function render(d){
  const comboAll=list=>{
   const b=Object.assign({},buck);let x=1;
   list.forEach(q=>{
-   if(q.e.slot==="X"||q.e.slot==="An"){x*=q.mul;return;}
+   // X · An · AH 는 칸이 아니라 계수다 → 자기 배율을 그대로 곱한다.
+   if(q.e.slot==="X"||q.e.slot==="An"||q.e.slot==="AH"){x*=q.mul;return;}
    const put=(sl,v)=>{if(b[sl]!==undefined)b[sl]+=v;};
    put(q.e.slot,q.e.v);if(q.e.also)put(q.e.also.slot,q.e.also.v);});
   return ORDER.reduce((a,sl)=>a*(b[sl]/buck[sl]),1)*x;};

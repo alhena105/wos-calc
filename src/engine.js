@@ -1,10 +1,15 @@
 const SLOTS=i18nFill({},function(){return{
  A:{n:L("피해량 증가","Damage bonus"),k:"dmg"},An:{n:L("일반공격 피해","Normal-attack damage"),k:"dmg"},B:{n:L("공격력 증가","Attack bonus"),k:"dmg"},
+ AH:{n:L("타격 추가피해","Extra hit damage"),k:"dmg"},
  E:{n:L("파괴력 증가","Lethality bonus"),k:"dmg"},F:{n:L("적 방어력 감소","Enemy defense down"),k:"dmg"},G:{n:L("적 받는 피해 증가","Enemy damage taken up"),k:"dmg"},
  CRIT:{n:L("치명률","Crit rate"),k:"dmg"},
  C:{n:L("체력 증가","Health bonus"),k:"sur"},D:{n:L("받는 피해 감소","Damage taken down"),k:"sur"},DEF:{n:L("방어력 증가","Defense bonus"),k:"sur"},
  H:{n:L("적 공격력 감소","Enemy attack down"),k:"sur"},I:{n:L("적 파괴력 감소","Enemy lethality down"),k:"sur"},J:{n:L("적 피해량 감소","Enemy damage down"),k:"sur"},
  DODGE:{n:L("회피","Dodge"),k:"sur"}};});
+// AH 는 일부러 ORDER 에 없다 — 칸이 아니기 때문이다. 원문이 "extra damage / extra attack /
+// N% damage" 인 스킬은 Damage Dealt 스탯이 아니라 타격에 붙는 다른 기전이고, 어느 칸인지
+// 자료가 없다. 그래서 합연산 칸을 만들지 않고 자기 계수로만 곱한다(포화를 겪지 않는다).
+// X 스킬에서 extra damage 계열에 bk 를 달지 않는 것과 같은 규칙이다.
 const ORDER=["A","An","B","E","F","G","CRIT","C","D","DEF","H","I","J","DODGE"];
 const byId=Object.fromEntries(HEROES.map(h=>[h.id,h]));
 const wpct=l=>l<2?0:5+(Math.floor(l/2)-1)*2.5;
@@ -128,7 +133,8 @@ function calc(){
  if(leaders.length===0){out.innerHTML='<div class="callout co-tip"><p>'+S("needLeader")+'</p></div>';return;}
 
  // ── 칸 집계 ──
- const buck={},src={},cls=[];
+ const buck={},src={},cls=[],hits=[];
+ let hitMul=1;
  ORDER.forEach(s=>{buck[s]=1;src[s]=[];});
  leaders.forEach(({hero})=>hero.exp.forEach(e=>{
    if(e.slot==="ECO")return;
@@ -144,6 +150,8 @@ function calc(){
      const bk=q=>{if(q.bk)add(q.bk,q.v*xShare(q,r),L(" (병종 지분 환산)"," (class share)"));};
      bk(e); if(e.also&&e.also.slot==="X")bk(e.also);
      return;}
+   // AH(타격 계열)는 칸이 아니다 — 합연산 대신 자기 계수로 곱해서 따로 모은다.
+   if(e.slot==="AH"){const v=eVal(e,r);hits.push({hero,e,v});hitMul*=1+v;return;}
    add(e.slot,eVal(e,r)); if(e.also)add(e.also.slot,eVal(e.also,r));
  }));
 
@@ -174,6 +182,11 @@ function calc(){
      mul=part(e); if(e.also&&e.also.slot==="X")mul*=part(e.also);
    }else if(e.slot==="An"){
      mul=1+e.v*NA_SHARE;detail.push(L("일반공격 비중 "+(NA_SHARE*100)+"% 가정","assumes normal attacks are "+(NA_SHARE*100)+"% of damage"));
+   }else if(e.slot==="AH"){
+     // 칸이 아니라 자기 계수다 → 리더가 A칸을 얼마나 채웠든 포화를 겪지 않는다.
+     mul=1+eVal(e,r);
+     detail.push(L("타격 계열 — 칸이 아니라 자기 계수로 곱합니다 (포화 없음)",
+                   "hit-type — multiplies on its own, not through a slot (no saturation)"));
    }else{
      const step=(sl,val)=>{const b=buck[sl];if(b===undefined)return;const m=(b+val)/b;mul*=m;
        detail.push(sl+" "+b.toFixed(2)+"→"+(b+val).toFixed(2)+" ×"+m.toFixed(3));};
@@ -204,5 +217,5 @@ function calc(){
    ctr=Object.assign({mode,en:ea},
      mode==="defender"?garrisonVerdict(mine,ea):sheetVerdict(ea,mine));
  }
- render({mode,leaders,picks,r,buck,src,cls,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap});
+ render({mode,leaders,picks,r,buck,src,cls,hits,hitMul,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap});
 }
