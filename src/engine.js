@@ -64,6 +64,28 @@ const COUNTERS=i18nFill([],function(){return[
  {m:[40,10,50],lbl:L("40/10/50 (준공격)","40/10/50 (semi-offensive)"),src:"theory",cv:[[40,40,20],[50,40,10]],
   c:["40/40/20","50/40/10"],ban:[],
   why:L("상대 창병이 10뿐이라 내 후열이 안전하다. 창40으로 상대 주력(궁50)을 지운다. ※ 가이드 카운터표에 없는 확장 항목(이론).","With only 10 lancers on their side your back line is safe. 40 lancers erase their main damage (50 marksmen). Note: an extension not present in the guide's counter table (theory).")}];});
+// ── 지금 이 편성이 시트의 어느 행인가 ────────────────────────────────
+// 리더 셋이 그 행의 (대안 포함) 리더와 맞고 병비가 라벨에 적힌 비율 중 하나와 가까우면 그 행이다.
+// 허용 오차는 밴드 판정과 같은 6 을 쓴다 — 시트가 한 행에 여러 비율을 적어 두므로
+// 그 사이를 메우려고 넓힐 필요가 없다(48/4/48 과 40/10/50 은 둘 다 rs 에 들어 있다).
+const COMP_TOL=6;
+function matchComp(ids,r){
+ const mine=[r.inf,r.lan,r.mar];
+ const pick=ids.filter(Boolean);
+ if(pick.length<2)return null;
+ let best=null,bd=1e9;
+ SHEET_COMPS.forEach(c=>{
+  // 고른 리더가 전부 그 자리의 대안 안에 있어야 하고, 그 행이 요구하는 자리를 다 채워야 한다
+  for(let i=0;i<3;i++){
+   const want=c.l[i],got=ids[i];
+   if(want.length&&(!got||want.indexOf(got)<0))return;
+   if(!want.length&&got)return;
+  }
+  const d=Math.min.apply(null,c.rs.map(v=>dist(mine,v)));
+  if(d<=COMP_TOL&&d<bd){bd=d;best=c;}
+ });
+ return best;
+}
 const BAND_TOL=6;   // 내 병비가 금지 비율과 이 거리 안이면 밴드
 const ROW_TOL=10;   // 상대 비율이 이 거리 밖이면 밴드 판정을 내리지 않는다
 
@@ -217,5 +239,7 @@ function calc(){
    ctr=Object.assign({mode,en:ea},
      mode==="defender"?garrisonVerdict(mine,ea):sheetVerdict(ea,mine));
  }
- render({mode,leaders,picks,r,buck,src,cls,hits,hitMul,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap});
+ // 이 편성이 시트에 있는 행인가 — 있으면 애매한 자리에서 시트 쪽으로 기운다(render.js)
+ const comp=matchComp(picks.map(p=>p.hero&&p.hero.id||""),r);
+ render({mode,leaders,picks,r,buck,src,cls,hits,hitMul,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap,comp});
 }

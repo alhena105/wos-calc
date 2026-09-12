@@ -351,3 +351,72 @@ const HEROES = [
        t:"궁병 2공격마다 적 궁병에 피해 +60%",te:"marksmen every 2 attacks: +60% damage vs enemy marksmen"}],
  w:{side:"rally",stat:"Lethality",name:"Doom Patrol"}}
 ];
+
+// ── Ton 시트의 편성 행 ───────────────────────────────────────────
+// EN 툴 둘("Gen 1~9" · "Gen 10+")의 편성 행을 그대로 옮겼다 (2026-09-12, CSV 수집).
+//   g  = 세대 · l = 리더 [보병[], 창병[], 궁병[]] (슬래시 대안을 배열로 다 담았다)
+//   rs = 라벨에 적힌 병비 **전부** ("60/40 or 60/30/10" 이면 둘 다)
+//   j  = 조이너 **칸 단위** [[칸1 후보], [칸2 후보], …]
+//        시트가 "Jessie*" 라고 적은 건 **한 칸**이고 그 칸의 후보가 제시/제셀/제로니모 셀이다.
+//        평평하게 펌치면 제시와 제셀을 둘 다 넣어도 "시트대로"가 돼버린다 — 그러면 이 기능이
+//        해결하려던 문제(같은 칸을 중복으로 잡는 것)를 그대로 놓친다.
+//
+// 쓰는 곳은 **하나**다: 입력한 리더·병비가 이 행과 맞으면, 조이너 넷을 고를 때
+// **애매한 차이는 시트 쪽으로 기울인다**(render.js 의 SHEET_EDGE).
+// 배율을 바꾸는 게 아니라 거의 같은 둘 중 어느 쪽을 집느냐만 정한다.
+// 맞는 행이 없으면 아무 일도 일어나지 않는다 — 그게 보통의 경우다.
+const SHEET_COMPS = [
+ {g:1,l:[["jeronimo"],["molly"],["zinman"]],rs:[[60,40,0],[60,10,30],[50,20,30]],j:[["lingxue"],["patrick"],["patrick"],["lumak"]]},
+ {g:1,l:[["jeronimo"],["molly"],["zinman"]],rs:[[50,20,30],[30,20,50]],j:[["lingxue"],["patrick"],["patrick"],["lumak"]]},
+ {g:2,l:[["flint"],["philly"],["zinman"]],rs:[[60,40,0],[60,10,30],[50,20,30]],j:[["patrick"],["jessie","jasser","jeronimo"],["seoyoon"],["sergey","bahiti","lumak"]]},
+ {g:2,l:[["jeronimo"],["philly"],["alonso"]],rs:[[50,20,30],[30,20,50]],j:[["patrick"],["jessie","jasser","jeronimo"],["seoyoon"],["zinman"]]},
+ {g:3,l:[["logan"],["philly"],["zinman"]],rs:[[60,40,0],[60,30,10]],j:[["mia"],["patrick"],["jessie","jasser","jeronimo"],["seoyoon"]]},
+ {g:3,l:[["jeronimo"],["mia"],["greg"]],rs:[[50,20,30],[30,20,50]],j:[["jessie","jasser","jeronimo"],["seoyoon"],["philly"],["patrick"]]},
+ {g:3,l:[["jeronimo"],["mia"],["greg","alonso"]],rs:[[60,40,0],[40,60,0]],j:[["jessie","jasser","jeronimo"],["seoyoon"],["philly"],["patrick"]]},
+ {g:3,l:[["logan"],["philly"],["greg"]],rs:[[50,20,30]],j:[["mia"],["patrick"],["jessie","jasser","jeronimo"],["seoyoon"]]},
+ {g:4,l:[["ahmose","logan"],["reina"],["lynn"]],rs:[[60,40,0],[60,30,10],[50,20,30]],j:[["mia"],["patrick"],["jessie","jasser","jeronimo"],["seoyoon"]]},
+ {g:4,l:[["jeronimo"],["reina"],["greg"]],rs:[[50,20,30],[30,20,50]],j:[["mia"],["philly"],["patrick"],["zinman"]]},
+ {g:4,l:[["jeronimo"],["mia"],["greg","alonso"]],rs:[[48,4,48],[40,10,50]],j:[["patrick"],["philly"],["zinman"],["reina"]]},
+ {g:4,l:[["jeronimo"],["reina","mia"],["greg"]],rs:[[60,40,0],[40,60,0]],j:[["patrick"],["philly"],["zinman"],["mia","reina"]]},
+ {g:4,l:[["ahmose","logan"],["molly","philly"],["lynn"]],rs:[[50,2,48]],j:[["mia"],["patrick"],["jessie","jasser","jeronimo"],["seoyoon"]]},
+ {g:5,l:[["hector","logan"],["norah"],["zinman"]],rs:[[60,40,0]],j:[["mia"],["patrick"],["jessie","jasser","jeronimo"],["philly"]]},
+ {g:5,l:[["jeronimo"],["reina"],["gwen"]],rs:[[50,20,30],[30,20,50]],j:[["mia"],["jessie","jasser","jeronimo"],["seoyoon"],["norah"]]},
+ {g:5,l:[["jeronimo"],["mia"],["gwen"]],rs:[[48,4,48],[40,10,50]],j:[["norah"],["norah"],["norah"],["patrick"]]},
+ {g:5,l:[["jeronimo"],["norah"],["greg"]],rs:[[60,40,0],[40,60,0]],j:[["mia"],["patrick"],["jessie","jasser","jeronimo"],["philly"]]},
+ {g:5,l:[["logan"],["norah"],["greg"]],rs:[[60,40,0]],j:[["mia"],["norah"],["jessie","jasser","jeronimo"],["philly"]]},
+ {g:6,l:[["wuming"],["norah"],["zinman"]],rs:[[60,40,0]],j:[["renee"],["mia"],["patrick"],["jessie","jasser","jeronimo"]]},
+ {g:6,l:[["jeronimo"],["renee"],["gwen"]],rs:[[50,20,30],[30,20,50]],j:[["jessie","jasser","jeronimo"],["seoyoon"],["mia"],["norah"]]},
+ {g:6,l:[["jeronimo","hector"],["mia"],["wayne","gwen"]],rs:[[48,4,48],[40,10,50]],j:[["norah"],["norah"],["norah"],["norah","patrick"]]},
+ {g:6,l:[["jeronimo"],["renee"],["greg"]],rs:[[60,40,0],[40,60,0]],j:[["mia"],["patrick"],["jessie","jasser","jeronimo"],["wuming"]]},
+ {g:6,l:[["logan"],["philly"],["wayne"]],rs:[[45,5,50],[40,0,60]],j:[["norah"],["norah"],["norah"],["norah","patrick"]]},
+ {g:6,l:[["hector"],["norah"],["wayne"]],rs:[[45,15,40]],j:[["mia"],["patrick"],["philly"],["lynn"]]},
+ {g:6,l:[["hector"],["molly"],["wayne"]],rs:[[50,0,50]],j:[["mia"],["patrick"],["norah"],["norah"]]},
+ {g:7,l:[["edith"],["gordon"],["bradley"]],rs:[[60,40,0]],j:[["renee"],["mia"],["reina"],["jessie","jasser","jeronimo"]]},
+ {g:7,l:[["edith"],["molly","philly"],["bradley"]],rs:[[40,0,60],[48,4,48]],j:[["mia"],["norah"],["norah"],["lynn"]]},
+ {g:7,l:[["jeronimo","edith"],["mia"],["bradley"]],rs:[[48,4,48],[40,10,50]],j:[["norah"],["norah"],["norah"],["patrick"]]},
+ {g:8,l:[["gatot"],["sonya"],["bradley"]],rs:[[60,40,0]],j:[["renee"],["patrick"],["mia"],["hendrik"]]},
+ {g:8,l:[["gatot"],["molly","philly"],["bradley"]],rs:[[40,0,60],[48,4,48]],j:[["mia"],["patrick"],["norah"],["lynn"]]},
+ {g:8,l:[["edith","jeronimo"],["mia"],["hendrik"]],rs:[[48,4,48],[40,0,60]],j:[["norah"],["norah"],["jessie","jasser","jeronimo"],["seoyoon"]]},
+ {g:8,l:[["edith","gatot"],["sonya"],["bradley"]],rs:[[60,40,0],[40,60,0]],j:[["renee"],["mia"],["hendrik"],["jessie","jasser","jeronimo"]]},
+ {g:8,l:[["jeronimo"],["gordon"],["bradley"]],rs:[[60,40,0],[40,60,0]],j:[["renee"],["mia"],["hendrik"],["patrick"]]},
+ {g:8,l:[["jeronimo"],["mia"],["bradley"]],rs:[[48,4,48]],j:[["norah"],["norah"],["norah"],["hendrik"]]},
+ {g:9,l:[["magnus"],["sonya"],["bradley"]],rs:[[60,40,0]],j:[["renee"],["mia"],["patrick"],["hendrik"]]},
+ {g:9,l:[["magnus"],["molly","philly"],["bradley","xura"]],rs:[[40,0,60],[48,4,48]],j:[["mia"],["patrick"],["norah"],["lynn"]]},
+ {g:9,l:[["magnus"],["mia"],["hendrik"]],rs:[[48,4,48],[40,10,50],[40,0,60]],j:[["norah"],["norah"],["norah"],["patrick"]]},
+ {g:9,l:[["magnus"],["fred"],["bradley"]],rs:[[60,40,0],[40,60,0]],j:[["renee"],["mia"],["patrick"],["hendrik"]]},
+ {g:10,l:[["gregory"],["freya"],["bradley"]],rs:[[60,40,0]],j:[["renee"],["mia"],["patrick"],["hendrik"]]},
+ {g:10,l:[["gregory"],["molly","philly"],["bradley","xura"]],rs:[[40,2,58],[48,4,48]],j:[["mia"],["norah"],["hendrik"],["patrick"]]},
+ {g:10,l:[["gregory"],["mia"],["blanchette"]],rs:[[48,4,48],[40,10,50]],j:[["norah"],["norah"],["hendrik"],["patrick"]]},
+ {g:10,l:[["gregory"],["fred"],["bradley"]],rs:[[60,40,0]],j:[["renee"],["mia"],["hendrik"],["patrick"]]},
+ {g:11,l:[["eleonora"],["lloyd"],["bradley"]],rs:[[60,40,0]],j:[["renee"],["mia"],["hendrik"],["reina"]]},
+ {g:11,l:[["eleonora"],["molly","philly"],["xura"]],rs:[[40,2,58],[48,4,48]],j:[["mia"],["norah"],["hendrik"],["reina"]]},
+ {g:11,l:[["eleonora"],["mia"],["rufus"]],rs:[[48,4,48],[40,10,50]],j:[["norah"],["norah"],["hendrik"],["gatot"]]},
+ {g:11,l:[["eleonora"],["lloyd","fred"],["bradley"]],rs:[[60,40,0]],j:[["renee"],["mia"],["hendrik"],["reina"]]},
+ {g:12,l:[["herbjorg"],["lloyd"],["bradley"]],rs:[[60,40,0]],j:[["mia"],["renee"],["patrick"],["hendrik"]]},
+ {g:12,l:[["herbjorg"],["lloyd"],["ligeia"]],rs:[[60,20,20]],j:[["mia"],["patrick"],["norah"],["seoyoon"]]},
+ {g:12,l:[["herbjorg"],["molly","philly"],["ligeia"]],rs:[[50,2,48]],j:[["mia"],["patrick"],["norah"],["gatot"]]},
+ {g:12,l:[["herbjorg"],["lloyd"],["ligeia"]],rs:[[50,10,40]],j:[["mia"],["patrick"],["norah"],["gatot"]]},
+ {g:12,l:[["herbjorg"],["mia"],["rufus"]],rs:[[48,4,48]],j:[["patrick"],["hendrik"],["norah"],["gatot"]]},
+ {g:12,l:[["herbjorg"],["karol"],["rufus"]],rs:[[50,10,40]],j:[["mia"],["patrick"],["hendrik"],["norah"]]},
+ {g:12,l:[["herbjorg"],["karol"],["bradley","greg"]],rs:[[60,40,0]],j:[["mia"],["renee"],["gatot"],["hendrik"]]},
+];

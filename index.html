@@ -688,6 +688,75 @@ const HEROES = [
        t:"궁병 2공격마다 적 궁병에 피해 +60%",te:"marksmen every 2 attacks: +60% damage vs enemy marksmen"}],
  w:{side:"rally",stat:"Lethality",name:"Doom Patrol"}}
 ];
+
+// ── Ton 시트의 편성 행 ───────────────────────────────────────────
+// EN 툴 둘("Gen 1~9" · "Gen 10+")의 편성 행을 그대로 옮겼다 (2026-09-12, CSV 수집).
+//   g  = 세대 · l = 리더 [보병[], 창병[], 궁병[]] (슬래시 대안을 배열로 다 담았다)
+//   rs = 라벨에 적힌 병비 **전부** ("60/40 or 60/30/10" 이면 둘 다)
+//   j  = 조이너 **칸 단위** [[칸1 후보], [칸2 후보], …]
+//        시트가 "Jessie*" 라고 적은 건 **한 칸**이고 그 칸의 후보가 제시/제셀/제로니모 셀이다.
+//        평평하게 펌치면 제시와 제셀을 둘 다 넣어도 "시트대로"가 돼버린다 — 그러면 이 기능이
+//        해결하려던 문제(같은 칸을 중복으로 잡는 것)를 그대로 놓친다.
+//
+// 쓰는 곳은 **하나**다: 입력한 리더·병비가 이 행과 맞으면, 조이너 넷을 고를 때
+// **애매한 차이는 시트 쪽으로 기울인다**(render.js 의 SHEET_EDGE).
+// 배율을 바꾸는 게 아니라 거의 같은 둘 중 어느 쪽을 집느냐만 정한다.
+// 맞는 행이 없으면 아무 일도 일어나지 않는다 — 그게 보통의 경우다.
+const SHEET_COMPS = [
+ {g:1,l:[["jeronimo"],["molly"],["zinman"]],rs:[[60,40,0],[60,10,30],[50,20,30]],j:[["lingxue"],["patrick"],["patrick"],["lumak"]]},
+ {g:1,l:[["jeronimo"],["molly"],["zinman"]],rs:[[50,20,30],[30,20,50]],j:[["lingxue"],["patrick"],["patrick"],["lumak"]]},
+ {g:2,l:[["flint"],["philly"],["zinman"]],rs:[[60,40,0],[60,10,30],[50,20,30]],j:[["patrick"],["jessie","jasser","jeronimo"],["seoyoon"],["sergey","bahiti","lumak"]]},
+ {g:2,l:[["jeronimo"],["philly"],["alonso"]],rs:[[50,20,30],[30,20,50]],j:[["patrick"],["jessie","jasser","jeronimo"],["seoyoon"],["zinman"]]},
+ {g:3,l:[["logan"],["philly"],["zinman"]],rs:[[60,40,0],[60,30,10]],j:[["mia"],["patrick"],["jessie","jasser","jeronimo"],["seoyoon"]]},
+ {g:3,l:[["jeronimo"],["mia"],["greg"]],rs:[[50,20,30],[30,20,50]],j:[["jessie","jasser","jeronimo"],["seoyoon"],["philly"],["patrick"]]},
+ {g:3,l:[["jeronimo"],["mia"],["greg","alonso"]],rs:[[60,40,0],[40,60,0]],j:[["jessie","jasser","jeronimo"],["seoyoon"],["philly"],["patrick"]]},
+ {g:3,l:[["logan"],["philly"],["greg"]],rs:[[50,20,30]],j:[["mia"],["patrick"],["jessie","jasser","jeronimo"],["seoyoon"]]},
+ {g:4,l:[["ahmose","logan"],["reina"],["lynn"]],rs:[[60,40,0],[60,30,10],[50,20,30]],j:[["mia"],["patrick"],["jessie","jasser","jeronimo"],["seoyoon"]]},
+ {g:4,l:[["jeronimo"],["reina"],["greg"]],rs:[[50,20,30],[30,20,50]],j:[["mia"],["philly"],["patrick"],["zinman"]]},
+ {g:4,l:[["jeronimo"],["mia"],["greg","alonso"]],rs:[[48,4,48],[40,10,50]],j:[["patrick"],["philly"],["zinman"],["reina"]]},
+ {g:4,l:[["jeronimo"],["reina","mia"],["greg"]],rs:[[60,40,0],[40,60,0]],j:[["patrick"],["philly"],["zinman"],["mia","reina"]]},
+ {g:4,l:[["ahmose","logan"],["molly","philly"],["lynn"]],rs:[[50,2,48]],j:[["mia"],["patrick"],["jessie","jasser","jeronimo"],["seoyoon"]]},
+ {g:5,l:[["hector","logan"],["norah"],["zinman"]],rs:[[60,40,0]],j:[["mia"],["patrick"],["jessie","jasser","jeronimo"],["philly"]]},
+ {g:5,l:[["jeronimo"],["reina"],["gwen"]],rs:[[50,20,30],[30,20,50]],j:[["mia"],["jessie","jasser","jeronimo"],["seoyoon"],["norah"]]},
+ {g:5,l:[["jeronimo"],["mia"],["gwen"]],rs:[[48,4,48],[40,10,50]],j:[["norah"],["norah"],["norah"],["patrick"]]},
+ {g:5,l:[["jeronimo"],["norah"],["greg"]],rs:[[60,40,0],[40,60,0]],j:[["mia"],["patrick"],["jessie","jasser","jeronimo"],["philly"]]},
+ {g:5,l:[["logan"],["norah"],["greg"]],rs:[[60,40,0]],j:[["mia"],["norah"],["jessie","jasser","jeronimo"],["philly"]]},
+ {g:6,l:[["wuming"],["norah"],["zinman"]],rs:[[60,40,0]],j:[["renee"],["mia"],["patrick"],["jessie","jasser","jeronimo"]]},
+ {g:6,l:[["jeronimo"],["renee"],["gwen"]],rs:[[50,20,30],[30,20,50]],j:[["jessie","jasser","jeronimo"],["seoyoon"],["mia"],["norah"]]},
+ {g:6,l:[["jeronimo","hector"],["mia"],["wayne","gwen"]],rs:[[48,4,48],[40,10,50]],j:[["norah"],["norah"],["norah"],["norah","patrick"]]},
+ {g:6,l:[["jeronimo"],["renee"],["greg"]],rs:[[60,40,0],[40,60,0]],j:[["mia"],["patrick"],["jessie","jasser","jeronimo"],["wuming"]]},
+ {g:6,l:[["logan"],["philly"],["wayne"]],rs:[[45,5,50],[40,0,60]],j:[["norah"],["norah"],["norah"],["norah","patrick"]]},
+ {g:6,l:[["hector"],["norah"],["wayne"]],rs:[[45,15,40]],j:[["mia"],["patrick"],["philly"],["lynn"]]},
+ {g:6,l:[["hector"],["molly"],["wayne"]],rs:[[50,0,50]],j:[["mia"],["patrick"],["norah"],["norah"]]},
+ {g:7,l:[["edith"],["gordon"],["bradley"]],rs:[[60,40,0]],j:[["renee"],["mia"],["reina"],["jessie","jasser","jeronimo"]]},
+ {g:7,l:[["edith"],["molly","philly"],["bradley"]],rs:[[40,0,60],[48,4,48]],j:[["mia"],["norah"],["norah"],["lynn"]]},
+ {g:7,l:[["jeronimo","edith"],["mia"],["bradley"]],rs:[[48,4,48],[40,10,50]],j:[["norah"],["norah"],["norah"],["patrick"]]},
+ {g:8,l:[["gatot"],["sonya"],["bradley"]],rs:[[60,40,0]],j:[["renee"],["patrick"],["mia"],["hendrik"]]},
+ {g:8,l:[["gatot"],["molly","philly"],["bradley"]],rs:[[40,0,60],[48,4,48]],j:[["mia"],["patrick"],["norah"],["lynn"]]},
+ {g:8,l:[["edith","jeronimo"],["mia"],["hendrik"]],rs:[[48,4,48],[40,0,60]],j:[["norah"],["norah"],["jessie","jasser","jeronimo"],["seoyoon"]]},
+ {g:8,l:[["edith","gatot"],["sonya"],["bradley"]],rs:[[60,40,0],[40,60,0]],j:[["renee"],["mia"],["hendrik"],["jessie","jasser","jeronimo"]]},
+ {g:8,l:[["jeronimo"],["gordon"],["bradley"]],rs:[[60,40,0],[40,60,0]],j:[["renee"],["mia"],["hendrik"],["patrick"]]},
+ {g:8,l:[["jeronimo"],["mia"],["bradley"]],rs:[[48,4,48]],j:[["norah"],["norah"],["norah"],["hendrik"]]},
+ {g:9,l:[["magnus"],["sonya"],["bradley"]],rs:[[60,40,0]],j:[["renee"],["mia"],["patrick"],["hendrik"]]},
+ {g:9,l:[["magnus"],["molly","philly"],["bradley","xura"]],rs:[[40,0,60],[48,4,48]],j:[["mia"],["patrick"],["norah"],["lynn"]]},
+ {g:9,l:[["magnus"],["mia"],["hendrik"]],rs:[[48,4,48],[40,10,50],[40,0,60]],j:[["norah"],["norah"],["norah"],["patrick"]]},
+ {g:9,l:[["magnus"],["fred"],["bradley"]],rs:[[60,40,0],[40,60,0]],j:[["renee"],["mia"],["patrick"],["hendrik"]]},
+ {g:10,l:[["gregory"],["freya"],["bradley"]],rs:[[60,40,0]],j:[["renee"],["mia"],["patrick"],["hendrik"]]},
+ {g:10,l:[["gregory"],["molly","philly"],["bradley","xura"]],rs:[[40,2,58],[48,4,48]],j:[["mia"],["norah"],["hendrik"],["patrick"]]},
+ {g:10,l:[["gregory"],["mia"],["blanchette"]],rs:[[48,4,48],[40,10,50]],j:[["norah"],["norah"],["hendrik"],["patrick"]]},
+ {g:10,l:[["gregory"],["fred"],["bradley"]],rs:[[60,40,0]],j:[["renee"],["mia"],["hendrik"],["patrick"]]},
+ {g:11,l:[["eleonora"],["lloyd"],["bradley"]],rs:[[60,40,0]],j:[["renee"],["mia"],["hendrik"],["reina"]]},
+ {g:11,l:[["eleonora"],["molly","philly"],["xura"]],rs:[[40,2,58],[48,4,48]],j:[["mia"],["norah"],["hendrik"],["reina"]]},
+ {g:11,l:[["eleonora"],["mia"],["rufus"]],rs:[[48,4,48],[40,10,50]],j:[["norah"],["norah"],["hendrik"],["gatot"]]},
+ {g:11,l:[["eleonora"],["lloyd","fred"],["bradley"]],rs:[[60,40,0]],j:[["renee"],["mia"],["hendrik"],["reina"]]},
+ {g:12,l:[["herbjorg"],["lloyd"],["bradley"]],rs:[[60,40,0]],j:[["mia"],["renee"],["patrick"],["hendrik"]]},
+ {g:12,l:[["herbjorg"],["lloyd"],["ligeia"]],rs:[[60,20,20]],j:[["mia"],["patrick"],["norah"],["seoyoon"]]},
+ {g:12,l:[["herbjorg"],["molly","philly"],["ligeia"]],rs:[[50,2,48]],j:[["mia"],["patrick"],["norah"],["gatot"]]},
+ {g:12,l:[["herbjorg"],["lloyd"],["ligeia"]],rs:[[50,10,40]],j:[["mia"],["patrick"],["norah"],["gatot"]]},
+ {g:12,l:[["herbjorg"],["mia"],["rufus"]],rs:[[48,4,48]],j:[["patrick"],["hendrik"],["norah"],["gatot"]]},
+ {g:12,l:[["herbjorg"],["karol"],["rufus"]],rs:[[50,10,40]],j:[["mia"],["patrick"],["hendrik"],["norah"]]},
+ {g:12,l:[["herbjorg"],["karol"],["bradley","greg"]],rs:[[60,40,0]],j:[["mia"],["renee"],["gatot"],["hendrik"]]},
+];
 /* =============================================================================
    gear-data.js — 홍색(전설) 영웅장비 상수
    -----------------------------------------------------------------------------
@@ -924,6 +993,28 @@ const COUNTERS=i18nFill([],function(){return[
  {m:[40,10,50],lbl:L("40/10/50 (준공격)","40/10/50 (semi-offensive)"),src:"theory",cv:[[40,40,20],[50,40,10]],
   c:["40/40/20","50/40/10"],ban:[],
   why:L("상대 창병이 10뿐이라 내 후열이 안전하다. 창40으로 상대 주력(궁50)을 지운다. ※ 가이드 카운터표에 없는 확장 항목(이론).","With only 10 lancers on their side your back line is safe. 40 lancers erase their main damage (50 marksmen). Note: an extension not present in the guide's counter table (theory).")}];});
+// ── 지금 이 편성이 시트의 어느 행인가 ────────────────────────────────
+// 리더 셋이 그 행의 (대안 포함) 리더와 맞고 병비가 라벨에 적힌 비율 중 하나와 가까우면 그 행이다.
+// 허용 오차는 밴드 판정과 같은 6 을 쓴다 — 시트가 한 행에 여러 비율을 적어 두므로
+// 그 사이를 메우려고 넓힐 필요가 없다(48/4/48 과 40/10/50 은 둘 다 rs 에 들어 있다).
+const COMP_TOL=6;
+function matchComp(ids,r){
+ const mine=[r.inf,r.lan,r.mar];
+ const pick=ids.filter(Boolean);
+ if(pick.length<2)return null;
+ let best=null,bd=1e9;
+ SHEET_COMPS.forEach(c=>{
+  // 고른 리더가 전부 그 자리의 대안 안에 있어야 하고, 그 행이 요구하는 자리를 다 채워야 한다
+  for(let i=0;i<3;i++){
+   const want=c.l[i],got=ids[i];
+   if(want.length&&(!got||want.indexOf(got)<0))return;
+   if(!want.length&&got)return;
+  }
+  const d=Math.min.apply(null,c.rs.map(v=>dist(mine,v)));
+  if(d<=COMP_TOL&&d<bd){bd=d;best=c;}
+ });
+ return best;
+}
 const BAND_TOL=6;   // 내 병비가 금지 비율과 이 거리 안이면 밴드
 const ROW_TOL=10;   // 상대 비율이 이 거리 밖이면 밴드 판정을 내리지 않는다
 
@@ -1077,7 +1168,9 @@ function calc(){
    ctr=Object.assign({mode,en:ea},
      mode==="defender"?garrisonVerdict(mine,ea):sheetVerdict(ea,mine));
  }
- render({mode,leaders,picks,r,buck,src,cls,hits,hitMul,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap});
+ // 이 편성이 시트에 있는 행인가 — 있으면 애매한 자리에서 시트 쪽으로 기운다(render.js)
+ const comp=matchComp(picks.map(p=>p.hero&&p.hero.id||""),r);
+ render({mode,leaders,picks,r,buck,src,cls,hits,hitMul,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap,comp});
 }
 /* =============================================================================
    gear-engine.js — 홍색 장비 업그레이드 순서 계산. 순수 함수만 있다.
@@ -1339,10 +1432,14 @@ const esc=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[
 const hpic=(h,cls)=>'<img class="hpic'+(cls?" "+cls:"")+'" loading="lazy" alt="" src="img/heroes/'+
  encodeURIComponent(h.id)+'.webp" onerror="this.remove()">';
 const sTag=s=>'<span class="slot s-'+(["A","B","E","F","G","C","D"].includes(s)?s:"X")+'">'+s+'</span>';
+// 애매한 차이의 기준 — 최고값의 (1−SHEET_EDGE) 안이면 "가를 수 없다"고 본다.
+// 최상위 let 이다 — 검사가 0 으로 끄고 **순수 모델**의 시트 재현율을 따로 재야 하기 때문이다.
+// 시트를 따른 상태에서 재는 재현율은 순환논이라 검증이 아니다.
+let SHEET_EDGE=.02;
 const statKr=i18nFill({},function(){return{Attack:L("공격력","Attack"),Defense:L("방어력","Defense"),Lethality:L("파괴력","Lethality"),Health:L("체력","Health")};});
 
 function render(d){
- const {mode,leaders,picks,r,buck,src,cls,hits,hitMul,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap}=d;
+ const {mode,leaders,picks,r,buck,src,cls,hits,hitMul,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap,comp}=d;
  let o="";
  const modeKr=mode==="rally"?L("공성(랠리)","Rally (offense)"):L("수성(개리슨)","Garrison (defense)");
  o+='<h2>'+L("① 리더 구성","① Leaders")+' <span>'+modeKr+L(" · 병비 "," · ratio ")+r.inf.toFixed(0)+"/"+r.lan.toFixed(0)+"/"+r.mar.toFixed(0)+'</span></h2>';
@@ -1498,14 +1595,40 @@ function render(d){
  //
  // 동률이면 pool 순서가 이긴다 — pool 은 이미 투자 문턱(시트 등재 → 에픽 → 낮은 세대)으로
  // 정렬돼 있으므로 그 정책이 그대로 지켜진다.
+ // 애매하면 시트를 따른다 — 입력이 시트 행과 맞을 때만.
+ // 매 단계에서 최고값의 (1−SHEET_EDGE) 안에 드는 후보 중 **그 행의 조이너**가 있으면 그쪽을 집는다.
+ // 배율을 바꾸는 게 아니라, 거의 같은 둘 중 어느 쪽을 집느냐만 정한다.
+ //
+ // 여유폭 2% 의 근거는 **우리 모델 자체의 오차**다. 근거 없는 가정 둘을 흔들어 보면
+ // (DW.infantry 0.3→0.2/0.5 · NA_SHARE 0.8→0.7/0.9) 추천 4명의 전투 배율이
+ // 평균 1.0~1.75% · 최대 2.4~7.0% 움직이고, NA_SHARE 를 ±0.1 만 흔들어도
+ // **52행 중 29~35행의 명단이 바뀐다.** 그 안쪽 차이는 우리가 가를 수 없다 → 시트를 따른다.
+ // 실측 대가: 전투 배율 평균 −0.27% · 최대 −2.09% (여유폭과 같은 크기다).
+ // 시트 행의 조이너는 **칸 단위**다. 아직 안 채운 칸을 메우는 후보만 우대한다 —
+ // 그래야 "제시* 칸"에 제시와 제셀을 둘 다 넣고 시트대로라고 우기는 일이 없다.
  const pick4=list=>{
+  const cells=comp?comp.j:null;
   const out=[];
   for(let k=0;k<4;k++){
    let best=null,bv=-1;
    list.forEach(c=>{if(out.indexOf(c)>=0)return;
     const v=comboAll(out.concat([c]));
     if(v>bv+1e-9){bv=v;best=c;}});
-   if(!best)break;out.push(best);}
+   if(!best)break;
+   if(cells&&SHEET_EDGE>0){
+    // 이미 out 이 채운 칸은 뺀다 — **한 명이 한 칸만** 먹는다(먼저 비어 있는 칸부터).
+    const used=[];
+    out.forEach(x=>{for(let i=0;i<cells.length;i++)
+      if(used.indexOf(i)<0&&cells[i].indexOf(x.h.id)>=0){used.push(i);break;}});
+    const opens=cells.filter((cell,i)=>used.indexOf(i)<0);
+    let alt=null,av=-1;
+    list.forEach(c=>{if(out.indexOf(c)>=0)return;
+     if(!opens.some(cell=>cell.indexOf(c.h.id)>=0))return;
+     const v=comboAll(out.concat([c]));
+     if(v>=bv*(1-SHEET_EDGE)-1e-12&&v>av){av=v;alt=c;}});
+    if(alt)best=alt;
+   }
+   out.push(best);}
   return out;};
  const calcTop=pick4(pool);
  // 시트 등재 영웅은 에픽 8명이 gen 0 이라 gcap 을 아무리 낮춰도 넷은 남는다.
@@ -1516,8 +1639,12 @@ function render(d){
   ' <span class="tag t-ok">'+L("시트 등재만","sheet-listed only")+'</span></h3><p><b>'+top.map(x=>hpic(x.h,"sm")+esc(HN(x.h))).join(" · ")+
   '</b></p><p class="cap">'+L("전투 배율 ×","Combat multiplier ×")+comboAll(top).toFixed(3)+
   L(" · 리더와 겹치는 영웅은 자동 제외했습니다."," · heroes already used as leaders are excluded automatically.")+"</p>"+
-  '<p class="cap">'+L("여기 나오는 건 <b>Ton 시트 조이너 명단에 오른 영웅만</b>입니다. 계산 순위 1~4위를 그대로 쓰지 않는 이유는 <b>투자 문턱</b> 때문입니다 — 이론 순위가 높아도 전설은 만렙 보유자가 적고, 만렙 찍은 사람은 대개 이미 그 영웅을 리더로 쓰고 있어 조이너로 못 뺍니다. 시트 52행과 대조했더니 <b>이쪽이 #1 재현 90.4% · 겹침 58.8%</b> 로, 계산 순위 그대로(84.6% · 50.0%)보다 낫고 <b>한 행도 나빠지지 않았습니다</b>.",
-     "These are only heroes on the Ton sheet’s joiner list. The raw top four is not used because of the <b>investment threshold</b>: legendaries are rarely maxed, and whoever did max one is usually already running it as a leader. Checked against all 52 sheet rows, this list reproduces the sheet’s #1 joiner <b>90.4%</b> of the time with <b>58.8%</b> overlap, against 84.6% / 50.0% for the raw ranking — and it was never worse on any row.")+"</p>"+
+  '<p class="cap">'+L("여기 나오는 건 <b>Ton 시트 조이너 명단에 오른 영웅만</b>입니다. 계산 순위 1~4위를 그대로 쓰지 않는 이유는 <b>투자 문턱</b> 때문입니다 — 이론 순위가 높아도 전설은 만렙 보유자가 적고, 만렙 찍은 사람은 대개 이미 그 영웅을 리더로 쓰고 있어 조이너로 못 뺍니다. 시트 52행과 대조했더니 <b>이쪽이 #1 재현 92.3% · 겹침 61.4%</b> 로, 계산 순위 그대로(86.5% · 51.8%)보다 낫고 <b>한 행도 나빠지지 않았습니다</b>.",
+     "These are only heroes on the Ton sheet’s joiner list. The raw top four is not used because of the <b>investment threshold</b>: legendaries are rarely maxed, and whoever did max one is usually already running it as a leader. Checked against all 52 sheet rows, this list reproduces the sheet’s #1 joiner <b>92.3%</b> of the time with <b>61.4%</b> overlap, against 86.5% / 51.8% for the raw ranking — and it was never worse on any row.")+"</p>"+
+  (comp?'<p class="cap">'+L("📋 이 편성은 <b>Ton 시트 Gen "+comp.g+" 행</b>에 있습니다(병비 "+comp.rs.map(v=>v.join("/")).join(" · ")+"). 시트가 적은 조이너는 <b>"+
+     comp.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+"</b> 입니다. 계산이 <b>2% 안쪽으로 애매하면 시트 쪽을 집습니다</b> — 우리 모델의 자체 오차가 딱 그 크기라(근거 없는 가정 <code>DW.infantry</code>·<code>NA_SHARE</code> 를 흔들면 배율이 1~2% 움직이고 절반 넘는 행의 명단이 바뀝니다) 그 안쪽은 계산이 가를 수 없기 때문입니다. <b>시트에 없는 편성에서는 이 보정이 걸리지 않습니다.</b>",
+     "📋 This lineup is <b>row Gen "+comp.g+" of the Ton sheet</b> (ratios "+comp.rs.map(v=>v.join("/")).join(", ")+"), whose joiners are <b>"+
+     comp.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+"</b>. Where our figures are <b>within 2%, the sheet wins</b> — that is the size of our own error bar (nudging the unfounded <code>DW.infantry</code> and <code>NA_SHARE</code> assumptions moves the multiplier 1–2% and changes over half the rows), so the model cannot separate them. <b>No such nudge is applied to lineups the sheet does not cover.</b>")+"</p>":"")+
   '<p class="cap">'+L("넷은 ⑤ 순위 상위 4명을 그냥 자른 게 아니라, <b>포화를 보며 한 명씩</b> 골랐습니다 — 매번 “여기에 더했을 때 전투 배율이 가장 커지는 한 명”입니다. 자르기만 하면 <b>제시·제셀·제로니모처럼 같은 A칸에 들어가는 영웅이 나란히 뽑힙니다</b>(각자 ×1.250 이지만 둘째는 ×1.200, 셋째는 ×1.167 로 떨어집니다). 그래서 순위표 1~4위와 명단이 다를 수 있습니다.",
      "The four are not the top four of ranking ⑤ — each is picked in turn as <b>whoever raises the combined multiplier most</b>, given the ones already chosen. Plain truncation lines up heroes that share a slot (Jessie, Jasser and Jeronimo all fill A: ×1.250, then ×1.200, then ×1.167). So this list can differ from rows 1–4 of the table.")+"</p>"+
   '<p class="cap">'+L("위 배율은 네 명의 단독 배율을 곱한 값이 아니라 <b>같은 칸에 겹치는 분을 합쳤을 때</b>의 값입니다. 순위표의 배율을 넣는 순서대로 곱하면 더 크게 나오는데, 그건 포화를 빼먹은 숫자입니다. 그리고 <b>생존 칸도 같은 무게로 셉니다</b> — 전투비를 양쪽 식으로 펴면 <code>(내딜증 × 내감소) ÷ (상대딜증 × 상대감소)</code> 라, 내 딜 칸과 내 감소 칸이 결과에 똑같이 곱해집니다.",

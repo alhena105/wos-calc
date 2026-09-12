@@ -755,6 +755,7 @@ section("전투 배율 — bk 겹침 · pc 기대값");
   // 이 조합(로건·필리·웨인 45/5/50)은 추천이 미아·노라·제시·제셀 로 나와 둘을 한꺼번에 밟는다.
   const a = boot("ko").leaders("logan", "philly", "wayne").mine([45, 5, 50]);
   a.el("gcap").value = "6";
+  a.js("SHEET_EDGE=0");   // 이 절은 comboAll 자체를 보는 자리다 — 시트 우선을 끄고 순수 모델로 잰다
   const html = a.render();
   const st = html.indexOf('id="rec"');
   const ids = [...html.slice(st, html.indexOf("</b>", st)).matchAll(/img\/heroes\/([a-z-]+)\.webp/g)].map(m => m[1]);
@@ -862,9 +863,13 @@ section("시트 행 대조 (조이너 순위)");
   // 실제 추천은 그걸 빼고 고르는데 검사가 안 빼서 2026-09-12 까지 재현율이 낮게 찍혔다
   // (49행 기준 73.5% 로 나왔는데 추천 패널로 재면 같은 엔진이 81.5% 였다).
   // 화면에서 사람이 읽는 것도 추천 패널이므로 거기를 본다.
+  // ⚠️ 여기서는 **시트 우선(SHEET_EDGE)을 꺼야 한다.** 켜 두면 "시트를 보고 시트에 맞췄더니
+  // 시트와 맞더라" 가 되어 검증이 아니라 순환논이다. 이 절은 **순수 모델**의 재현율만 잰다.
+  // 시트 우선의 효과와 대가는 바로 아래 절에서 따로 잰다.
   const recOf = row => {
     const a = boot("ko").leaders(row.lead[0] || "", row.lead[1] || "", row.lead[2] || "").mine(row.r);
     a.el("gcap").value = String(row.gen);
+    a.js("SHEET_EDGE=0");
     const html = a.render();
     const after = html.slice(html.indexOf('id="rec"'));
     const b = /<p><b>([\s\S]*?)<\/b><\/p>/.exec(after);
@@ -894,6 +899,7 @@ section("시트 행 대조 (조이너 순위)");
   for (const row of SHEET_ROWS) {
     const a = boot("ko").leaders(row.lead[0] || "", row.lead[1] || "", row.lead[2] || "").mine(row.r);
     a.el("gcap").value = String(row.gen);
+    a.js("SHEET_EDGE=0");   // 시트 우선은 일부러 배율을 낮추므로 여기서는 끈다
     const html = a.render();
     const after = html.slice(html.indexOf('id="rec"'));
     const shown = +(/전투 배율 ×([\d.]+)/.exec(after) || [0, 0])[1];
@@ -938,6 +944,82 @@ section("시트 행 대조 (조이너 순위)");
   note("포화를 보며 고르기가 자르기보다 높은 행 " + gWin + "/" + SHEET_ROWS.length + " · 낮은 행 " + gLose);
   ok(gLose === 0, "자르기보다 낮아지는 행이 없다", String(gLose));
   ok(gWin >= 15, "자르기보다 실제로 높아지는 행이 충분히 많다", String(gWin));
+}
+
+// ── N+8. 애매하면 시트를 따른다 (SHEET_COMPS · SHEET_EDGE) ──────────────
+section("애매하면 시트 우선");
+{
+  // ⚠️ 이 절의 "시트 재현율"은 **검증이 아니다.** 시트를 보고 시트 쪽으로 기울였으니
+  // 올라가는 게 당연하다. 여기서 지켜야 하는 것은 두 가지다:
+  //   ① 시트 행과 안 맞는 입력에서는 **아무 일도 일어나지 않는다**
+  //   ② 시트를 따르느라 잃는 배율이 여유폭(2%) 안에 머문다
+  const pick = (row, edge) => {
+    const a = boot("ko").leaders(row.lead[0] || "", row.lead[1] || "", row.lead[2] || "").mine(row.r);
+    a.el("gcap").value = String(row.gen);
+    a.js("SHEET_EDGE=" + edge);
+    const html = a.render();
+    const after = html.slice(html.indexOf('id="rec"'));
+    const b = /<p><b>([\s\S]*?)<\/b><\/p>/.exec(after);
+    return {
+      ids: b ? [...b[1].matchAll(/heroes\/([a-z-]+)\.webp/g)].map(m => m[1]) : [],
+      v: +(/전투 배율 ×([\d.]+)/.exec(after) || [0, 0])[1],
+    };
+  };
+  // 모든 시트 행이 실제로 매칭되어야 한다 — 안 되면 SHEET_COMPS 가 픽스처와 어긋난 것이다
+  let matched = 0;
+  for (const row of SHEET_ROWS) {
+    const a = boot("ko").leaders(row.lead[0] || "", row.lead[1] || "", row.lead[2] || "").mine(row.r);
+    if (a.js("!!matchComp(" + JSON.stringify(row.lead) + ",norm(" + row.r.join(",") + "))")) matched++;
+  }
+  ok(matched === SHEET_ROWS.length,
+     "SHEET_ROWS 52행이 전부 SHEET_COMPS 에서 찾아진다 (두 표가 어긋나지 않았다)",
+     matched + "/" + SHEET_ROWS.length);
+
+  let changed = 0, loss = 0, worst = 0, first0 = 0, first1 = 0, hit0 = 0, hit1 = 0, tot = 0;
+  for (const row of SHEET_ROWS) {
+    const off = pick(row, 0), on = pick(row, 0.02);
+    if (off.ids.join() !== on.ids.join()) changed++;
+    const d = (off.v - on.v) / off.v * 100;
+    loss += d; if (d > worst) worst = d;
+    if (row.top.some(x => off.ids.includes(x))) first0++;
+    if (row.top.some(x => on.ids.includes(x))) first1++;
+    for (const j of row.pri) { tot++; if (off.ids.includes(j)) hit0++; if (on.ids.includes(j)) hit1++; }
+  }
+  note("명단이 바뀐 행 " + changed + "/" + SHEET_ROWS.length +
+       " · 배율 손실 평균 " + (loss / SHEET_ROWS.length).toFixed(3) + "% · 최대 " + worst.toFixed(2) + "%");
+  note("(참고 · 검증 아님) 시트 #1 재현 " + (first0 / SHEET_ROWS.length * 100).toFixed(1) + "% → " +
+       (first1 / SHEET_ROWS.length * 100).toFixed(1) + "% · 겹침 " +
+       (hit0 / tot * 100).toFixed(1) + "% → " + (hit1 / tot * 100).toFixed(1) + "%");
+  ok(worst <= 2.5, "시트를 따르느라 잃는 배율이 여유폭(2%) 근처를 넘지 않는다", worst.toFixed(2) + "%");
+  ok(changed >= 10, "시트 행에서 실제로 판단이 바뀐다", String(changed));
+  ok(hit1 > hit0 && first1 >= first0, "따르게 했으니 시트와 더 가까워진다", hit1 + " vs " + hit0);
+
+  // ① 시트에 없는 편성에서는 아무 일도 일어나지 않아야 한다
+  const odd = {lead: ["flint", "mia", "bradley"], r: [33, 34, 33], gen: 17};
+  {
+    const a = boot("ko").leaders(odd.lead[0], odd.lead[1], odd.lead[2]).mine(odd.r);
+    ok(!a.js("!!matchComp(" + JSON.stringify(odd.lead) + ",norm(" + odd.r.join(",") + "))"),
+       "시트에 없는 조합은 매칭되지 않는다");
+    ok(pick(odd, 0).ids.join() === pick(odd, 0.02).ids.join(),
+       "매칭이 없으면 시트 우선이 결과를 바꾸지 않는다", pick(odd, 0.02).ids.join());
+  }
+  // ② 리더는 맞는데 병비가 멀면 매칭되지 않는다 (허용 오차 6)
+  {
+    const a = boot("ko").leaders("logan", "philly", "zinman").mine([10, 10, 80]);
+    ok(!a.js('!!matchComp(["logan","philly","zinman"],norm(10,10,80))'),
+       "리더가 같아도 병비가 멀면 매칭되지 않는다");
+  }
+  // ③ 사용자가 잡은 자리: 로건·필리·진먼 60/40/0 Gen 3 → 시트는 미아·패트릭·제시*·서윤
+  {
+    const row = {lead: ["logan", "philly", "zinman"], r: [60, 40, 0], gen: 3};
+    const on = pick(row, 0.02);
+    ok(on.ids.includes("patrick") && on.ids.includes("mia") &&
+       on.ids.includes("seoyoon") && on.ids.some(x => ["jessie", "jasser", "jeronimo"].includes(x)),
+       "로건·필리·진먼 60/40 에서 시트의 네 칸을 그대로 채운다", on.ids.join(","));
+    // 제시 칸을 두 명이 먹지 않는다
+    ok(on.ids.filter(x => ["jessie", "jasser", "jeronimo"].includes(x)).length === 1,
+       "제시* 칸은 한 명만 채운다 (평평하게 펴면 둘이 들어가던 자리)", on.ids.join(","));
+  }
 }
 
 // ── 결과 ───────────────────────────────────────────────────────────────

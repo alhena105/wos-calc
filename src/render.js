@@ -3,10 +3,14 @@ const esc=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[
 const hpic=(h,cls)=>'<img class="hpic'+(cls?" "+cls:"")+'" loading="lazy" alt="" src="img/heroes/'+
  encodeURIComponent(h.id)+'.webp" onerror="this.remove()">';
 const sTag=s=>'<span class="slot s-'+(["A","B","E","F","G","C","D"].includes(s)?s:"X")+'">'+s+'</span>';
+// 애매한 차이의 기준 — 최고값의 (1−SHEET_EDGE) 안이면 "가를 수 없다"고 본다.
+// 최상위 let 이다 — 검사가 0 으로 끄고 **순수 모델**의 시트 재현율을 따로 재야 하기 때문이다.
+// 시트를 따른 상태에서 재는 재현율은 순환논이라 검증이 아니다.
+let SHEET_EDGE=.02;
 const statKr=i18nFill({},function(){return{Attack:L("공격력","Attack"),Defense:L("방어력","Defense"),Lethality:L("파괴력","Lethality"),Health:L("체력","Health")};});
 
 function render(d){
- const {mode,leaders,picks,r,buck,src,cls,hits,hitMul,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap}=d;
+ const {mode,leaders,picks,r,buck,src,cls,hits,hitMul,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap,comp}=d;
  let o="";
  const modeKr=mode==="rally"?L("공성(랠리)","Rally (offense)"):L("수성(개리슨)","Garrison (defense)");
  o+='<h2>'+L("① 리더 구성","① Leaders")+' <span>'+modeKr+L(" · 병비 "," · ratio ")+r.inf.toFixed(0)+"/"+r.lan.toFixed(0)+"/"+r.mar.toFixed(0)+'</span></h2>';
@@ -162,14 +166,40 @@ function render(d){
  //
  // 동률이면 pool 순서가 이긴다 — pool 은 이미 투자 문턱(시트 등재 → 에픽 → 낮은 세대)으로
  // 정렬돼 있으므로 그 정책이 그대로 지켜진다.
+ // 애매하면 시트를 따른다 — 입력이 시트 행과 맞을 때만.
+ // 매 단계에서 최고값의 (1−SHEET_EDGE) 안에 드는 후보 중 **그 행의 조이너**가 있으면 그쪽을 집는다.
+ // 배율을 바꾸는 게 아니라, 거의 같은 둘 중 어느 쪽을 집느냐만 정한다.
+ //
+ // 여유폭 2% 의 근거는 **우리 모델 자체의 오차**다. 근거 없는 가정 둘을 흔들어 보면
+ // (DW.infantry 0.3→0.2/0.5 · NA_SHARE 0.8→0.7/0.9) 추천 4명의 전투 배율이
+ // 평균 1.0~1.75% · 최대 2.4~7.0% 움직이고, NA_SHARE 를 ±0.1 만 흔들어도
+ // **52행 중 29~35행의 명단이 바뀐다.** 그 안쪽 차이는 우리가 가를 수 없다 → 시트를 따른다.
+ // 실측 대가: 전투 배율 평균 −0.27% · 최대 −2.09% (여유폭과 같은 크기다).
+ // 시트 행의 조이너는 **칸 단위**다. 아직 안 채운 칸을 메우는 후보만 우대한다 —
+ // 그래야 "제시* 칸"에 제시와 제셀을 둘 다 넣고 시트대로라고 우기는 일이 없다.
  const pick4=list=>{
+  const cells=comp?comp.j:null;
   const out=[];
   for(let k=0;k<4;k++){
    let best=null,bv=-1;
    list.forEach(c=>{if(out.indexOf(c)>=0)return;
     const v=comboAll(out.concat([c]));
     if(v>bv+1e-9){bv=v;best=c;}});
-   if(!best)break;out.push(best);}
+   if(!best)break;
+   if(cells&&SHEET_EDGE>0){
+    // 이미 out 이 채운 칸은 뺀다 — **한 명이 한 칸만** 먹는다(먼저 비어 있는 칸부터).
+    const used=[];
+    out.forEach(x=>{for(let i=0;i<cells.length;i++)
+      if(used.indexOf(i)<0&&cells[i].indexOf(x.h.id)>=0){used.push(i);break;}});
+    const opens=cells.filter((cell,i)=>used.indexOf(i)<0);
+    let alt=null,av=-1;
+    list.forEach(c=>{if(out.indexOf(c)>=0)return;
+     if(!opens.some(cell=>cell.indexOf(c.h.id)>=0))return;
+     const v=comboAll(out.concat([c]));
+     if(v>=bv*(1-SHEET_EDGE)-1e-12&&v>av){av=v;alt=c;}});
+    if(alt)best=alt;
+   }
+   out.push(best);}
   return out;};
  const calcTop=pick4(pool);
  // 시트 등재 영웅은 에픽 8명이 gen 0 이라 gcap 을 아무리 낮춰도 넷은 남는다.
@@ -180,8 +210,12 @@ function render(d){
   ' <span class="tag t-ok">'+L("시트 등재만","sheet-listed only")+'</span></h3><p><b>'+top.map(x=>hpic(x.h,"sm")+esc(HN(x.h))).join(" · ")+
   '</b></p><p class="cap">'+L("전투 배율 ×","Combat multiplier ×")+comboAll(top).toFixed(3)+
   L(" · 리더와 겹치는 영웅은 자동 제외했습니다."," · heroes already used as leaders are excluded automatically.")+"</p>"+
-  '<p class="cap">'+L("여기 나오는 건 <b>Ton 시트 조이너 명단에 오른 영웅만</b>입니다. 계산 순위 1~4위를 그대로 쓰지 않는 이유는 <b>투자 문턱</b> 때문입니다 — 이론 순위가 높아도 전설은 만렙 보유자가 적고, 만렙 찍은 사람은 대개 이미 그 영웅을 리더로 쓰고 있어 조이너로 못 뺍니다. 시트 52행과 대조했더니 <b>이쪽이 #1 재현 90.4% · 겹침 58.8%</b> 로, 계산 순위 그대로(84.6% · 50.0%)보다 낫고 <b>한 행도 나빠지지 않았습니다</b>.",
-     "These are only heroes on the Ton sheet’s joiner list. The raw top four is not used because of the <b>investment threshold</b>: legendaries are rarely maxed, and whoever did max one is usually already running it as a leader. Checked against all 52 sheet rows, this list reproduces the sheet’s #1 joiner <b>90.4%</b> of the time with <b>58.8%</b> overlap, against 84.6% / 50.0% for the raw ranking — and it was never worse on any row.")+"</p>"+
+  '<p class="cap">'+L("여기 나오는 건 <b>Ton 시트 조이너 명단에 오른 영웅만</b>입니다. 계산 순위 1~4위를 그대로 쓰지 않는 이유는 <b>투자 문턱</b> 때문입니다 — 이론 순위가 높아도 전설은 만렙 보유자가 적고, 만렙 찍은 사람은 대개 이미 그 영웅을 리더로 쓰고 있어 조이너로 못 뺍니다. 시트 52행과 대조했더니 <b>이쪽이 #1 재현 92.3% · 겹침 61.4%</b> 로, 계산 순위 그대로(86.5% · 51.8%)보다 낫고 <b>한 행도 나빠지지 않았습니다</b>.",
+     "These are only heroes on the Ton sheet’s joiner list. The raw top four is not used because of the <b>investment threshold</b>: legendaries are rarely maxed, and whoever did max one is usually already running it as a leader. Checked against all 52 sheet rows, this list reproduces the sheet’s #1 joiner <b>92.3%</b> of the time with <b>61.4%</b> overlap, against 86.5% / 51.8% for the raw ranking — and it was never worse on any row.")+"</p>"+
+  (comp?'<p class="cap">'+L("📋 이 편성은 <b>Ton 시트 Gen "+comp.g+" 행</b>에 있습니다(병비 "+comp.rs.map(v=>v.join("/")).join(" · ")+"). 시트가 적은 조이너는 <b>"+
+     comp.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+"</b> 입니다. 계산이 <b>2% 안쪽으로 애매하면 시트 쪽을 집습니다</b> — 우리 모델의 자체 오차가 딱 그 크기라(근거 없는 가정 <code>DW.infantry</code>·<code>NA_SHARE</code> 를 흔들면 배율이 1~2% 움직이고 절반 넘는 행의 명단이 바뀝니다) 그 안쪽은 계산이 가를 수 없기 때문입니다. <b>시트에 없는 편성에서는 이 보정이 걸리지 않습니다.</b>",
+     "📋 This lineup is <b>row Gen "+comp.g+" of the Ton sheet</b> (ratios "+comp.rs.map(v=>v.join("/")).join(", ")+"), whose joiners are <b>"+
+     comp.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+"</b>. Where our figures are <b>within 2%, the sheet wins</b> — that is the size of our own error bar (nudging the unfounded <code>DW.infantry</code> and <code>NA_SHARE</code> assumptions moves the multiplier 1–2% and changes over half the rows), so the model cannot separate them. <b>No such nudge is applied to lineups the sheet does not cover.</b>")+"</p>":"")+
   '<p class="cap">'+L("넷은 ⑤ 순위 상위 4명을 그냥 자른 게 아니라, <b>포화를 보며 한 명씩</b> 골랐습니다 — 매번 “여기에 더했을 때 전투 배율이 가장 커지는 한 명”입니다. 자르기만 하면 <b>제시·제셀·제로니모처럼 같은 A칸에 들어가는 영웅이 나란히 뽑힙니다</b>(각자 ×1.250 이지만 둘째는 ×1.200, 셋째는 ×1.167 로 떨어집니다). 그래서 순위표 1~4위와 명단이 다를 수 있습니다.",
      "The four are not the top four of ranking ⑤ — each is picked in turn as <b>whoever raises the combined multiplier most</b>, given the ones already chosen. Plain truncation lines up heroes that share a slot (Jessie, Jasser and Jeronimo all fill A: ×1.250, then ×1.200, then ×1.167). So this list can differ from rows 1–4 of the table.")+"</p>"+
   '<p class="cap">'+L("위 배율은 네 명의 단독 배율을 곱한 값이 아니라 <b>같은 칸에 겹치는 분을 합쳤을 때</b>의 값입니다. 순위표의 배율을 넣는 순서대로 곱하면 더 크게 나오는데, 그건 포화를 빼먹은 숫자입니다. 그리고 <b>생존 칸도 같은 무게로 셉니다</b> — 전투비를 양쪽 식으로 펴면 <code>(내딜증 × 내감소) ÷ (상대딜증 × 상대감소)</code> 라, 내 딜 칸과 내 감소 칸이 결과에 똑같이 곱해집니다.",
