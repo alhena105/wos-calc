@@ -117,8 +117,15 @@ function render(d){
     "The multipliers above already carry this division — a 20% reduction showing ×1.200 <em>is</em> that value. And there is no such thing as an offensive or defensive joiner: the damage formula is identical for both, only widgets differ, so <b>stacking 25% increases wins even on defense</b>.")+
   '</p><p class="cap">'+L("예외 — 상대가 같은 영웅을 4스택하면 상대 칸이 이미 합연산으로 포화라 우리 감소가 상대적으로 크게 먹힙니다. 그때는 20% 계열도 쓸 만합니다. · 근거: 볼트 「랠리 조이너 선정 규칙·개리슨 운영 (Ton)」 §5·§8 (Ton 반복 테스트)",
     "Exception — if the enemy stacks the same hero four times, their slot is already saturated by addition, so your reduction bites relatively harder; 20% skills are worth taking then. · Source: vault note “Rally joiner selection & garrison ops (Ton)”, §5 and §8.")+"</p></div>";
- const top=rank.filter(x=>!x.dup&&x.mul>1.001).slice(0,4);
- const tSheet=rank.filter(x=>!x.dup&&x.mul>1.001&&x.h.s).slice(0,4);
+ // 기본은 **시트 등재 영웅만**이다(2026-09-12). 계산 순위 그대로가 아니다.
+ // 근거: 시트 52행 대조에서 등재만 쪽이 #1 재현 84.6→90.4% · 겹침 50.0→58.8% 로 올라갔고,
+ // **한 행도 나빠지지 않았다.** 이론 배지 영웅(웨인·고든·플린트·그웬)이 36회 끼어들던 자리다.
+ // 계산 순위는 아래 보조 패널(#recAll)로 계속 보여준다 — 값을 감추는 게 아니라 순서를 바꾼 것이다.
+ const calcTop=rank.filter(x=>!x.dup&&x.mul>1.001).slice(0,4);
+ const sheetTop=rank.filter(x=>!x.dup&&x.mul>1.001&&x.h.s).slice(0,4);
+ // 시트 등재 영웅은 에픽 8명이 gen 0 이라 gcap 을 아무리 낮춰도 넷은 남는다.
+ // 그래도 빈 경우엔 계산 순위로 되돌린다 — 화면이 비는 것보다 낫다.
+ const top=sheetTop.length?sheetTop:calcTop;
  // 네 명을 한 칸 묶음에 다 넣고 최종 칸으로 계산한다.
  // 각자의 한계 배율을 그냥 곱하면 같은 칸에 겹칠 때의 포화를 놓친다 —
  // Ton 시트 Rally Joiners 탭이 4×제시를 1.25⁴=2.441 이 아니라 2.0 으로 적어 둔다.
@@ -135,15 +142,22 @@ function render(d){
    const put=(sl,v)=>{if(b[sl]!==undefined)b[sl]+=v;};
    put(q.e.slot,q.e.v);if(q.e.also)put(q.e.also.slot,q.e.also.v);});
   return ORDER.reduce((a,sl)=>a*(b[sl]/buck[sl]),1)*x;};
- o+='<div class="callout co-key" id="rec"><h3>'+L("⭐ 추천 조이너 4명","⭐ Recommended four joiners")+'</h3><p><b>'+top.map(x=>hpic(x.h,"sm")+esc(HN(x.h))).join(" · ")+
+ o+='<div class="callout co-key" id="rec"><h3>'+L("⭐ 추천 조이너 4명","⭐ Recommended four joiners")+
+  ' <span class="tag t-ok">'+L("시트 등재만","sheet-listed only")+'</span></h3><p><b>'+top.map(x=>hpic(x.h,"sm")+esc(HN(x.h))).join(" · ")+
   '</b></p><p class="cap">'+L("전투 배율 ×","Combat multiplier ×")+comboAll(top).toFixed(3)+
   L(" · 리더와 겹치는 영웅은 자동 제외했습니다."," · heroes already used as leaders are excluded automatically.")+"</p>"+
+  '<p class="cap">'+L("여기 나오는 건 <b>Ton 시트 조이너 명단에 오른 영웅만</b>입니다. 계산 순위 1~4위를 그대로 쓰지 않는 이유는 <b>투자 문턱</b> 때문입니다 — 이론 순위가 높아도 전설은 만렙 보유자가 적고, 만렙 찍은 사람은 대개 이미 그 영웅을 리더로 쓰고 있어 조이너로 못 뺍니다. 시트 52행과 대조했더니 <b>이쪽이 #1 재현 90.4% · 겹침 58.8%</b> 로, 계산 순위 그대로(84.6% · 50.0%)보다 낫고 <b>한 행도 나빠지지 않았습니다</b>.",
+     "These are only heroes on the Ton sheet’s joiner list. The raw top four is not used because of the <b>investment threshold</b>: legendaries are rarely maxed, and whoever did max one is usually already running it as a leader. Checked against all 52 sheet rows, this list reproduces the sheet’s #1 joiner <b>90.4%</b> of the time with <b>58.8%</b> overlap, against 84.6% / 50.0% for the raw ranking — and it was never worse on any row.")+"</p>"+
   '<p class="cap">'+L("위 배율은 네 명의 단독 배율을 곱한 값이 아니라 <b>같은 칸에 겹치는 분을 합쳤을 때</b>의 값입니다. 순위표의 배율을 넣는 순서대로 곱하면 더 크게 나오는데, 그건 포화를 빼먹은 숫자입니다. 그리고 <b>생존 칸도 같은 무게로 셉니다</b> — 전투비를 양쪽 식으로 펴면 <code>(내딜증 × 내감소) ÷ (상대딜증 × 상대감소)</code> 라, 내 딜 칸과 내 감소 칸이 결과에 똑같이 곱해집니다.",
      "This multiplier is not the product of the four individual figures — it is what you get after <b>adding up the parts that land in the same slot</b>. Multiplying the ranking figures together gives a larger number that ignores saturation. <b>Survival slots count the same</b>: expand the kill ratio for both sides and it reduces to <code>(my damage-up × my reduction) ÷ (theirs × theirs)</code>, so your damage slots and your reduction slots multiply the outcome equally.")+"</p>"+
   (rank.filter(x=>x.dup).length?'<p class="cap">'+L("🚫 리더 중복 금지: ","🚫 Cannot double as joiners: ")+rank.filter(x=>x.dup).map(x=>esc(HN(x.h))).join(" · ")+"</p>":"")+"</div>"+
-  (top.map(x=>x.h.id).join()!==tSheet.map(x=>x.h.id).join()?
-   '<div class="callout co-tip"><h3>'+L("📋 Ton 시트 등재 영웅만","📋 Sheet-listed heroes only")+'</h3><p><b>'+tSheet.map(x=>hpic(x.h,"sm")+esc(HN(x.h))).join(" · ")+
-   '</b></p><p class="cap">'+L('위 계산 순위에 <span class="tag t-warn">이론</span> 배지가 붙은 영웅은 실전 시트 조이너 명단에 없습니다. 대개 <b>투자 문턱</b> 때문입니다 — 전설이라 만렙 보유자가 적거나, 그 영웅을 만렙 찍은 사람은 이미 리더로 쓰고 있어 조이너로 못 뺍니다. 실전에서는 시트 쪽을 우선하세요.','Heroes tagged <span class="tag t-warn">theory</span> above are not on the sheet’s practical joiner list, usually because of the <b>investment threshold</b> — legendaries few players max, or whose owners already run them as leaders and cannot spare them as joiners. In practice, prefer the sheet.')+'</p></div>':"")+"</div>";
+  (top.map(x=>x.h.id).join()!==calcTop.map(x=>x.h.id).join()?
+   '<div class="callout co-tip" id="recAll"><h3>'+L("🧮 계산 순위 그대로","🧮 Raw ranking")+
+   ' <span class="tag t-warn">'+L("이론 포함","includes theory")+'</span></h3><p><b>'+calcTop.map(x=>hpic(x.h,"sm")+esc(HN(x.h))).join(" · ")+
+   '</b></p><p class="cap">'+L("전투 배율 ×","Combat multiplier ×")+comboAll(calcTop).toFixed(3)+
+   L(" — 시트 명단을 무시하고 ⑤ 순위 1~4위를 그대로 쓰면 이렇게 됩니다."," — this is the top four of the ⑤ ranking, ignoring the sheet’s list.")+'</p>'+
+   '<p class="cap">'+L('여기 <span class="tag t-warn">이론</span> 배지가 붙은 영웅은 시트 조이너 명단에 없습니다. <b>배율이 틀렸다는 뜻이 아니라</b>, 그 영웅이 실제로 Lv.5 로 올라와 조이너로 들어올 가능성이 낮다는 뜻입니다. <b>연맹원이 이미 그 영웅을 만렙으로 갖고 있다면 이쪽을 쓰는 게 맞습니다.</b>',
+     'Heroes tagged <span class="tag t-warn">theory</span> here are not on the sheet’s joiner list. That does <b>not</b> mean the multiplier is wrong — only that such a hero is unlikely to actually show up maxed as a joiner. <b>If someone in your alliance already has it maxed, this is the list to use.</b>')+'</p></div>':"")+"</div>";
 
  // 카운터 · 밴드 — 근거는 가이드 카운터표 하나뿐이다
  if(ctr){

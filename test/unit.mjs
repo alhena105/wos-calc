@@ -525,7 +525,16 @@ section("조이너 추천 · T12 경고 (렌더)");
   let cond = 1;
   for (const id of ids) {
     const e = E.byId[id].exp[0];
-    if (e.slot === "X") continue;                       // 아래에서 화면 배율로 곱한다
+    // X 는 칸이 아니라 계수다. 예전에는 여기서 그냥 건너뛰었는데, 추천에 X 영웅이 낀 적이
+    // 없어서 안 드러났을 뿐이다(2026-09-12 시트 등재만이 기본이 되면서 노라가 들어와 터졌다).
+    // ⑤ 순위표에 찍힌 그 영웅의 배율을 그대로 곱한다 — 화면과 같은 값을 써야 검산이 성립한다.
+    if (e.slot === "X") {
+      const row = new RegExp("heroes/" + E.byId[id].en.toLowerCase().replace(/ /g, "-") +
+        "\\.webp[\\s\\S]*?×([\\d.]+)<div").exec(html);
+      ok(!!row, "⑤ 순위표에서 " + id + " 의 배율을 읽었다");
+      cond *= row ? +row[1] : 1;
+      continue;
+    }
     if (e.slot === "An") { cond *= 1 + e.v * E.NA_SHARE; continue; }
     // AH(타격 계열)는 칸이 아니다 — 합연산에 들어가지 않고 자기 계수로 곱한다
     if (e.slot === "AH") { cond *= 1 + e.v; continue; }
@@ -536,9 +545,13 @@ section("조이너 추천 · T12 경고 (렌더)");
   const dmgOnly = E.ORDER.filter(sl => E.SLOTS[sl].k === "dmg")
     .reduce((x, sl) => x * (b[sl] / base[sl]), 1) * cond;
   ok(ids.length === 4, "추천 4명이 네 명이다", ids.join(","));
-  ok(Math.abs(shown - +want.toFixed(3)) < 5e-4,
+  // X 영웅의 배율은 ⑤ 순위표에서 읽는데 거기 이미 3자리로 반올림돼 있다 →
+  // 그 한 명당 최대 ±0.0005 가 곱해져 들어온다. X 개수만큼만 한도를 넓힌다.
+  const nX = ids.filter(id => E.byId[id].exp[0].slot === "X").length;
+  const tol = 5e-4 + nX * 2e-3;
+  ok(Math.abs(shown - +want.toFixed(3)) < tol,
      "화면의 추천 4명 전투 배율이 모든 칸 재계산과 일치",
-     "화면 " + shown + " / 칸 " + want.toFixed(3) + " · " + ids.join(","));
+     "화면 " + shown + " / 칸 " + want.toFixed(3) + " (X " + nX + "명, 한도 " + tol.toFixed(4) + ") · " + ids.join(","));
   ok(ids.some(id => {
        const e = E.byId[id].exp[0];
        return e.slot !== "X" && E.SLOTS[e.slot] && E.SLOTS[e.slot].k === "sur";
@@ -546,6 +559,20 @@ section("조이너 추천 · T12 경고 (렌더)");
      "생존 칸 조이너가 있으면 딜만 센 값보다 크다",
      "전체 " + want.toFixed(3) + " vs 딜만 " + dmgOnly.toFixed(3));
   ok(/전투 배율 ×/.test(html), "라벨이 '전투 배율' 이다");
+
+  // 기본 추천은 **시트 등재 영웅만**이다 (2026-09-12). 계산 순위는 보조 패널로 내려갔다.
+  ok(ids.every(id => E.byId[id].s), "기본 추천 4명이 전부 시트 등재(s:1)다",
+     ids.filter(id => !E.byId[id].s).join(","));
+  ok(/시트 등재만/.test(html.slice(st, st + 400)), "추천 패널 제목 옆에 '시트 등재만' 배지가 있다");
+  {
+    const i = html.indexOf('id="recAll"');
+    ok(i > st, "계산 순위 패널(#recAll)이 추천 패널 아래에 있다", "rec=" + st + " recAll=" + i);
+    const alt = [...html.slice(i, html.indexOf("</b>", i)).matchAll(/heroes\/([a-z-]+)\.webp/g)].map(m => m[1]);
+    ok(alt.length === 4 && alt.join() !== ids.join(),
+       "두 목록이 실제로 다를 때만 보조 패널이 뜬다", alt.join(",") + " vs " + ids.join(","));
+    ok(alt.some(s => !E.HEROES.find(h => h.en.toLowerCase().replace(/ /g, "-") === s).s),
+       "보조 패널에는 이론(시트 미등재) 영웅이 들어 있다", alt.join(","));
+  }
   ok(/생존 칸도 같은 무게로 셉니다/.test(html), "생존 칸을 같이 세는 근거가 화면에 있다");
   ok(/같은 칸에 겹치는 분을 합쳤을 때/.test(html),
      "단독 배율을 곱한 값이 아니라는 설명이 붙어 있다");
@@ -616,9 +643,12 @@ section("X 스킬의 칸 귀속 (bk)");
     const bucketed = (A + 1.0 * sh) / A, old = 1 + 1.0 * sh;
     ok(bucketed < old, "칸에서 재면 플린트 배율이 예전보다 낮다",
        bucketed.toFixed(3) + " < " + old.toFixed(3) + " (A칸 " + A + ")");
-    const rec = html.slice(html.indexOf('id="rec"'));
-    ok(!/heroes\/flint\.webp/.test(rec.slice(0, rec.indexOf("</b>"))),
-       "60/40 리더 팀에서 플린트가 추천 4명에 들지 않는다");
+    // ⚠️ #rec(시트 등재만)이 아니라 #recAll(계산 순위 그대로)을 봐야 한다.
+    // 플린트는 시트 미등재라 #rec 에는 애초에 못 든다 — 거기서 검사하면
+    // bk 가 도로 빠져도 통과해버려서 이 검사가 아무것도 안 지킨다.
+    const idx = html.indexOf('id="recAll"'), src2 = idx >= 0 ? html.slice(idx) : html.slice(html.indexOf('id="rec"'));
+    ok(!/heroes\/flint\.webp/.test(src2.slice(0, src2.indexOf("</b>"))),
+       "60/40 리더 팀에서 플린트가 계산 순위 상위 4명에 들지 않는다");
   }
 }
 
@@ -736,8 +766,8 @@ section("시트 행 대조 (조이너 순위)");
   note("시트 #1~#4 겹침 " + anyP + "/" + totP + " (" + pp.toFixed(1) + "%) · 대체 칸까지 " +
        anyA + "/" + totA + " (" + ap.toFixed(1) + "%)");
   // 하한선은 실측에서 여유를 두고 잡았다. 떨어지면 모델이 시트에서 멀어진 것이다.
-  ok(fp >= 80, "시트 #1 조이너 재현이 80% 이상", fp.toFixed(1) + "% · 놓친 행: " + missed.slice(0, 4).join(", "));
-  ok(pp >= 48, "시트 #1~#4 조이너 겹침이 48% 이상", pp.toFixed(1) + "%");
+  ok(fp >= 86, "시트 #1 조이너 재현이 86% 이상", fp.toFixed(1) + "% · 놓친 행: " + missed.slice(0, 4).join(", "));
+  ok(pp >= 55, "시트 #1~#4 조이너 겹침이 55% 이상", pp.toFixed(1) + "%");
 }
 
 // ── 결과 ───────────────────────────────────────────────────────────────
