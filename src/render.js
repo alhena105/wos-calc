@@ -136,11 +136,21 @@ function render(d){
  // X(병종 한정)는 칸이 아니지만 역시 R 에 곱해지는 계수라 자기 배율로 넣는다.
  const comboAll=list=>{
   const b=Object.assign({},buck);let x=1;
+  const put=(sl,v)=>{if(b[sl]!==undefined)b[sl]+=v;};
   list.forEach(q=>{
-   // X · An · AH 는 칸이 아니라 계수다 → 자기 배율을 그대로 곱한다.
-   if(q.e.slot==="X"||q.e.slot==="An"||q.e.slot==="AH"){x*=q.mul;return;}
-   const put=(sl,v)=>{if(b[sl]!==undefined)b[sl]+=v;};
-   put(q.e.slot,q.e.v);if(q.e.also)put(q.e.also.slot,q.e.also.v);});
+   if(q.e.slot==="X"){
+    // ⚠️ bk 가 붙은 X 는 그 칸의 **스탯**이다 → 반드시 칸에 넣는다.
+    // q.mul 을 그냥 곱하면 그 값이 "리더만 있는 칸" 기준이라, 같은 칸에 들어가는
+    // 다른 조이너와 겹치는 분을 통째로 놓친다(제시+제셀+노라가 다 A칸인데 따로 세던 버그).
+    const part=w=>{const sh=xShare(w,r);
+      if(w.bk&&b[w.bk]!==undefined)put(w.bk,w.v*sh); else x*=1+w.v*sh;};
+    part(q.e); if(q.e.also&&q.e.also.slot==="X")part(q.e.also);
+    return;}
+   // An · AH 는 칸이 아니라 계수다 → 자기 배율을 그대로 곱한다.
+   if(q.e.slot==="An"||q.e.slot==="AH"){x*=q.mul;return;}
+   // ⚠️ e.v 가 아니라 eVal(e,r) 이다 — 미아처럼 pc 가 붙은 스킬은 편성 병종 수로
+   // 기대값을 다시 내야 한다(0.25 가 아니라 3병종이면 0.4375).
+   put(q.e.slot,eVal(q.e,r));if(q.e.also)put(q.e.also.slot,q.e.also.v);});
   return ORDER.reduce((a,sl)=>a*(b[sl]/buck[sl]),1)*x;};
  o+='<div class="callout co-key" id="rec"><h3>'+L("⭐ 추천 조이너 4명","⭐ Recommended four joiners")+
   ' <span class="tag t-ok">'+L("시트 등재만","sheet-listed only")+'</span></h3><p><b>'+top.map(x=>hpic(x.h,"sm")+esc(HN(x.h))).join(" · ")+

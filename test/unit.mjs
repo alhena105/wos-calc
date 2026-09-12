@@ -45,7 +45,7 @@ function note(t) { console.log("   " + t); }
 
 // ── 로더 ───────────────────────────────────────────────────────────────
 const EXPORTS = "LANG,L,HN,CN,STR,HEROES,SLOTS,ORDER,byId,wpct,norm,tgtRatio,DW,dmgShare," +
-  "NA_SHARE,tgtName,tgtStat,COUNTERS,BAND_TOL,ROW_TOL,MECH,dist,sheetVerdict,garrisonVerdict";
+  "NA_SHARE,tgtName,tgtStat,COUNTERS,BAND_TOL,ROW_TOL,MECH,dist,sheetVerdict,garrisonVerdict,eVal,xShare,nCls";
 function load(lang) {
   const code = src("i18n.js") + src("data.js") + src("engine.js") +
     "\n;globalThis.__api={" + EXPORTS + "};\n";
@@ -510,14 +510,23 @@ section("조이너 추천 · T12 경고 (렌더)");
   const ids = [...html.slice(st, html.indexOf("</b>", st)).matchAll(/img\/heroes\/([a-z-]+)\.webp/g)].map(m => m[1]);
   const shown = +(html.slice(st, st + 1400).match(/배율 ×([\d.]+)/) || [0, 0])[1];
 
-  // 화면 값이 "칸에 다 넣고 다시 잰 값" 과 같은가
+  // 화면 값이 "칸에 다 넣고 다시 잰 값" 과 같은가.
+  // 리더 칸도 엔진과 같은 규칙으로 쌓는다 — eVal(pc) · bk(X) · AH 제외까지.
+  // base 가 엔진의 buck 과 어긋나면 b/base 비가 통째로 틀어지므로 여기서 줄여 쓰면 안 된다.
+  const rr = E.norm(48, 4, 48);
   const base = {};
   E.ORDER.forEach(sl => { base[sl] = 1; });
   for (const lid of ["gregory", "mia", "blanchette"])
     for (const e of E.byId[lid].exp) {
-      if (e.slot === "ECO" || e.slot === "X") continue;
-      if (base[e.slot] !== undefined) base[e.slot] += e.v;
-      if (e.also && base[e.also.slot] !== undefined) base[e.also.slot] += e.also.v;
+      if (e.slot === "ECO") continue;
+      if (e.slot === "X") {
+        const bk = w => { if (w.bk && base[w.bk] !== undefined) base[w.bk] += w.v * E.xShare(w, rr); };
+        bk(e); if (e.also && e.also.slot === "X") bk(e.also);
+        continue;
+      }
+      if (e.slot === "AH") continue;                 // 칸이 아니다
+      if (base[e.slot] !== undefined) base[e.slot] += E.eVal(e, rr);
+      if (e.also && base[e.also.slot] !== undefined) base[e.also.slot] += E.eVal(e.also, rr);
     }
   // 전투비를 양쪽 식으로 펴면 (내딜증 × 내감소) / (상대딜증 × 상대감소) 라
   // 내 딜 칸과 내 감소 칸이 결과에 똑같이 곱해진다 → 모든 칸을 센다.
@@ -525,33 +534,34 @@ section("조이너 추천 · T12 경고 (렌더)");
   let cond = 1;
   for (const id of ids) {
     const e = E.byId[id].exp[0];
-    // X 는 칸이 아니라 계수다. 예전에는 여기서 그냥 건너뛰었는데, 추천에 X 영웅이 낀 적이
-    // 없어서 안 드러났을 뿐이다(2026-09-12 시트 등재만이 기본이 되면서 노라가 들어와 터졌다).
-    // ⑤ 순위표에 찍힌 그 영웅의 배율을 그대로 곱한다 — 화면과 같은 값을 써야 검산이 성립한다.
+    // X 는 예전에 여기서 그냥 건너뛰었다. 추천에 X 영웅이 낀 적이 없어 안 드러났을 뿐이고,
+    // 시트 등재만이 기본이 되면서 노라가 들어와 터졌다(2026-09-12).
+    //   · bk 가 붙은 X = 그 칸의 스탯이다 → 다른 조이너와 같은 칸에 **합산**한다.
+    //     계수로 곱하면 제시+제셀+노라가 전부 A칸인데 겹침을 놓친다.
+    //   · bk 가 없는 X = 칸이 아니다 → 자기 계수로 곱한다.
     if (e.slot === "X") {
-      const row = new RegExp("heroes/" + E.byId[id].en.toLowerCase().replace(/ /g, "-") +
-        "\\.webp[\\s\\S]*?×([\\d.]+)<div").exec(html);
-      ok(!!row, "⑤ 순위표에서 " + id + " 의 배율을 읽었다");
-      cond *= row ? +row[1] : 1;
+      const part = w => {
+        const sh = E.xShare(w, rr);
+        if (w.bk && b[w.bk] !== undefined) b[w.bk] += w.v * sh; else cond *= 1 + w.v * sh;
+      };
+      part(e); if (e.also && e.also.slot === "X") part(e.also);
       continue;
     }
     if (e.slot === "An") { cond *= 1 + e.v * E.NA_SHARE; continue; }
     // AH(타격 계열)는 칸이 아니다 — 합연산에 들어가지 않고 자기 계수로 곱한다
     if (e.slot === "AH") { cond *= 1 + e.v; continue; }
-    if (b[e.slot] !== undefined) b[e.slot] += e.v;
+    // pc(미아)는 편성 병종 수로 기대값을 다시 낸다 — 원값 0.25 를 더하면 안 된다
+    if (b[e.slot] !== undefined) b[e.slot] += E.eVal(e, rr);
     if (e.also && b[e.also.slot] !== undefined) b[e.also.slot] += e.also.v;
   }
   const want = E.ORDER.reduce((x, sl) => x * (b[sl] / base[sl]), 1) * cond;
   const dmgOnly = E.ORDER.filter(sl => E.SLOTS[sl].k === "dmg")
     .reduce((x, sl) => x * (b[sl] / base[sl]), 1) * cond;
   ok(ids.length === 4, "추천 4명이 네 명이다", ids.join(","));
-  // X 영웅의 배율은 ⑤ 순위표에서 읽는데 거기 이미 3자리로 반올림돼 있다 →
-  // 그 한 명당 최대 ±0.0005 가 곱해져 들어온다. X 개수만큼만 한도를 넓힌다.
-  const nX = ids.filter(id => E.byId[id].exp[0].slot === "X").length;
-  const tol = 5e-4 + nX * 2e-3;
-  ok(Math.abs(shown - +want.toFixed(3)) < tol,
+  // 반올림 자리만 허용한다. 화면에서 읽은 값을 쓰지 않고 전부 스스로 계산하므로 넓힐 이유가 없다.
+  ok(Math.abs(shown - +want.toFixed(3)) < 5e-4,
      "화면의 추천 4명 전투 배율이 모든 칸 재계산과 일치",
-     "화면 " + shown + " / 칸 " + want.toFixed(3) + " (X " + nX + "명, 한도 " + tol.toFixed(4) + ") · " + ids.join(","));
+     "화면 " + shown + " / 칸 " + want.toFixed(3) + " · " + ids.join(","));
   ok(ids.some(id => {
        const e = E.byId[id].exp[0];
        return e.slot !== "X" && E.SLOTS[e.slot] && E.SLOTS[e.slot].k === "sur";
@@ -732,6 +742,104 @@ section("조이너 동률 타이브레이크");
   ok(desc, "배율 자체는 여전히 내림차순이다");
 
   ok(/시트 등재 → 에픽 → 낮은 세대/.test(html), "타이브레이크 기준이 화면에 적혀 있다");
+}
+
+// ── N+6b. 전투 배율 — bk(X) 겹침과 pc 기대값 회귀 ──────────────────────
+section("전투 배율 — bk 겹침 · pc 기대값");
+{
+  // 2026-09-12 에 comboAll 에서 잡은 버그 둘. 둘 다 "추천에 그 조합이 나온 적이 없어서"
+  // 안 드러나 있었고, 시트 등재만이 기본이 되면서 한 화면에 같이 떴다.
+  //   ① bk 가 붙은 X 조이너(노라)를 칸에 넣지 않고 리더 기준 배율을 그냥 곱했다
+  //      → 제시·제셀이 같은 A칸에 들어가는데 겹침을 놓쳤다
+  //   ② pc 가 붙은 조이너(미아)를 원값 0.25 로 더했다 → 3병종 기대값 0.4375 여야 한다
+  // 이 조합(로건·필리·웨인 45/5/50)은 추천이 미아·노라·제시·제셀 로 나와 둘을 한꺼번에 밟는다.
+  const a = boot("ko").leaders("logan", "philly", "wayne").mine([45, 5, 50]);
+  a.el("gcap").value = "6";
+  const html = a.render();
+  const st = html.indexOf('id="rec"');
+  const ids = [...html.slice(st, html.indexOf("</b>", st)).matchAll(/img\/heroes\/([a-z-]+)\.webp/g)].map(m => m[1]);
+  const shown = +(html.slice(st, st + 1400).match(/배율 ×([\d.]+)/) || [0, 0])[1];
+  ok(ids.join(",") === "mia,norah,jessie,jasser",
+     "이 조합의 추천이 미아·노라·제시·제셀 이다 (버그 둘을 같이 밟는 자리)", ids.join(","));
+
+  const rr = E.norm(45, 5, 50);
+  const mkBase = () => {
+    const base = {};
+    E.ORDER.forEach(sl => { base[sl] = 1; });
+    for (const lid of ["logan", "philly", "wayne"])
+      for (const e of E.byId[lid].exp) {
+        if (e.slot === "ECO" || e.slot === "AH") continue;
+        if (e.slot === "X") {
+          const bk = w => { if (w.bk && base[w.bk] !== undefined) base[w.bk] += w.v * E.xShare(w, rr); };
+          bk(e); if (e.also && e.also.slot === "X") bk(e.also);
+          continue;
+        }
+        if (base[e.slot] !== undefined) base[e.slot] += E.eVal(e, rr);
+        if (e.also && base[e.also.slot] !== undefined) base[e.also.slot] += E.eVal(e.also, rr);
+      }
+    return base;
+  };
+  // mode: "ok" = 지금 규칙 · "flatBk" = 옛 버그① · "rawPc" = 옛 버그②
+  const combo = mode => {
+    const base = mkBase(), b = Object.assign({}, base);
+    let x = 1;
+    for (const id of ids) {
+      const e = E.byId[id].exp[0];
+      if (e.slot === "X") {
+        if (mode === "flatBk") {                       // 옛 버그: 순위표 배율을 그냥 곱한다
+          const m = new RegExp("heroes/" + E.byId[id].en.toLowerCase().replace(/ /g, "-") +
+            "\\.webp[\\s\\S]*?×([\\d.]+)<div").exec(html);
+          x *= m ? +m[1] : 1;
+          continue;
+        }
+        const part = w => {
+          const sh = E.xShare(w, rr);
+          if (w.bk && b[w.bk] !== undefined) b[w.bk] += w.v * sh; else x *= 1 + w.v * sh;
+        };
+        part(e); if (e.also && e.also.slot === "X") part(e.also);
+        continue;
+      }
+      const v = mode === "rawPc" ? e.v : E.eVal(e, rr);
+      if (b[e.slot] !== undefined) b[e.slot] += v;
+      if (e.also && b[e.also.slot] !== undefined) b[e.also.slot] += e.also.v;
+    }
+    return E.ORDER.reduce((acc, sl) => acc * (b[sl] / base[sl]), 1) * x;
+  };
+  const good = combo("ok"), bad1 = combo("flatBk"), bad2 = combo("rawPc");
+  ok(Math.abs(shown - +good.toFixed(3)) < 5e-4,
+     "화면 전투 배율이 bk 를 칸에 넣고 pc 를 기대값으로 잰 값과 일치",
+     "화면 " + shown + " / 계산 " + good.toFixed(3));
+  ok(Math.abs(shown - +bad1.toFixed(3)) > 5e-4,
+     "bk 를 칸에 안 넣는 옛 계산과는 다르다 (겹침을 놓치던 버그)",
+     "옛 " + bad1.toFixed(3) + " vs 지금 " + good.toFixed(3));
+  ok(Math.abs(shown - +bad2.toFixed(3)) > 5e-4,
+     "pc 를 원값으로 더하던 옛 계산과는 다르다 (미아 0.25 → 0.4375)",
+     "옛 " + bad2.toFixed(3) + " vs 지금 " + good.toFixed(3));
+  note("이 조합 전투 배율 ×" + good.toFixed(3) + " (옛 bk 버그 ×" + bad1.toFixed(3) +
+       " · 옛 pc 버그 ×" + bad2.toFixed(3) + ")");
+
+  // 시트가 이 행에 적은 노라 3스택은 우리 모델에서 추천보다 낮다 — 남은 이견의 크기를 박아 둔다.
+  const stack = (() => {
+    const base = mkBase(), b = Object.assign({}, base);
+    let x = 1;
+    for (const id of ["norah", "norah", "norah", "patrick"]) {
+      const e = E.byId[id].exp[0];
+      if (e.slot === "X") {
+        const part = w => {
+          const sh = E.xShare(w, rr);
+          if (w.bk && b[w.bk] !== undefined) b[w.bk] += w.v * sh; else x *= 1 + w.v * sh;
+        };
+        part(e); if (e.also && e.also.slot === "X") part(e.also);
+        continue;
+      }
+      if (b[e.slot] !== undefined) b[e.slot] += E.eVal(e, rr);
+      if (e.also && b[e.also.slot] !== undefined) b[e.also.slot] += e.also.v;
+    }
+    return E.ORDER.reduce((acc, sl) => acc * (b[sl] / base[sl]), 1) * x;
+  })();
+  ok(good > stack, "우리 추천이 시트의 노라 3스택보다 높다 (우리 모델 기준)",
+     "추천 " + good.toFixed(3) + " vs 노라×3+패트릭 " + stack.toFixed(3));
+  note("노라 3스택 ×" + stack.toFixed(3) + " — 같은 영웅을 쌓으면 A·D 두 칸이 자기끼리 포화한다");
 }
 
 // ── N+7. 시트 세대별 행과 조이너 순위 대조 ─────────────────────────────
