@@ -121,11 +121,8 @@ function render(d){
  // 근거: 시트 52행 대조에서 등재만 쪽이 #1 재현 84.6→90.4% · 겹침 50.0→58.8% 로 올라갔고,
  // **한 행도 나빠지지 않았다.** 이론 배지 영웅(웨인·고든·플린트·그웬)이 36회 끼어들던 자리다.
  // 계산 순위는 아래 보조 패널(#recAll)로 계속 보여준다 — 값을 감추는 게 아니라 순서를 바꾼 것이다.
- const calcTop=rank.filter(x=>!x.dup&&x.mul>1.001).slice(0,4);
- const sheetTop=rank.filter(x=>!x.dup&&x.mul>1.001&&x.h.s).slice(0,4);
- // 시트 등재 영웅은 에픽 8명이 gen 0 이라 gcap 을 아무리 낮춰도 넷은 남는다.
- // 그래도 빈 경우엔 계산 순위로 되돌린다 — 화면이 비는 것보다 낫다.
- const top=sheetTop.length?sheetTop:calcTop;
+ const pool=rank.filter(x=>!x.dup&&x.mul>1.001);
+ const poolS=pool.filter(x=>x.h.s);
  // 네 명을 한 칸 묶음에 다 넣고 최종 칸으로 계산한다.
  // 각자의 한계 배율을 그냥 곱하면 같은 칸에 겹칠 때의 포화를 놓친다 —
  // Ton 시트 Rally Joiners 탭이 4×제시를 1.25⁴=2.441 이 아니라 2.0 으로 적어 둔다.
@@ -152,12 +149,41 @@ function render(d){
    // 기대값을 다시 내야 한다(0.25 가 아니라 3병종이면 0.4375).
    put(q.e.slot,eVal(q.e,r));if(q.e.also)put(q.e.also.slot,q.e.also.v);});
   return ORDER.reduce((a,sl)=>a*(b[sl]/buck[sl]),1)*x;};
+
+ // ── 넷을 고르는 방법: 단독 배율 상위 4명이 아니라 **포화를 보며 한 명씩** 고른다 (2026-09-12)
+ // 예전에는 rank 상위 4명을 그냥 잘랐다. 그러면 제시·제셀·제로니모처럼 **같은 A칸에 들어가는
+ // 영웅이 나란히 뽑힌다** — 각자 단독으로는 ×1.250 이지만 둘째부터는 ×1.200, ×1.167 로 떨어지는데
+ // 자르기는 그걸 모른다. 실제로 로건·필리·진먼 Gen 3 에서 미아·제시·제셀·제로니모가 나왔다.
+ // 매번 "지금까지 고른 넷에 더했을 때 전투 배율이 가장 커지는 한 명"을 고르면 그 문제가 사라진다.
+ //
+ // ⚠️ 같은 영웅을 두 번 고르지 않는다. 예전 노트가 "탐욕을 돌리면 같은 X 영웅 4명을 쌓는 답이
+ // 나온다"고 경고했는데, 그건 중복을 허용했을 때 이야기다. 후보를 서로 다른 영웅으로 제한하면
+ // 시트 지침 5번("4명을 섞는 게 낫다")과 어긋나지 않는다.
+ //
+ // 동률이면 pool 순서가 이긴다 — pool 은 이미 투자 문턱(시트 등재 → 에픽 → 낮은 세대)으로
+ // 정렬돼 있으므로 그 정책이 그대로 지켜진다.
+ const pick4=list=>{
+  const out=[];
+  for(let k=0;k<4;k++){
+   let best=null,bv=-1;
+   list.forEach(c=>{if(out.indexOf(c)>=0)return;
+    const v=comboAll(out.concat([c]));
+    if(v>bv+1e-9){bv=v;best=c;}});
+   if(!best)break;out.push(best);}
+  return out;};
+ const calcTop=pick4(pool);
+ // 시트 등재 영웅은 에픽 8명이 gen 0 이라 gcap 을 아무리 낮춰도 넷은 남는다.
+ // 그래도 빈 경우엔 계산 순위로 되돌린다 — 화면이 비는 것보다 낫다.
+ const sheetTop=pick4(poolS);
+ const top=sheetTop.length?sheetTop:calcTop;
  o+='<div class="callout co-key" id="rec"><h3>'+L("⭐ 추천 조이너 4명","⭐ Recommended four joiners")+
   ' <span class="tag t-ok">'+L("시트 등재만","sheet-listed only")+'</span></h3><p><b>'+top.map(x=>hpic(x.h,"sm")+esc(HN(x.h))).join(" · ")+
   '</b></p><p class="cap">'+L("전투 배율 ×","Combat multiplier ×")+comboAll(top).toFixed(3)+
   L(" · 리더와 겹치는 영웅은 자동 제외했습니다."," · heroes already used as leaders are excluded automatically.")+"</p>"+
   '<p class="cap">'+L("여기 나오는 건 <b>Ton 시트 조이너 명단에 오른 영웅만</b>입니다. 계산 순위 1~4위를 그대로 쓰지 않는 이유는 <b>투자 문턱</b> 때문입니다 — 이론 순위가 높아도 전설은 만렙 보유자가 적고, 만렙 찍은 사람은 대개 이미 그 영웅을 리더로 쓰고 있어 조이너로 못 뺍니다. 시트 52행과 대조했더니 <b>이쪽이 #1 재현 90.4% · 겹침 58.8%</b> 로, 계산 순위 그대로(84.6% · 50.0%)보다 낫고 <b>한 행도 나빠지지 않았습니다</b>.",
      "These are only heroes on the Ton sheet’s joiner list. The raw top four is not used because of the <b>investment threshold</b>: legendaries are rarely maxed, and whoever did max one is usually already running it as a leader. Checked against all 52 sheet rows, this list reproduces the sheet’s #1 joiner <b>90.4%</b> of the time with <b>58.8%</b> overlap, against 84.6% / 50.0% for the raw ranking — and it was never worse on any row.")+"</p>"+
+  '<p class="cap">'+L("넷은 ⑤ 순위 상위 4명을 그냥 자른 게 아니라, <b>포화를 보며 한 명씩</b> 골랐습니다 — 매번 “여기에 더했을 때 전투 배율이 가장 커지는 한 명”입니다. 자르기만 하면 <b>제시·제셀·제로니모처럼 같은 A칸에 들어가는 영웅이 나란히 뽑힙니다</b>(각자 ×1.250 이지만 둘째는 ×1.200, 셋째는 ×1.167 로 떨어집니다). 그래서 순위표 1~4위와 명단이 다를 수 있습니다.",
+     "The four are not the top four of ranking ⑤ — each is picked in turn as <b>whoever raises the combined multiplier most</b>, given the ones already chosen. Plain truncation lines up heroes that share a slot (Jessie, Jasser and Jeronimo all fill A: ×1.250, then ×1.200, then ×1.167). So this list can differ from rows 1–4 of the table.")+"</p>"+
   '<p class="cap">'+L("위 배율은 네 명의 단독 배율을 곱한 값이 아니라 <b>같은 칸에 겹치는 분을 합쳤을 때</b>의 값입니다. 순위표의 배율을 넣는 순서대로 곱하면 더 크게 나오는데, 그건 포화를 빼먹은 숫자입니다. 그리고 <b>생존 칸도 같은 무게로 셉니다</b> — 전투비를 양쪽 식으로 펴면 <code>(내딜증 × 내감소) ÷ (상대딜증 × 상대감소)</code> 라, 내 딜 칸과 내 감소 칸이 결과에 똑같이 곱해집니다.",
      "This multiplier is not the product of the four individual figures — it is what you get after <b>adding up the parts that land in the same slot</b>. Multiplying the ranking figures together gives a larger number that ignores saturation. <b>Survival slots count the same</b>: expand the kill ratio for both sides and it reduces to <code>(my damage-up × my reduction) ÷ (theirs × theirs)</code>, so your damage slots and your reduction slots multiply the outcome equally.")+"</p>"+
   (rank.filter(x=>x.dup).length?'<p class="cap">'+L("🚫 리더 중복 금지: ","🚫 Cannot double as joiners: ")+rank.filter(x=>x.dup).map(x=>esc(HN(x.h))).join(" · ")+"</p>":"")+"</div>"+

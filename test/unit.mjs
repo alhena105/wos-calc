@@ -759,8 +759,12 @@ section("전투 배율 — bk 겹침 · pc 기대값");
   const st = html.indexOf('id="rec"');
   const ids = [...html.slice(st, html.indexOf("</b>", st)).matchAll(/img\/heroes\/([a-z-]+)\.webp/g)].map(m => m[1]);
   const shown = +(html.slice(st, st + 1400).match(/배율 ×([\d.]+)/) || [0, 0])[1];
-  ok(ids.join(",") === "mia,norah,jessie,jasser",
-     "이 조합의 추천이 미아·노라·제시·제셀 이다 (버그 둘을 같이 밟는 자리)", ids.join(","));
+  // 정확한 명단을 박지 않는다 — 고르는 방법을 바꾸면(2026-09-12 탐욕) 명단은 움직인다.
+  // 이 검사가 필요로 하는 건 "bk X 한 명 + 그와 같은 칸에 들어가는 조이너 + pc 한 명"뿐이다.
+  ok(ids.includes("norah"), "추천에 bk X 조이너(노라)가 있다", ids.join(","));
+  ok(ids.includes("mia"), "추천에 pc 조이너(미아)가 있다", ids.join(","));
+  ok(ids.some(id => id !== "norah" && E.byId[id].exp[0].slot === "A"),
+     "노라와 같은 A칸에 들어가는 조이너가 함께 있다 (겹침이 실제로 생기는 자리)", ids.join(","));
 
   const rr = E.norm(45, 5, 50);
   const mkBase = () => {
@@ -799,6 +803,10 @@ section("전투 배율 — bk 겹침 · pc 기대값");
         part(e); if (e.also && e.also.slot === "X") part(e.also);
         continue;
       }
+      // An · AH 는 칸이 아니라 계수다 — 예전에 이 둘을 빼먹어서
+      // 레이나(An)가 추천에 들자 검산이 혼자 달라졌다.
+      if (e.slot === "An") { x *= 1 + e.v * E.NA_SHARE; continue; }
+      if (e.slot === "AH") { x *= 1 + E.eVal(e, rr); continue; }
       const v = mode === "rawPc" ? e.v : E.eVal(e, rr);
       if (b[e.slot] !== undefined) b[e.slot] += v;
       if (e.also && b[e.also.slot] !== undefined) b[e.also.slot] += e.also.v;
@@ -832,6 +840,8 @@ section("전투 배율 — bk 겹침 · pc 기대값");
         part(e); if (e.also && e.also.slot === "X") part(e.also);
         continue;
       }
+      if (e.slot === "An") { x *= 1 + e.v * E.NA_SHARE; continue; }
+      if (e.slot === "AH") { x *= 1 + E.eVal(e, rr); continue; }
       if (b[e.slot] !== undefined) b[e.slot] += E.eVal(e, rr);
       if (e.also && b[e.also.slot] !== undefined) b[e.also.slot] += e.also.v;
     }
@@ -874,8 +884,60 @@ section("시트 행 대조 (조이너 순위)");
   note("시트 #1~#4 겹침 " + anyP + "/" + totP + " (" + pp.toFixed(1) + "%) · 대체 칸까지 " +
        anyA + "/" + totA + " (" + ap.toFixed(1) + "%)");
   // 하한선은 실측에서 여유를 두고 잡았다. 떨어지면 모델이 시트에서 멀어진 것이다.
-  ok(fp >= 86, "시트 #1 조이너 재현이 86% 이상", fp.toFixed(1) + "% · 놓친 행: " + missed.slice(0, 4).join(", "));
-  ok(pp >= 55, "시트 #1~#4 조이너 겹침이 55% 이상", pp.toFixed(1) + "%");
+  ok(fp >= 88, "시트 #1 조이너 재현이 88% 이상", fp.toFixed(1) + "% · 놓친 행: " + missed.slice(0, 4).join(", "));
+  ok(pp >= 58, "시트 #1~#4 조이너 겹침이 58% 이상", pp.toFixed(1) + "%");
+
+  // ── 넷을 고르는 방법: 포화를 보며 한 명씩 (2026-09-12) ──
+  // 자르기(단독 상위 4명)보다 나빠지는 행이 하나도 없어야 한다. 하나라도 있으면
+  // 탐욕이 뒤로 미루는 선택 때문이므로, 그때는 방법을 다시 봐야 한다.
+  let gWin = 0, gLose = 0;
+  for (const row of SHEET_ROWS) {
+    const a = boot("ko").leaders(row.lead[0] || "", row.lead[1] || "", row.lead[2] || "").mine(row.r);
+    a.el("gcap").value = String(row.gen);
+    const html = a.render();
+    const after = html.slice(html.indexOf('id="rec"'));
+    const shown = +(/전투 배율 ×([\d.]+)/.exec(after) || [0, 0])[1];
+    // 같은 후보 풀에서 "단독 배율 상위 4명"을 잘라 같은 방식으로 재면 얼마인가
+    const cut = a.js(`(function(){
+      const r=norm(+document.getElementById("r1").value,+document.getElementById("r2").value,+document.getElementById("r3").value);
+      const lead=["hInf","hLan","hMar"].map(i=>byId[document.getElementById(i).value]).filter(Boolean);
+      const lid=new Set(lead.map(h=>h.id));
+      const buck={};ORDER.forEach(s=>{buck[s]=1;});
+      lead.forEach(h=>h.exp.forEach(e=>{
+        if(e.slot==="ECO"||e.slot==="AH")return;
+        const add=(sl,v)=>{if(buck[sl]!==undefined)buck[sl]+=v;};
+        if(e.slot==="X"){const bk=q=>{if(q.bk)add(q.bk,q.v*xShare(q,r));};
+          bk(e);if(e.also&&e.also.slot==="X")bk(e.also);return;}
+        add(e.slot,eVal(e,r));if(e.also)add(e.also.slot,eVal(e.also,r));}));
+      const one=id=>{const e=byId[id].exp[0];
+        if(e.slot==="X"){const p=w=>{const sh=xShare(w,r);
+            return w.bk&&buck[w.bk]!==undefined?(buck[w.bk]+w.v*sh)/buck[w.bk]:1+w.v*sh;};
+          return p(e)*(e.also&&e.also.slot==="X"?p(e.also):1);}
+        if(e.slot==="An")return 1+e.v*NA_SHARE;
+        if(e.slot==="AH")return 1+eVal(e,r);
+        let m=1;const st=(sl,v)=>{const b=buck[sl];if(b!==undefined)m*=(b+v)/b;};
+        st(e.slot,eVal(e,r)); if(e.also)st(e.also.slot,e.also.v); return m;};
+      const combo=ids=>{const b=Object.assign({},buck);let x=1;
+        const put=(sl,v)=>{if(b[sl]!==undefined)b[sl]+=v;};
+        ids.forEach(id=>{const e=byId[id].exp[0];
+          if(e.slot==="X"){const p=w=>{const sh=xShare(w,r);
+              if(w.bk&&b[w.bk]!==undefined)put(w.bk,w.v*sh); else x*=1+w.v*sh;};
+            p(e); if(e.also&&e.also.slot==="X")p(e.also); return;}
+          if(e.slot==="An"){x*=1+e.v*NA_SHARE;return;}
+          if(e.slot==="AH"){x*=1+eVal(e,r);return;}
+          put(e.slot,eVal(e,r)); if(e.also)put(e.also.slot,e.also.v);});
+        return ORDER.reduce((a,sl)=>a*(b[sl]/buck[sl]),1)*x;};
+      const gcap=+document.getElementById("gcap").value||99;
+      const pool=HEROES.filter(h=>h.gen<=gcap&&h.s&&!lid.has(h.id)&&h.exp[0]&&h.exp[0].slot!=="ECO")
+        .filter(h=>one(h.id)>1.001);
+      pool.sort((p,q)=>one(q.id)-one(p.id));
+      return combo(pool.slice(0,4).map(h=>h.id));
+    })()`);
+    if (shown > cut + 1e-3) gWin++; else if (shown < cut - 1e-3) gLose++;
+  }
+  note("포화를 보며 고르기가 자르기보다 높은 행 " + gWin + "/" + SHEET_ROWS.length + " · 낮은 행 " + gLose);
+  ok(gLose === 0, "자르기보다 낮아지는 행이 없다", String(gLose));
+  ok(gWin >= 15, "자르기보다 실제로 높아지는 행이 충분히 많다", String(gWin));
 }
 
 // ── 결과 ───────────────────────────────────────────────────────────────
