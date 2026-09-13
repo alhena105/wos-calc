@@ -104,8 +104,8 @@ function render(d){
  o+='<h2>'+L("⑤ 조이너 한계 배율 순위","⑤ Joiner marginal multiplier ranking")+' <span>'+L("S1만 기여 · 상위 4명만 채택","only S1 counts · top 4 are taken")+(gcap<99?(LANG==="en"?' · Gen '+gcap+' and below':' · Gen '+gcap+' 이하'):'')+'</span></h2><div class="panel"><table><thead><tr><th>#</th><th>'+L("조이너","Joiner")+'</th><th>'+L("S1 스킬","S1 skill")+'</th><th>'+L("칸","Slot")+'</th><th>'+L("계산","Working")+'</th><th>'+L("배율","Multiplier")+'</th></tr></thead><tbody>';
  rank.slice(0,14).forEach((x,i)=>{
   const dmg=x.e.slot!=="X"&&SLOTS[x.e.slot]&&SLOTS[x.e.slot].k==="dmg";
-  o+="<tr"+(i<4&&!x.dup?' class="hi"':x.mul<=1.001?' class="dead"':"")+"><td>"+(i+1)+'</td><td class="b"><span class="hrow">'+hpic(x.h)+"<span>"+esc(HN(x.h))+"</span></span>"+
-   (x.dup?'<span class="tag t-bad">'+L("리더 중복","already a leader")+'</span>':"")+(x.h.s?'<span class="tag t-ok">'+L("시트","sheet")+'</span>':'<span class="tag t-warn">'+L("이론","theory")+'</span>')+
+  o+="<tr"+(i<4?' class="hi"':x.mul<=1.001?' class="dead"':"")+"><td>"+(i+1)+'</td><td class="b"><span class="hrow">'+hpic(x.h)+"<span>"+esc(HN(x.h))+"</span></span>"+
+   (x.dup?'<span class="tag t-warn">'+L("리더도 씀","also a leader")+'</span>':"")+(x.h.s?'<span class="tag t-ok">'+L("시트","sheet")+'</span>':'<span class="tag t-warn">'+L("이론","theory")+'</span>')+
    '</td><td class="cap">'+esc(L(x.e.t,x.e.te||x.e.t))+"</td><td>"+(x.e.slot==="X"?sTag("X")+(x.e.bk?sTag(x.e.bk):""):sTag(x.e.slot)+(x.e.also?sTag(x.e.also.slot):""))+
    (x.cond?'<div class="note">'+x.cond.split("|")[1]+"</div>":"")+'</td><td class="note">'+x.detail.map(esc).join("<br>")+
    '</td><td class="big">×'+x.mul.toFixed(3)+'<div class="note">'+(x.e.slot==="X"?L("조건부","conditional"):dmg?L("딜","damage"):L("생존","survival"))+"</div></td></tr>";});
@@ -126,7 +126,11 @@ function render(d){
  // 근거: 시트 52행 대조에서 등재만 쪽이 #1 재현 84.6→90.4% · 겹침 50.0→58.8% 로 올라갔고,
  // **한 행도 나빠지지 않았다.** 이론 배지 영웅(웨인·고든·플린트·그웬)이 36회 끼어들던 자리다.
  // 계산 순위는 아래 보조 패널(#recAll)로 계속 보여준다 — 값을 감추는 게 아니라 순서를 바꾼 것이다.
- const pool=rank.filter(x=>!x.dup&&x.mul>1.001);
+ // 리더로 쓴 영웅도 조이너로 들어올 수 있다 — 다른 연맹원이 자기 것을 데려오는 것이다.
+ // 예전에는 뽑힌 수 없게 막아 둉는데 **근거 없는 가정**이었다 — 시트는 10개 행에서
+ // 리더 영웅을 조이너 칸에 적는다(제로니모 7행 · 노라 1행 등). 2026-09-13 사용자가 짚음.
+ // 대신 그 영웅의 스킬은 이미 리더 쪽에서 칸에 들어가 있으므로 한계 배율이 저절로 낮게 잡힌다.
+ const pool=rank.filter(x=>x.mul>1.001);
  const poolS=pool.filter(x=>x.h.s);
  // 네 명을 한 칸 묶음에 다 넣고 최종 칸으로 계산한다.
  // 각자의 한계 배율을 그냥 곱하면 같은 칸에 겹칠 때의 포화를 놓친다 —
@@ -136,8 +140,9 @@ function render(d){
  //   R = SkillMod(나)/SkillMod(상대) = (내딜증 × 내감소) / (상대딜증 × 상대감소)
  // 내 딜 칸과 내 감소 칸이 R 에 **똑같이** 곱해지므로, 생존 칸도 같은 무게로 센다.
  // X(병종 한정)는 칸이 아니지만 역시 R 에 곱해지는 계수라 자기 배율로 넣는다.
+ const lid=leaders.map(l=>l.hero.id);
  const comboAll=list=>{
-  const b=Object.assign({},buck);let x=1;
+  const b=Object.assign({},buck);let x=1;const seen=[];
   const put=(sl,v)=>{if(b[sl]!==undefined)b[sl]+=v;};
   list.forEach(q=>{
    if(q.e.slot==="X"){
@@ -150,9 +155,11 @@ function render(d){
     return;}
    // An · AH 는 칸이 아니라 계수다 → 자기 배율을 그대로 곱한다.
    if(q.e.slot==="An"||q.e.slot==="AH"){x*=q.mul;return;}
-   // ⚠️ e.v 가 아니라 eVal(e,r) 이다 — 미아처럼 pc 가 붙은 스킬은 편성 병종 수로
-   // 기대값을 다시 내야 한다(0.25 가 아니라 3병종이면 0.4375).
-   put(q.e.slot,eVal(q.e,r));if(q.e.also)put(q.e.also.slot,q.e.also.v);});
+   // ⚠️ e.v 가 아니라 eAdd 다 — 미아처럼 pc 가 붙은 스킬은 편성 병종 수로 기대값을 내고,
+   // **이미 몇 장 있는지**(리더 보유분 + 앞서 고른 조이너)에 따라 두 장째부터 값이 확 준다.
+   const have=(lid.indexOf(q.h.id)>=0?1:0)+seen.filter(z=>z===q.h.id).length;
+   seen.push(q.h.id);
+   put(q.e.slot,eAdd(q.e,r,have));if(q.e.also)put(q.e.also.slot,q.e.also.v);});
   return ORDER.reduce((a,sl)=>a*(b[sl]/buck[sl]),1)*x;};
 
  // ── 넷을 고르는 방법: 단독 배율 상위 4명이 아니라 **포화를 보며 한 명씩** 고른다 (2026-09-12)
@@ -225,7 +232,7 @@ function render(d){
      "Norah appears <b>three times</b> because <b>the sheet writes three Norah cells for this row</b>. By our numbers the third copy is worth about <b>−3%</b>, so it would never be chosen on merit — that gap is what following the sheet costs here, and what the numbers alone would pick is in <b>🧮 Raw ranking</b> below.")+"</p>":"")+
   '<p class="cap">'+L("위 배율은 네 명의 단독 배율을 곱한 값이 아니라 <b>같은 칸에 겹치는 분을 합쳤을 때</b>의 값입니다. 순위표의 배율을 넣는 순서대로 곱하면 더 크게 나오는데, 그건 포화를 빼먹은 숫자입니다. 그리고 <b>생존 칸도 같은 무게로 셉니다</b> — 전투비를 양쪽 식으로 펴면 <code>(내딜증 × 내감소) ÷ (상대딜증 × 상대감소)</code> 라, 내 딜 칸과 내 감소 칸이 결과에 똑같이 곱해집니다.",
      "This multiplier is not the product of the four individual figures — it is what you get after <b>adding up the parts that land in the same slot</b>. Multiplying the ranking figures together gives a larger number that ignores saturation. <b>Survival slots count the same</b>: expand the kill ratio for both sides and it reduces to <code>(my damage-up × my reduction) ÷ (theirs × theirs)</code>, so your damage slots and your reduction slots multiply the outcome equally.")+"</p>"+
-  (rank.filter(x=>x.dup).length?'<p class="cap">'+L("🚫 리더 중복 금지: ","🚫 Cannot double as joiners: ")+rank.filter(x=>x.dup).map(x=>esc(HN(x.h))).join(" · ")+"</p>":"")+"</div>"+
+  (top.filter(x=>x.dup).length?'<p class="cap">'+L("⚠️ 리더와 같은 영웅: <b>"+top.filter(x=>x.dup).map(x=>esc(HN(x.h))).join(" · ")+"</b> — 다른 연맹원이 데려오는 것이라 <b>들어올 수 있습니다</b>(시트도 10개 행에서 리더 영웅을 조이너 칸에 적습니다). 다만 그 스킬이 이미 칸에 들어가 있어 <b>한 장 더 얹는 값</b>으로 재어 있습니다.","⚠️ Also a leader: <b>"+top.filter(x=>x.dup).map(x=>esc(HN(x.h))).join(" · ")+"</b> — a different alliance member brings their own copy, so this is <b>allowed</b> (the sheet does it in ten rows). The multiplier already accounts for the leader’s copy already sitting in the slot.")+"</p>":"")+"</div>"+
   (top.map(x=>x.h.id).join()!==calcTop.map(x=>x.h.id).join()?
    '<div class="callout co-tip" id="recAll"><h3>'+L("🧮 계산 순위 그대로","🧮 Raw ranking")+
    ' <span class="tag t-warn">'+L("이론 포함","includes theory")+'</span></h3><p><b>'+calcTop.map(x=>hpic(x.h,"sm")+esc(HN(x.h))).join(" · ")+

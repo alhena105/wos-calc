@@ -29,6 +29,16 @@ function dmgShare(t,r){
 function nCls(r){return (r.inf>0?1:0)+(r.lan>0?1:0)+(r.mar>0?1:0);}
 function eVal(e,r){const n=nCls(r);
  return e.pc&&n>0?e.v*(1-Math.pow(1-e.pc,n))/e.pc:e.v;}
+// 같은 스킬이 k장 있을 때의 기대값. pc 는 **시행 횟수만** 늘어나므로 k 에 비례하지 않는다 —
+// 시행이 n·k 번이 될 뿐이라 곧 포화한다. 일반 스킬은 그냥 k 배다.
+function eK(e,r,k){const n=nCls(r);
+ return e.pc&&n>0?e.v*(1-Math.pow(1-e.pc,n*k))/e.pc:e.v*k;}
+// 이미 have 장 있을 때 한 장 더 넣는 값. have=0 이면 eVal 과 같다.
+// ⚠️ 미아를 리더로 쓰고 조이너로 또 넣을 때 이게 없으면 두 번째 장이 +43.75%p 로 잡힌다.
+// 실제로는 3병종 발동이 87.5% → 98.4% 로 오를 뿐이라 **+5.5%p** 다.
+// 볼트 「랠리 조이너 선정 규칙·개리슨 운영 (Ton)」 §6 "2번째 미아의 기대 이득은 최대 +6.25%p" 와 맞는다.
+// 새 가정이 아니라 위 eVal 공식에 시행 횟수를 넣은 것뿐이다.
+function eAdd(e,r,have){return eK(e,r,have+1)-eK(e,r,have);}
 // X(병종 한정) 스킬의 환산 지분 — 딜은 딜 지분, 생존은 병력 지분
 function xShare(q,r){return q.k==="sur"?tgtRatio(q.tgt,r)/100:dmgShare(q.tgt,r);}
 const NA_SHARE=.8; // 일반공격이 총딜에서 차지하는 비중 가정
@@ -198,6 +208,10 @@ function calc(){
  const rank=HEROES.filter(h=>h.gen<=gcap).map(h=>{
    const e=h.exp[0];if(!e||e.slot==="ECO")return null;
    let mul=1,detail=[],cond=null;
+   // 리더로 쓴 영웅도 조이너로 들어올 수 있다 — 다른 연맹원이 자기 것을 데려오는 것이다.
+   // 시트도 10개 행에서 리더 영웅을 조이너 칸에 적는다(제로니모 7행 · 노라 1행 등).
+   // 다만 그 영웅의 스킬은 이미 리더 쪽에서 칸에 들어가 있으므로 **한 장 더 얹는 값**으로 잰다.
+   const have=lid.has(h.id)?1:0;
    if(e.slot==="X"){const[st,lbl,v]=tgtStat(e.tgt,r);cond=st+"|"+tgtName[e.tgt]+" "+v.toFixed(0)+"% ("+lbl+")";
      if(st==="dead")return{h,e,mul:1,detail:[L("병종 비중 부족 → 사망","class share too low → dead")],cond,dup:lid.has(h.id)};
      // 한 스킬이 두 병종에 걸리면 각각 지분을 곱한다 — 서로 다른 축이라 곱연산이다
@@ -219,9 +233,12 @@ function calc(){
    }else{
      const step=(sl,val)=>{const b=buck[sl];if(b===undefined)return;const m=(b+val)/b;mul*=m;
        detail.push(sl+" "+b.toFixed(2)+"→"+(b+val).toFixed(2)+" ×"+m.toFixed(3));};
-     if(e.pc)detail.push(L("병종 "+nCls(r)+"종 → 발동 "+((1-Math.pow(1-e.pc,nCls(r)))*100).toFixed(1)+"% · 기대값 "+(eVal(e,r)*100).toFixed(2)+"%",
-                           nCls(r)+" troop types → fires "+((1-Math.pow(1-e.pc,nCls(r)))*100).toFixed(1)+"% · EV "+(eVal(e,r)*100).toFixed(2)+"%"));
-     step(e.slot,eVal(e,r)); if(e.also)step(e.also.slot,e.also.v);
+     if(e.pc)detail.push(have
+       ?L("리더가 이미 들고 있음 → 시행만 "+nCls(r)+"회 늘어 발동 "+((1-Math.pow(1-e.pc,nCls(r)*2))*100).toFixed(1)+"% · 두 장째 값 +"+(eAdd(e,r,1)*100).toFixed(2)+"%p",
+           "already on the leader → only "+nCls(r)+" more rolls: fires "+((1-Math.pow(1-e.pc,nCls(r)*2))*100).toFixed(1)+"%, second copy adds +"+(eAdd(e,r,1)*100).toFixed(2)+"pp")
+       :L("병종 "+nCls(r)+"종 → 발동 "+((1-Math.pow(1-e.pc,nCls(r)))*100).toFixed(1)+"% · 기대값 "+(eVal(e,r)*100).toFixed(2)+"%",
+           nCls(r)+" troop types → fires "+((1-Math.pow(1-e.pc,nCls(r)))*100).toFixed(1)+"% · EV "+(eVal(e,r)*100).toFixed(2)+"%"));
+     step(e.slot,eAdd(e,r,have)); if(e.also)step(e.also.slot,e.also.v);
    }
    return{h,e,mul,detail,cond,dup:lid.has(h.id)};
  }).filter(Boolean);

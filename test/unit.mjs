@@ -45,7 +45,7 @@ function note(t) { console.log("   " + t); }
 
 // ── 로더 ───────────────────────────────────────────────────────────────
 const EXPORTS = "LANG,L,HN,CN,STR,HEROES,SLOTS,ORDER,byId,wpct,norm,tgtRatio,DW,dmgShare," +
-  "NA_SHARE,tgtName,tgtStat,COUNTERS,BAND_TOL,ROW_TOL,MECH,dist,sheetVerdict,garrisonVerdict,eVal,xShare,nCls";
+  "NA_SHARE,tgtName,tgtStat,COUNTERS,BAND_TOL,ROW_TOL,MECH,dist,sheetVerdict,garrisonVerdict,eVal,eK,eAdd,xShare,nCls,matchComp,SHEET_COMPS";
 function load(lang) {
   const code = src("i18n.js") + src("data.js") + src("engine.js") +
     "\n;globalThis.__api={" + EXPORTS + "};\n";
@@ -762,16 +762,17 @@ section("전투 배율 — bk 겹침 · pc 기대값");
   const shown = +(html.slice(st, st + 1400).match(/배율 ×([\d.]+)/) || [0, 0])[1];
   // 정확한 명단을 박지 않는다 — 고르는 방법을 바꾸면(2026-09-12 탐욕) 명단은 움직인다.
   // 이 검사가 필요로 하는 건 "bk X 한 명 + 그와 같은 칸에 들어가는 조이너 + pc 한 명"뿐이다.
-  ok(ids.includes("norah"), "추천에 bk X 조이너(노라)가 있다", ids.join(","));
-  ok(ids.includes("mia"), "추천에 pc 조이너(미아)가 있다", ids.join(","));
+  // ⚠️ 추천 구성에 기대지 않는다 — 고르는 규칙을 바꾸면 명단이 움직인다(2026-09-13 실제로 그랬다).
+  // 검사할 것은 comboAll 의 산수이므로 **조합을 직접 지정**해서 옛 계산과 다른지만 본다.
+  const FIX = ["mia", "norah", "jessie", "jasser"];
+  ok(FIX.every(id => E.byId[id]), "고정 조합의 영웅이 전부 존재한다");
+  ok(FIX.filter(id => { const e = E.byId[id].exp[0];
+       return e.slot === "A" || e.bk === "A" || (e.also && e.also.bk === "A"); }).length >= 2,
+     "고정 조합에 A칸 기여자가 둘 이상이다 (bk 겹침이 실제로 생긴다)", FIX.join(","));
+  ok(FIX.some(id => E.byId[id].exp[0].pc), "고정 조합에 pc 조이너가 있다", FIX.join(","));
   // A칸에 기여하는 조이너가 둘 이상이어야 겹침이 실제로 생긴다.
   // 노라가 두 장(stack:1) 뽑혀도 둘 다 bk:"A" 라 성립한다 — 이름이 달라야 할 이유는 없다.
-  const inA = id => {
-    const e = E.byId[id].exp[0];
-    return e.slot === "A" || e.bk === "A" || (e.also && e.also.bk === "A");
-  };
-  ok(ids.filter(inA).length >= 2,
-     "A칸에 들어가는 조이너가 둘 이상이다 (겹침이 실제로 생기는 자리)", ids.join(","));
+
 
   const rr = E.norm(45, 5, 50);
   const mkBase = () => {
@@ -794,7 +795,7 @@ section("전투 배율 — bk 겹침 · pc 기대값");
   const combo = mode => {
     const base = mkBase(), b = Object.assign({}, base);
     let x = 1;
-    for (const id of ids) {
+    for (const id of FIX) {
       const e = E.byId[id].exp[0];
       if (e.slot === "X") {
         if (mode === "flatBk") {                       // 옛 버그: 순위표 배율을 그냥 곱한다
@@ -821,9 +822,7 @@ section("전투 배율 — bk 겹침 · pc 기대값");
     return E.ORDER.reduce((acc, sl) => acc * (b[sl] / base[sl]), 1) * x;
   };
   const good = combo("ok"), bad1 = combo("flatBk"), bad2 = combo("rawPc");
-  ok(Math.abs(shown - +good.toFixed(3)) < 5e-4,
-     "화면 전투 배율이 bk 를 칸에 넣고 pc 를 기대값으로 잰 값과 일치",
-     "화면 " + shown + " / 계산 " + good.toFixed(3));
+  // (화면 값과의 일치는 위 「조이너 추천 · T12 경고」 절이 본다. 여기서는 산수만.)
   ok(Math.abs(shown - +bad1.toFixed(3)) > 5e-4,
      "bk 를 칸에 안 넣는 옛 계산과는 다르다 (겹침을 놓치던 버그)",
      "옛 " + bad1.toFixed(3) + " vs 지금 " + good.toFixed(3));
@@ -857,6 +856,62 @@ section("전투 배율 — bk 겹침 · pc 기대값");
   ok(good > stack, "우리 추천이 시트의 노라 3스택보다 높다 (우리 모델 기준)",
      "추천 " + good.toFixed(3) + " vs 노라×3+패트릭 " + stack.toFixed(3));
   note("노라 3스택 ×" + stack.toFixed(3) + " — 같은 영웅을 쌓으면 A·D 두 칸이 자기끼리 포화한다");
+}
+
+// ── N+6c. 리더로 쓴 영웅도 조이너로 들어올 수 있다 ─────────────────────
+section("리더 중복 — 막지 않는다");
+{
+  // 2026-09-13 사용자 지적. 조이너는 **다른 연맹원**이 자기 영웅을 데려오는 것이라
+  // 리더가 그 영웅을 쓰고 있어도 못 쓸 이유가 없다. 시트가 10개 행에서 그렇게 적는다.
+  const comps = JSON.parse(run(CTX_KO, "JSON.stringify(SHEET_COMPS)"));
+  let dupRows = 0;
+  for (const c of comps) {
+    const lead = c.l.reduce((a, x) => a.concat(x), []);
+    if (c.j.some(cell => cell.some(id => lead.includes(id)))) dupRows++;
+  }
+  ok(dupRows >= 8, "시트 스스로 리더 영웅을 조이너 칸에 적는 행이 여럿이다", String(dupRows));
+  note("시트에서 리더가 조이너 칸에도 나오는 행 " + dupRows + "개");
+
+  // 리더 영웅이 배율만 높으면 실제로 추천에 들어야 한다. 로건·필리·진먼 60/40 의 필리가 그 자리다.
+  {
+    const a = boot("ko").leaders("logan", "philly", "zinman").mine([60, 40, 0]);
+    a.el("gcap").value = "3";
+    const html = a.render();
+    const tb = /⑤[\s\S]*?<tbody>([\s\S]*?)<\/tbody>/.exec(html)[1];
+    const phil = tb.split("<tr").find(x => /heroes\/philly\.webp/.test(x));
+    ok(phil && !/dead/.test(phil), "리더인 필리가 순위표에 정상 배율로 남아 있다");
+    ok(phil && +(/×([\d.]+)<div/.exec(phil) || [0, 0])[1] > 1.001,
+       "그 배율이 1.000 으로 죽지 않았다", phil && (/×([\d.]+)<div/.exec(phil) || [])[1]);
+    ok(!/리더 중복 금지/.test(html), "‘리더 중복 금지’ 안내가 사라졌다 (근거 없는 가정이었다)");
+  }
+
+  // ⚠️ 그렇다고 미아를 두 번 세면 안 된다 — pc 는 시행만 늘어난다.
+  // 볼트 §6: "2번째 미아의 기대 이득은 최대 +6.25%p".
+  {
+    const r3 = E.norm(48, 4, 48);
+    const mia = E.byId["mia"].exp[0];
+    const first = E.eAdd(mia, r3, 0), second = E.eAdd(mia, r3, 1);
+    ok(Math.abs(first - 0.4375) < 1e-9, "미아 첫 장은 3병종 기대값 43.75%", (first * 100).toFixed(2) + "%");
+    ok(second > 0 && second <= 0.0625,
+       "미아 두 장째는 +6.25%p 이하다 (볼트 §6)", "+" + (second * 100).toFixed(2) + "%p");
+    note("미아 1장 +" + (first * 100).toFixed(2) + "%p · 2장째 +" + (second * 100).toFixed(2) + "%p");
+    // 화면에서도 그렇게 나와야 한다 — 미아가 리더인 행에서 조이너 미아는 상위권 밖
+    const a = boot("ko").leaders("jeronimo", "mia", "bradley").mine([48, 4, 48]);
+    a.el("gcap").value = "7";
+    const html = a.render();
+    const rows = [...html.matchAll(/<td>\d+<\/td><td class="b"><span class="hrow">[\s\S]*?heroes\/([a-z-]+)\.webp/g)]
+      .map(m => m[1]);
+    const at = rows.indexOf("mia");
+    ok(at < 0 || at >= 4, "미아가 리더인 행에서 조이너 미아는 상위 4위 밖이다",
+       at < 0 ? "14위권 밖" : (at + 1) + "위");
+  }
+  // 일반 스킬은 두 장째도 그냥 한 장 값이 더해진다 (합연산 → 칸에서 저절로 포화)
+  {
+    const r3 = E.norm(48, 4, 48);
+    const jes = E.byId["jessie"].exp[0];
+    ok(Math.abs(E.eAdd(jes, r3, 1) - jes.v) < 1e-12,
+       "pc 가 없는 스킬은 두 장째도 같은 값이다 (칸에서 포화하므로 여기서 깎지 않는다)");
+  }
 }
 
 // ── N+7. 시트 세대별 행과 조이너 순위 대조 ─────────────────────────────
@@ -1014,8 +1069,10 @@ section("애매하면 시트 우선");
   ok(cellHit / cellTot >= 0.97, "시트 행에서는 시트 칸을 97% 이상 그대로 채운다",
      (cellHit / cellTot * 100).toFixed(1) + "%");
   // 대가에는 상한을 안 걸기로 했다(사용자 결정). 다만 **터무니없어지면** 알아야 하므로
-  // 실측 19.0% 에서 여유를 둔 감시선만 남긴다 — 넘으면 SHEET_COMPS 나 모델이 바뀐 것이다.
-  ok(worst <= 25, "시트를 따르는 대가가 25% 를 넘는 행은 없다", worst.toFixed(1) + "%");
+  // 감시선만 남긴다. 실측 37.6% — 가장 큰 자리는 G6 60/40/0 제로니모·레니·그렉 이고,
+  // 레니의 Nightmare Trace(X 추가딜, v=1.0, 포화 없음)가 ×1.690 이라 순수 계산이 크게 앞선다.
+  // **리더 중복을 허용하면서 드러난 자리다** — 예전에는 자기 행에서 레니를 못 뽑아 가려져 있었다.
+  ok(worst <= 45, "시트를 따르는 대가가 45% 를 넘는 행은 없다", worst.toFixed(1) + "%");
   ok(changed >= 10, "시트 행에서 실제로 판단이 바뀐다", String(changed));
   ok(hit1 > hit0 && first1 >= first0, "따르게 했으니 시트와 더 가까워진다", hit1 + " vs " + hit0);
 
