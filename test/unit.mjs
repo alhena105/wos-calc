@@ -1059,21 +1059,36 @@ section("애매하면 시트 우선");
   }
   // ③ 중복은 stack:1 인 영웅(노라)에게만 허용된다
   {
-    ok(E.HEROES.filter(h => h.stack).map(h => h.id).join() === "norah",
-       "stack:1 은 노라 하나뿐이다", E.HEROES.filter(h => h.stack).map(h => h.id).join());
+    // ⚠️ 명단을 기억으로 박지 않는다 — **SHEET_COMPS 에서 기계적으로 센다.**
+    // 2026-09-13 까지 "노라 하나뿐"이라고 적어 뒀는데 Gen 1 두 행의 패트릭을 놓치고 있었다.
+    // 사용자가 잡았다. 이 검사가 있으면 그런 누락이 다시 안 생긴다.
+    const comps = JSON.parse(run(CTX_KO, "JSON.stringify(SHEET_COMPS)"));
+    const repeated = new Set();
+    for (const c of comps) {
+      const seen = {};
+      c.j.forEach(cell => { const k = cell.join("/"); seen[k] = (seen[k] || 0) + 1; });
+      for (const k of Object.keys(seen)) if (seen[k] >= 2 && k.indexOf("/") < 0) repeated.add(k);
+    }
+    const flagged = new Set(E.HEROES.filter(h => h.stack).map(h => h.id));
+    const missing = [...repeated].filter(x => !flagged.has(x));
+    const extra = [...flagged].filter(x => !repeated.has(x));
+    ok(missing.length === 0 && extra.length === 0,
+       "stack:1 이 붙은 영웅 == 시트가 한 행에서 겹쳐 쓴 영웅",
+       (missing.length ? "빠짐: " + missing.join(",") : "") + (extra.length ? " 잉여: " + extra.join(",") : ""));
+    note("시트가 겹쳐 쓰는 영웅: " + [...repeated].map(x => E.byId[x].kr).join(" · "));
     let dupRows = 0;
     const bad = [];
-    for (const row of SHEET_ROWS) for (const edge of [0, 0.02]) {
+    for (const row of SHEET_ROWS) for (const edge of [0, 1]) {
       const ids = pick(row, edge).ids;
       const cnt = {};
       ids.forEach(i => { cnt[i] = (cnt[i] || 0) + 1; });
       for (const id of Object.keys(cnt)) {
         if (cnt[id] < 2) continue;
-        if (id !== "norah") bad.push("G" + row.gen + " " + row.r.join("/") + " " + id + "×" + cnt[id]);
-        else if (edge === 0.02) dupRows++;
+        if (!E.byId[id].stack) bad.push("G" + row.gen + " " + row.r.join("/") + " " + id + "×" + cnt[id]);
+        else if (edge === 1 && id === "norah") dupRows++;
       }
     }
-    ok(bad.length === 0, "노라 말고는 아무도 중복으로 뽑히지 않는다", bad.slice(0, 3).join(", "));
+    ok(bad.length === 0, "stack:1 이 없는 영웅은 중복으로 뽑히지 않는다", bad.slice(0, 3).join(", "));
     ok(dupRows >= 3, "노라 중복이 실제로 쓰이는 행이 있다 (예외가 죽어 있지 않다)", String(dupRows));
     let three = 0;
     for (const row of SHEET_ROWS) {

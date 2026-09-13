@@ -345,12 +345,15 @@ function setLang(l){
 //   올리는(내리는) 스킬이라는 표시다. 이런 스킬은 일반 칸과 같은 스탯이므로 칸을 우회하면 안 되고,
 //   병종 딜 지분(dmg) 또는 병력 지분(sur)으로 환산해 그 칸에 합산한다. 근거는 wosheroes 원문이고,
 //   "extra damage / 추가피해" 처럼 타격에 붙는 것은 다른 기전이라 bk 를 달지 않는다.
-// stack:1 — 이 영웅만 조이너로 **중복으로 들여보낸다**는 표시. 현재 노라 하나뿐이다.
-//   근거: 시트 세대 탭이 10개 행에서 노라를 2~3장 곹쳐 쓰고(다른 영웅은 한 번도 안 곹친다),
-//   볼트 「랠리 참여자 영웅 가이드」 257행이 "노라의 스킬이 스택 시에도 효율이 좋은 특수 케이스"라고 적었다.
-//   ⚠️ 이건 **고를 수 있게만** 해 주는 플래그지 "쌀라"는 지시가 아니다. 둘째 노라는 같은 A·D 칸에
-//   합연산으로 들어가 자기끼리 포화하므로, 우리 모델은 그게 더 나을 때만 집는다.
-//   순수 계산(SHEET_EDGE=0)에서는 둘째 노라가 사실상 안 뽑힌다 — 그게 정상이다.
+// stack:1 — 시트가 **한 행에 같은 칸을 두 번 이상 적은** 영웅. 지금 둘이다 — 노라(11행) · 패트릭(2행).
+//   ⚠️ 이 목록을 기억으로 적지 말 것. `SHEET_COMPS` 에서 기계적으로 세서 맞춰야 한다 —
+//   실제로 2026-09-13 까지 "노라 하나뿐"이라고 적어 두었는데 Gen 1 두 행의 패트릭을 놓치고 있었다.
+//   `unit.mjs` 가 **stack 이 붙은 영웅 집합 == 시트가 겹쳐 쓴 영웅 집합** 을 검사한다.
+//   근거 — 노라: 볼트 「랠리 참여자 영웅 가이드」 257행 "스택 시에도 효율이 좋은 특수 케이스".
+//   패트릭: Gen 1 은 풀이 얇아서 **2장째 패트릭(×1.185)이 20% 계열(세르게이·바히티 ×1.167)보다 낫다.**
+//   우리 순위표에서도 그렇게 나온다(사용자가 짚어준 이유이고, 숫자로 확인됐다).
+//   ⚠️ 단 **고를 수 있게만** 해 주는 플래그지 "쌀라"는 지시가 아니다. 둘째 장은 같은 칸에
+//   합연산으로 들어가 자기끼리 포화한다 — 순수 계산은 더 나을 때만 집는다.
 // slot:"AH" — 위 규칙의 짝이다. 원문이 "extra damage / extra attack / N% damage" 처럼
 //   **타격에 붙는** 것은 Damage Dealt 스탯이 아니므로 A칸(합연산)에 넣지 않는다.
 //   어느 칸인지는 자료가 없으니 칸을 만들지도 않는다 — 자기 계수로만 곱한다(포화 없음).
@@ -375,7 +378,7 @@ const HEROES = [
 {id:"seoyoon",s:1,kr:"서윤",en:"Seo-yoon",cls:"marksman",gen:0,rar:"epic",
  exp:[{n:"Rallying Beat",slot:"B",v:.25,t:"전 부대 공격력 +25%",te:"all troops attack +25%"},
       {n:"Soothing Dance",slot:"ECO",v:0,t:"의무실 치료 속도 +50%",te:"infirmary healing speed +50%"}],w:null},
-{id:"patrick",s:1,kr:"패트릭",en:"Patrick",cls:"lancer",gen:0,rar:"epic",
+{id:"patrick",s:1,stack:1,kr:"패트릭",en:"Patrick",cls:"lancer",gen:0,rar:"epic",
  exp:[{n:"Super Nutrients",slot:"C",v:.25,t:"전 부대 체력 +25%",te:"all troops health +25%"},
       {n:"Caloric Booster",slot:"B",v:.25,t:"전 부대 공격력 +25%",te:"all troops attack +25%"}],w:null},
 {id:"sergey",s:1,kr:"세르게이",en:"Sergey",cls:"infantry",gen:0,rar:"epic",
@@ -1661,8 +1664,7 @@ function render(d){
   '<p class="cap">'+L("넷은 ⑤ 순위 상위 4명을 그냥 자른 게 아니라, <b>포화를 보며 한 명씩</b> 골랐습니다 — 매번 “여기에 더했을 때 전투 배율이 가장 커지는 한 명”입니다. 자르기만 하면 <b>제시·제셀·제로니모처럼 같은 A칸에 들어가는 영웅이 나란히 뽑힙니다</b>(각자 ×1.250 이지만 둘째는 ×1.200, 셋째는 ×1.167 로 떨어집니다). 그래서 순위표 1~4위와 명단이 다를 수 있습니다.",
      "The four are not the top four of ranking ⑤ — each is picked in turn as <b>whoever raises the combined multiplier most</b>, given the ones already chosen. Plain truncation lines up heroes that share a slot (Jessie, Jasser and Jeronimo all fill A: ×1.250, then ×1.200, then ×1.167). So this list can differ from rows 1–4 of the table.")+"</p>"+
   (top.filter((x,i)=>top.indexOf(x)!==i).length?'<p class="cap">'+
-   L("같은 영웅이 두 번 나온 것은 <b>노라만 허용</b>하기 때문입니다 — 시트 세대 탭이 노라만 2~3장 겹쳐 쓰고 다른 영웅은 한 번도 겹치지 않습니다(볼트 「랠리 참여자 영웅 가이드」도 “스택 시에도 효율이 좋은 특수 케이스”라고 적었습니다). 둘째 노라도 같은 A·D 칸에 합연산으로 들어가 <b>자기끼리 포화</b>하므로, 그래도 이득일 때만 뽑힙니다.",
-     "The same hero appears twice because <b>only Norah may repeat</b> — the sheet stacks her two or three deep in ten rows and never doubles anyone else (the vault guide calls her “a special case that stays efficient when stacked”). A second Norah still adds into the same A and D slots, so it <b>saturates against itself</b> and is only taken when it still wins.")+"</p>":"")+
+   L("같은 영웅이 두 번 나온 것은 <b>시트가 한 행에 그 영웅을 두 칸 이상 적어 둔 경우만</b> 허용하기 때문입니다 — 지금은 <b>노라(11행)·패트릭(2행)</b> 둘뿐이고, 나머지는 중복이 막혀 있습니다. 둘째 장도 같은 칸에 합연산으로 들어가 <b>자기끼리 포화</b>하므로, 계산은 그래도 이득일 때만 집습니다. (예: Gen 1 은 풀이 얇아 <b>2장째 패트릭 ×1.185 가 20% 계열 ×1.167 보다 낫습니다.</b>)","A hero appears twice only where <b>the sheet itself writes that hero in two or more cells of the row</b> — today that is <b>Norah (11 rows) and Patrick (2)</b>; everyone else is blocked from repeating. A second copy still adds into the same slot, so it <b>saturates against itself</b> and the numbers take it only when it still wins. (At Gen 1 the pool is thin enough that a <b>second Patrick, ×1.185, beats the 20% tier at ×1.167.</b>)")+"</p>":"")+
   (top.filter((x,i)=>top.indexOf(x)!==i).length>=2?'<p class="cap">'+
    L("노라가 <b>세 장</b>인 것은 <b>시트가 이 행에 노라 칸을 셋 적었기 때문</b>입니다. 셋째 노라는 우리 계산으로는 <b>−3% 쯤 손해</b>라 계산만으로는 안 뽑힙니다. 그 차이가 <b>시트를 따른 대가</b>이고, 계산만으로 고른 답은 아래 <b>「🧮 계산 순위 그대로」</b> 에 있습니다.",
      "Norah appears <b>three times</b> because <b>the sheet writes three Norah cells for this row</b>. By our numbers the third copy is worth about <b>−3%</b>, so it would never be chosen on merit — that gap is what following the sheet costs here, and what the numbers alone would pick is in <b>🧮 Raw ranking</b> below.")+"</p>":"")+
