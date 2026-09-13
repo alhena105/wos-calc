@@ -754,6 +754,49 @@ section("조이너 동률 타이브레이크");
 }
 
 // ── N+6b. 전투 배율 — bk(X) 겹침과 pc 기대값 회귀 ──────────────────────
+section("리더 self-pick — 무포화 스킬도 자기끼리 합연산 (2026-09-14)");
+{
+  // 2026-09-14 검증에서 드러난 비대칭: 칸에 들어가는 스킬은 리더가 이미 채워 두면
+  // 조이너의 한계가 줄어드는데(eAdd·bk), **칸이 아닌 스킬(bk 없는 X · AH)은 그렇지 않았다.**
+  // 그래서 리더 레니가 자기를 조이너로 다시 집을 때 페널티가 0 이었다(60/40 ×1.690 · 손실 38.5%).
+  // 같은 병리가 레니 2행 · 웨인 4행 · 고든 2행에 있었다.
+  // 고친 방법은 새 가정이 아니다 — **같은 스킬 두 장은 칸을 몰라도 같은 자리**이므로
+  // 이 프로젝트 1번 모델(같은 칸 합연산)을 자기 자신에게 적용한 것뿐이다(nbAdd).
+  const val = (lead, r, g, id) => {
+    const a = boot("ko").leaders(lead[0], lead[1], lead[2]).mine(r);
+    a.el("gcap").value = String(g);
+    const html = a.render();
+    // ⑤ 순위표에서 그 영웅 행의 마지막 배율. 리더 표에도 초상이 나오므로
+    // **× 가 들어 있는 행만** 본다(리더가 그 영웅인 케이스를 재기 때문에 중요하다).
+    for (const part of html.split("<tr").filter(x => x.includes(id + ".webp"))) {
+      const tr = ("<tr" + part).split("</tr>")[0];
+      const m = [...tr.matchAll(/×([\d.]+)/g)];
+      if (m.length) return +m[m.length - 1][1];
+    }
+    return null;
+  };
+  // [영웅, 계열, 리더로 쓴 편성, 안 쓴 편성, 병비, gcap]
+  const CASES = [
+    ["renee",  "X(bk없음)", ["jeronimo", "renee", "greg"],   ["jeronimo", "mia", "greg"],   [60, 40, 0], 6],
+    ["wayne",  "AH",        ["logan", "philly", "wayne"],    ["logan", "philly", "zinman"], [45, 5, 50], 6],
+    ["gordon", "X(bk없음)", ["edith", "gordon", "bradley"],  ["edith", "mia", "bradley"],   [60, 40, 0], 7],
+    ["flint",  "X(bk있음)", ["flint", "philly", "zinman"],   ["logan", "philly", "zinman"], [60, 40, 0], 2],
+  ];
+  for (const [id, kind, withL, without, r, g] of CASES) {
+    const w = val(withL, r, g, id), o2 = val(without, r, g, id);
+    ok(w !== null && o2 !== null && w < o2 - 1e-9,
+       "리더가 이미 든 " + kind + " 스킬은 조이너로 다시 집을 때 깎인다 — " + id,
+       "리더일 때 " + w + " · 아닐 때 " + o2);
+  }
+  // 회귀 표식: 예전 값(포화 0)으로 돌아가면 여기서 걸린다
+  const renee = val(["jeronimo", "renee", "greg"], [60, 40, 0], 6, "renee");
+  ok(renee < 1.5, "레니 자기 재선택이 옛 ×1.690 으로 돌아가지 않았다", String(renee));
+  // nbAdd 항등식 — have=0 이면 예전과 같아야 한다(옛 동작을 포함한다는 증명)
+  const nb = (v, h) => (1 + (h + 1) * v) / (1 + h * v);
+  ok(Math.abs(nb(0.37, 0) - 1.37) < 1e-12, "nbAdd(v,0) === 1+v (리더가 없으면 예전 그대로)");
+  ok(nb(0.37, 1) < nb(0.37, 0), "nbAdd 는 have 가 늘수록 줄어든다");
+}
+
 section("전투 배율 — bk 겹침 · pc 기대값");
 {
   // 2026-09-12 에 comboAll 에서 잡은 버그 둘. 둘 다 "추천에 그 조합이 나온 적이 없어서"
@@ -1090,8 +1133,13 @@ section("애매하면 시트 우선");
     const html = a.render();
     const after = html.slice(html.indexOf('id="rec"'));
     const b = /<p><b>([\s\S]*?)<\/b><\/p>/.exec(after);
+    const ia = html.indexOf('id="recAll"');
+    const ba = ia < 0 ? null : /<p><b>([\s\S]*?)<\/b><\/p>/.exec(html.slice(ia));
+    const ids = b ? [...b[1].matchAll(/heroes\/([a-z-]+)\.webp/g)].map(m => m[1]) : [];
     return {
-      ids: b ? [...b[1].matchAll(/heroes\/([a-z-]+)\.webp/g)].map(m => m[1]) : [],
+      ids,
+      // #recAll 은 SHEET_EDGE 와 무관하게 시트를 안 본다. 없으면 #rec 과 같다는 뜻이다.
+      all: ba ? [...ba[1].matchAll(/heroes\/([a-z-]+)\.webp/g)].map(m => m[1]) : ids,
       v: +(/전투 배율 ×([\d.]+)/.exec(after) || [0, 0])[1],
     };
   };
@@ -1108,7 +1156,7 @@ section("애매하면 시트 우선");
   // 시트 행이면 **시트 칸을 그대로 채운다**(2026-09-13, 사용자 결정: 상한 없음).
   // 그래서 여기서 재는 것은 "얼마나 맞췄나"가 아니라 **얼마를 포기했나**다.
   let changed = 0, loss = 0, worst = 0, first0 = 0, first1 = 0, hit0 = 0, hit1 = 0, tot = 0;
-  let cellHit = 0, cellHit0 = 0, cellTot = 0;
+  let cellHit = 0, cellHit0 = 0, cellHitAll = 0, cellTot = 0;
   // 픽 4명을 칸 4개에 **최대로** 배정한다. 앞에서부터 그리디로 채우면 순수 계산 쪽이
   // 순서 때문에 억울하게 낮게 잡힌다 — 두 모드를 같은 잣대로 재야 비교가 성립한다.
   const maxFill = (picks, cells) => {
@@ -1137,8 +1185,9 @@ section("애매하면 시트 우선");
     const c = JSON.parse(a.js("JSON.stringify(matchComp(" + JSON.stringify(row.lead) +
       ",norm(" + row.r.join(",") + ")," + row.gen + "))"));
     if (c) {
-      cellHit += maxFill(on.ids, c.j);    // 시트 우선 ON — 베낀 것이므로 100% 가 당연하다
-      cellHit0 += maxFill(off.ids, c.j);  // 시트 우선 OFF — 이쪽이 진짜 일치율이다
+      cellHit += maxFill(on.ids, c.j);      // 시트 우선 ON — 베낀 것이므로 100% 가 당연하다
+      cellHit0 += maxFill(off.ids, c.j);    // 시트 우선 OFF (시트 등재 풀 안에서)
+      cellHitAll += maxFill(off.all, c.j);  // 전체 풀 — 시트를 어느 쪽으로도 안 본다
       cellTot += c.j.length;
     }
   }
@@ -1150,8 +1199,13 @@ section("애매하면 시트 우선");
   // 예전에는 위 줄만 "시트 칸 적중 100.0%" 로 찍혀서 로그만 보면 "다 맞았다" 로 읽혔다(2026-09-13).
   note("시트 칸 복사 확인 (SHEET_EDGE=1) " + cellHit + "/" + cellTot +
        " (" + (cellHit / cellTot * 100).toFixed(1) + "%) — 순환논 · 검증 아님");
-  note("진짜 일치   (순수 계산 SHEET_EDGE=0) " + cellHit0 + "/" + cellTot +
+  // ⚠️ "순수 계산" 이라고만 쓰면 과장이다 — 칸 내용은 안 베끼지만 **후보 풀이 시트 파생**이다
+  // (poolS = s:1 = 시트 조이너 명단 · stack:1 = 시트가 두 칸 이상 적은 영웅).
+  // 필터를 떼면 64.9% → 54.8% 로 내려간다. 그래서 두 줄로 나눠 찍는다(2026-09-14 검증 지적).
+  note("진짜 일치   (SHEET_EDGE=0 · 시트 등재 풀 안에서) " + cellHit0 + "/" + cellTot +
        " (" + (cellHit0 / cellTot * 100).toFixed(1) + "%)");
+  note("진짜 일치   (전체 풀 #recAll · 시트를 아예 안 봄) " + cellHitAll + "/" + cellTot +
+       " (" + (cellHitAll / cellTot * 100).toFixed(1) + "%)");
   note("(참고 · 검증 아님) 시트 #1 재현 " + (first0 / SHEET_ROWS.length * 100).toFixed(1) + "% → " +
        (first1 / SHEET_ROWS.length * 100).toFixed(1) + "% · 겹침 " +
        (hit0 / tot * 100).toFixed(1) + "% → " + (hit1 / tot * 100).toFixed(1) + "%");
@@ -1162,8 +1216,14 @@ section("애매하면 시트 우선");
      (cellHit / cellTot * 100).toFixed(1) + "%");
   // 진짜 하한선. 순수 모델이 시트에서 멀어지면 여기가 먼저 내려간다.
   // 실측에서 여유를 두고 잡았다 — 올라가면 하한선도 같이 올린다.
-  ok(cellHit0 / cellTot >= 0.60, "순수 계산만으로도 시트 칸의 60% 이상에 떨어진다",
+  // ⚠️ 0.60 은 너무 느슨했다 — 회귀 6종을 심어 보니 1종만 걸렸다(2026-09-14 검증).
+  // 0.63 이면 「탐욕 대신 상위4 자르기」·「투자 문턱 뒤집기」까지 잡히고 여유가 4칸 남는다.
+  ok(cellHit0 / cellTot >= 0.63, "시트 등재 풀 안의 순수 계산이 시트 칸의 63% 이상에 떨어진다",
      (cellHit0 / cellTot * 100).toFixed(1) + "%");
+  // ⚠️ 위 지표는 `#rec` 을 읽으므로 **bk·AH 계열 회귀를 구조적으로 못 잡는다** — 플린트 같은
+  // 시트 미등재 영웅이 밀려들어도 `poolS` 밖이라 안 보이기 때문이다. 그래서 전체 풀도 같이 잰다.
+  ok(cellHitAll / cellTot >= 0.50, "전체 풀 순수 계산도 시트 칸의 50% 이상에 떨어진다",
+     (cellHitAll / cellTot * 100).toFixed(1) + "%");
   // 대가에는 상한을 안 걸기로 했다(사용자 결정). 다만 **터무니없어지면** 알아야 하므로
   // 감시선만 남긴다. 실측 37.6% — 가장 큰 자리는 G6 60/40/0 제로니모·레니·그렉 이고,
   // 레니의 Nightmare Trace(X 추가딜, v=1.0, 포화 없음)가 ×1.690 이라 순수 계산이 크게 앞선다.
@@ -1210,6 +1270,7 @@ section("애매하면 시트 우선");
     ok(!a.js('!!matchComp(["logan","philly","zinman"],norm(10,10,80),3)'),
        "리더가 같아도 병비가 멀면 매칭되지 않는다");
   }
+  const HNko = id => E.byId[id].kr;
   // ②a-3 겹쳐 넣은 영웅의 장당 한계 배율을 **이 편성의 실제 값**으로 찍는가 (2026-09-13)
   //      예전에는 문단이 "둘째 장도 자기끼리 포화한다" 고 주장만 하고, 숫자는 일반론이거나
   //      다른 편성 예시였다. 노라 3장을 받은 사람이 자기 2·3장째를 화면에서 못 봤다.
@@ -1226,8 +1287,13 @@ section("애매하면 시트 우선");
     // 핵심 교차검증 — 첫 장의 값은 ⑤ 순위표의 그 영웅 배율과 같아야 한다.
     // 다르면 둘 중 하나가 다른 것을 재고 있다는 뜻이다(영웅의 스킬을 전부 먹여서
     // 재면 여기가 어긋난다 — 실제로 그렇게 잘못 재어 본 적이 있다).
-    const row = html.split("<tr").filter(x => x.includes("norah.webp"))[0] || "";
-    const cells = [...row.split("</tr>")[0].matchAll(/×([\d.]+)/g)].map(m => +m[1]);
+    // ⚠️ 초상은 리더 표에도 나온다. **× 가 들어 있는 행만** 봐야 한다 — 그냥 첫 <tr> 를
+    // 잡으면 그 영웅이 리더인 케이스에서 엉뚱한 행을 읽는다(2026-09-14 지적).
+    let cells = [];
+    for (const part of html.split("<tr").filter(x => x.includes("norah.webp"))) {
+      const m = [...("<tr" + part).split("</tr>")[0].matchAll(/×([\d.]+)/g)].map(x => +x[1]);
+      if (m.length) { cells = m; break; }
+    }
     ok(cells.length > 0 && Math.abs(cells[cells.length - 1] - mg[0]) < 1e-9,
        "첫 장의 값이 ⑤ 순위표의 그 영웅 배율과 같다 (S1 하나만 센다)",
        "표 " + cells[cells.length - 1] + " vs 문단 " + mg[0]);
@@ -1303,6 +1369,25 @@ section("애매하면 시트 우선");
     // 순위에 안 들어간다는 문구를 지우면 안 된다 — 이게 이 문단의 요점이다
     ok((p1[0] || "").includes("순위 계산에는 넣지 않았습니다"),
        "'순위에 안 넣는다' 는 단서가 문단에 남아 있다");
+
+    // ⚠️ 시트가 답을 둘 적어 둔 자리에서 **대표 행의 alt 만** 뜨던 결함 (2026-09-14 검증에서 발견).
+    // ⚖️ 문단은 나머지 행의 j 를 그대로 보여 주는데 alt 는 조용히 사라지고 있었다 —
+    // g12 60/20/20 은 대표(#53 META)의 alt 가 노라뿐이라 #47 의 "가토" 가 화면에서 증발했다.
+    // "우리가 몰래 고르지 않습니다" 라고 적어 둔 문단 옆에서 alt 만 몰래 고르던 셈이다.
+    {
+      const rows2 = rows.filter(c => c.g === 12 && c.rs.some(v => v.join("/") === "60/20/20"));
+      const union = [...new Set(rows2.flatMap(c => (c.alt || []).flat()))];
+      ok(rows2.length === 2 && union.length >= 2,
+         "g12 60/20/20 은 답이 둘이고 두 행의 alt 가 서로 다르다 (검사가 헛돌지 않는다)",
+         rows2.length + "행 · alt " + union.join(","));
+      const q = boot("ko").leaders("herbjorg", "lloyd", "ligeia").mine([60, 20, 20]);
+      q.el("gcap").value = "12";
+      const seen2 = q.paras().filter(x => x.includes("🔁"))[0] || "";
+      const missing = union.filter(id => !seen2.includes(HNko(id)));
+      ok(missing.length === 0,
+         "답이 둘인 자리에서 두 행의 대체 조이너가 **모두** 뜬다",
+         "빠진 것: " + missing.map(HNko).join(",") + " · 문단: " + seen2.slice(0, 90));
+    }
   }
 
   // ②b 시트가 한 입력에 답을 둘 적어 둔 자리 — 감추지 않고 드러내는가 (2026-09-13)

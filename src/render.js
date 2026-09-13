@@ -123,7 +123,7 @@ function render(d){
   '</p><p class="cap">'+L("예외 — 상대가 같은 영웅을 4스택하면 상대 칸이 이미 합연산으로 포화라 우리 감소가 상대적으로 크게 먹힙니다. 그때는 20% 계열도 쓸 만합니다. · 근거: 볼트 「랠리 조이너 선정 규칙·개리슨 운영 (Ton)」 §5·§8 (Ton 반복 테스트)",
     "Exception — if the enemy stacks the same hero four times, their slot is already saturated by addition, so your reduction bites relatively harder; 20% skills are worth taking then. · Source: vault note “Rally joiner selection & garrison ops (Ton)”, §5 and §8.")+"</p></div>";
  // 기본은 **시트 등재 영웅만**이다(2026-09-12). 계산 순위 그대로가 아니다.
- // 근거: 시트 52행 대조(SHEET_EDGE=0)에서 등재만 쪽이 #1 재현 84.6→92.3% · 겹침 50.4→59.2% 로 올라갔고,
+ // 근거: 시트 52행 대조(SHEET_EDGE=0)에서 등재만 쪽이 #1 재현 86.5→92.3% · 겹침 48.7→58.8% 로 올라갔고,
  // **한 행도 나빠지지 않았다** — 이건 주장이 아니라 unit.mjs 가 지키는 검사다(#1·겹침 양쪽).
  // 이론 배지 영웅이 41회 끼어들던 자리다(웨인21·고든11·플린트3·알론소3·아모스2·블랑쉬1).
  // 계산 순위는 아래 보조 패널(#recAll)로 계속 보여준다 — 값을 감추는 게 아니라 순서를 바꾼 것이다.
@@ -146,20 +146,25 @@ function render(d){
   const b=Object.assign({},buck);let x=1;const seen=[];
   const put=(sl,v)=>{if(b[sl]!==undefined)b[sl]+=v;};
   list.forEach(q=>{
+   // have = 리더 보유분 + 앞서 고른 조이너 중 같은 영웅. 예전에는 **칸 스킬에만** 썼는데,
+   // 무포화 스킬(bk 없는 X · AH)도 자기끼리는 같은 자리라 같은 잣대를 써야 한다(nbAdd).
+   const have=(lid.indexOf(q.h.id)>=0?1:0)+seen.filter(z=>z===q.h.id).length;
+   seen.push(q.h.id);
    if(q.e.slot==="X"){
     // ⚠️ bk 가 붙은 X 는 그 칸의 **스탯**이다 → 반드시 칸에 넣는다.
     // q.mul 을 그냥 곱하면 그 값이 "리더만 있는 칸" 기준이라, 같은 칸에 들어가는
     // 다른 조이너와 겹치는 분을 통째로 놓친다(제시+제셀+노라가 다 A칸인데 따로 세던 버그).
     const part=w=>{const sh=xShare(w,r);
-      if(w.bk&&b[w.bk]!==undefined)put(w.bk,w.v*sh); else x*=1+w.v*sh;};
+      if(w.bk&&b[w.bk]!==undefined)put(w.bk,w.v*sh); else x*=nbAdd(w.v*sh,have);};
     part(q.e); if(q.e.also&&q.e.also.slot==="X")part(q.e.also);
     return;}
-   // An · AH 는 칸이 아니라 계수다 → 자기 배율을 그대로 곱한다.
-   if(q.e.slot==="An"||q.e.slot==="AH"){x*=q.mul;return;}
+   // An 은 칸이 아니라 계수다 → 자기 배율을 그대로 곱한다.
+   if(q.e.slot==="An"){x*=q.mul;return;}
+   // AH 도 칸은 아니지만 **자기끼리는** 합연산이다 — rank 의 mul 은 리더 보유분만 반영하므로
+   // 조이너끼리 겹치는 경우까지 맞추려면 여기서 have 로 다시 잰다.
+   if(q.e.slot==="AH"){x*=nbAdd(eVal(q.e,r),have);return;}
    // ⚠️ e.v 가 아니라 eAdd 다 — 미아처럼 pc 가 붙은 스킬은 편성 병종 수로 기대값을 내고,
    // **이미 몇 장 있는지**(리더 보유분 + 앞서 고른 조이너)에 따라 두 장째부터 값이 확 준다.
-   const have=(lid.indexOf(q.h.id)>=0?1:0)+seen.filter(z=>z===q.h.id).length;
-   seen.push(q.h.id);
    put(q.e.slot,eAdd(q.e,r,have));if(q.e.also)put(q.e.also.slot,q.e.also.v);});
   return ORDER.reduce((a,sl)=>a*(b[sl]/buck[sl]),1)*x;};
 
@@ -211,8 +216,9 @@ function render(d){
  // 예전에는 아래 문단이 "둘째 장도 자기끼리 포화하므로 이득일 때만 집습니다" 라고 **주장만** 하고,
  // 예로 든 숫자는 일반론(제시 둘째 ×1.200)이거나 **다른 편성**(Gen 1 패트릭 ×1.185)이었다.
  // 노라 3장을 추천받은 사람이 자기 편성의 2·3장째가 얼마인지 화면에서 알 수 없었다.
- // ⚠️ 순서는 **고른 순서 그대로**여야 한다 — 그래야 네 장의 한계 배율을 모두 곱했을 때
- // 위에 찍힌 전투 배율이 된다(정의상 그렇다). 정렬하거나 재배치하지 말 것.
+ // ⚠️ 순서는 **고른 순서 그대로**여야 한다. 이유는 곱셈이 아니다 — comboAll 은 **순서 불변**이라
+ // 어떤 순열로 재배치해도 곱은 같다(2026-09-14 검증, 24순열 전수 확인). 순서를 흙트러뜨리면
+ // **어느 장이 "첫 장"인지가 달라져** ⑤ 표 대조와 "장마다 줄어듭니다" 서사가 깨진다.
  // ⚠️ 한 영웅의 기여는 **S1 스킬 하나**다(⑤ 표 머리말 "S1만 기여"). 영웅의 스킬을 전부
  // 먹여서 재면 전혀 다른 숫자가 나온다 — 실제로 그렇게 잘못 재어 본 적이 있다.
  const stackNote=list=>{
@@ -228,8 +234,8 @@ function render(d){
   return out.length?'<p class="cap">'+
    L("↘ 같은 영웅을 겹쳐 넣은 자리입니다. <b>이 편성의 실제 값</b>은 ","↘ Some heroes are stacked here. <b>In this lineup</b> they actually add ")+
    out.join(" · ")+
-   L(" — 같은 칸에 합연산으로 들어가 <b>장마다 줄어듭니다</b>. 네 장의 한계 배율을 모두 곱하면 위의 전투 배율이 됩니다.",
-     " — copies land in the same slot additively, so <b>each one adds less</b>. Multiplying all four marginals gives the combat multiplier above.")+"</p>":"";};
+   L(" — 같은 칸에 합연산으로 들어가 <b>장마다 줄어듭니다</b>. 세 자리로 반올림한 값입니다.",
+     " — copies land in the same slot additively, so <b>each one adds less</b>. Rounded to three decimals.")+"</p>":"";};
  // ① 순수 계산 — 시트 우선을 **끄고** 둔다. 이게 보조 패널(#recAll)의 존재 이유다:
  // 시트를 따르느라 얼마를 포기했는지를 사용자가 볼 수 있어야 한다(노라 3장 행은 최대 8% 다).
  const calcTop=pick4(pool,false);
@@ -242,8 +248,8 @@ function render(d){
   '</b></p><p class="cap">'+L("전투 배율 ×","Combat multiplier ×")+comboAll(top).toFixed(3)+
   L(" · 리더가 쓰는 영웅도 조이너로 들어올 수 있습니다 — 다른 연맹원이 자기 것을 데려오는 것이라 막지 않습니다."," · a hero already run by a leader can still join — a different alliance member brings their own copy, so it is not blocked.")+"</p>"+
   stackNote(top)+
-  '<p class="cap">'+L("여기 나오는 건 <b>Ton 시트 조이너 명단에 오른 영웅만</b>입니다. 계산 순위 1~4위를 그대로 쓰지 않는 이유는 <b>투자 문턱</b> 때문입니다 — 이론 순위가 높아도 전설은 만렙 보유자가 적고, 만렙 찍은 사람은 대개 이미 그 영웅을 리더로 쓰고 있어 조이너로 못 뺍니다. 시트 52행과 대조했더니 <b>이쪽이 #1 재현 92.3% · 겹침 59.2%</b> 로, 계산 순위 그대로(84.6% · 50.4%)보다 낫고 <b>한 행도 나빠지지 않았습니다</b>.",
-     "These are only heroes on the Ton sheet’s joiner list. The raw top four is not used because of the <b>investment threshold</b>: legendaries are rarely maxed, and whoever did max one is usually already running it as a leader. Checked against all 52 sheet rows, this list reproduces the sheet’s #1 joiner <b>92.3%</b> of the time with <b>59.2%</b> overlap, against 84.6% / 50.4% for the raw ranking — and it was never worse on any row.")+"</p>"+
+  '<p class="cap">'+L("여기 나오는 건 <b>Ton 시트 조이너 명단에 오른 영웅만</b>입니다. 계산 순위 1~4위를 그대로 쓰지 않는 이유는 <b>투자 문턱</b> 때문입니다 — 이론 순위가 높아도 전설은 만렙 보유자가 적고, 만렙 찍은 사람은 대개 이미 그 영웅을 리더로 쓰고 있어 조이너로 못 뺍니다. 시트 52행과 대조했더니 <b>이쪽이 #1 재현 92.3% · 겹침 58.8%</b> 로, 계산 순위 그대로(86.5% · 48.7%)보다 낫고 <b>한 행도 나빠지지 않았습니다</b>.",
+     "These are only heroes on the Ton sheet’s joiner list. The raw top four is not used because of the <b>investment threshold</b>: legendaries are rarely maxed, and whoever did max one is usually already running it as a leader. Checked against all 52 sheet rows, this list reproduces the sheet’s #1 joiner <b>92.3%</b> of the time with <b>58.8%</b> overlap, against 86.5% / 48.7% for the raw ranking — and it was never worse on any row.")+"</p>"+
   (comp?'<p class="cap">'+L("📋 이 편성은 <b>Ton 시트 Gen "+comp.g+" 행</b>에 있습니다(병비 "+comp.rs.map(v=>v.join("/")).join(" · ")+"). 시트가 적은 조이너는 <b>"+
      comp.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+"</b> 입니다. <b>시트 행이면 그 칸을 그대로 따릅니다</b> — 칸 안에서 누구를 쓸지만 계산이 고릅니다(“제시*” 칸이면 제시·제셀·제로니모 중 하나). 이 계산기의 1번 원칙이 <b>“계산이 시트와 엇갈리면 시트를 따른다”</b> 이기 때문입니다. 그 대가는 숨기지 않습니다 — 계산만으로 고른 답이 바로 아래 <b>「🧮 계산 순위 그대로」</b> 에 그대로 있습니다. <b>시트에 없는 편성에서는 아무 일도 일어나지 않습니다</b> — 그게 보통입니다.",
      "📋 This lineup is <b>row Gen "+comp.g+" of the Ton sheet</b> (ratios "+comp.rs.map(v=>v.join("/")).join(", ")+"), whose joiners are <b>"+
@@ -251,12 +257,23 @@ function render(d){
   // 시트는 조이너 넷 옆에 "Alternative #1~#3" 칸을 따로 둔다(48/54 행 · 69칸).
   // 넷을 못 구할 때 쓰라는 목록이라 **순위에도 pick4 에도 넣지 않는다** — 시트가 그 셋에
   // 순서를 매기지 않았으므로 우리도 매기지 않고 그대로 보여주기만 한다.
-  (comp&&comp.alt&&comp.alt.length?'<p class="cap">'+L("🔁 시트는 이 행에 <b>대체 조이너</b>도 적어 뒀습니다 — <b>"+
-     comp.alt.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+
-     "</b>. 위 넷을 못 구할 때 쓰라는 칸이라 <b>순위 계산에는 넣지 않았습니다</b> — 시트가 그 안에서 순서를 매기지 않았기 때문입니다.",
-     "🔁 The sheet also lists <b>alternative joiners</b> for this row — <b>"+
-     comp.alt.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+
-     "</b>. They are for when the four above are unavailable, so they are <b>kept out of the ranking</b> — the sheet does not order them either.")+"</p>":"")+
+  // ⚠️ 시트가 답을 둘 적어 둔 자리에서 **대표 행의 alt 만** 보여 주던 결함이 있었다 —
+  // g12 60/20/20 에서 다른 행의 "가토" 대체 칸이 화면에서 사라졌다(2026-09-14 검증).
+  // ⚖️ 문단이 "우리가 몰래 고르지 않습니다" 라고 적는데 alt 만 몰래 고르고 있었던 것이다.
+  // 그래서 대표 + 나머지 행의 대체 칸을 **합쳐서** 낸다(칸 내용이 같으면 한 번만).
+  (function(){
+   var cs=comp?[comp].concat(rivals||[]):[],seen={},cells=[];
+   cs.forEach(function(c){(c.alt||[]).forEach(function(cell){
+    var k=cell.join("|"); if(seen[k])return; seen[k]=1; cells.push(cell);});});
+   if(!cells.length)return "";
+   var names=cells.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ");
+   var many=cs.length>1;
+   return '<p class="cap">'+L("🔁 시트는 이 행에 <b>대체 조이너</b>도 적어 뒀습니다 — <b>"+names+
+     "</b>. 위 넷을 못 구할 때 쓰라는 칸이라 <b>순위 계산에는 넣지 않았습니다</b> — 시트가 그 안에서 순서를 매기지 않았기 때문입니다."+
+     (many?" 시트가 이 편성에 답을 여럿 적었으므로 <b>그 행들의 대체 칸을 모두</b> 모았습니다.":""),
+     "🔁 The sheet also lists <b>alternative joiners</b> for this row — <b>"+names+
+     "</b>. They are for when the four above are unavailable, so they are <b>kept out of the ranking</b> — the sheet does not order them either."+
+     (many?" Since the sheet gives this lineup more than one answer, the alternatives from <b>all</b> of those rows are collected here.":""))+"</p>";})()+
   // 시트가 같은 리더·병비에 답을 둘 이상 적어 둔 자리가 있다. 우리가 몰래 하나를 고르고
   // 나머지를 감추면 "시트를 따른다"는 말이 반쪽이 된다 — 다른 답도 그대로 보여준다.
   (rivals&&rivals.length?'<p class="cap">'+L("⚖️ <b>시트가 이 편성에 답을 "+(rivals.length+1)+"개 적어 뒀습니다.</b> 위는 그중 하나이고, 나머지는 <b>"+

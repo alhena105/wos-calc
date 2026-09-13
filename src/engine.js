@@ -39,6 +39,12 @@ function eK(e,r,k){const n=nCls(r);
 // 볼트 「랠리 조이너 선정 규칙·개리슨 운영 (Ton)」 §6 "2번째 미아의 기대 이득은 최대 +6.25%p" 와 맞는다.
 // 새 가정이 아니라 위 eVal 공식에 시행 횟수를 넣은 것뿐이다.
 function eAdd(e,r,have){return eK(e,r,have+1)-eK(e,r,have);}
+// 무포화 스킬(bk 없는 X · AH)의 **자기 자신과 겹치는 분**. have 장이 이미 있을 때 한 장 더의 한계.
+// 어느 칸인지 모르는 것과, 같은 스킬 두 장이 같은 자리라는 것은 별개다 — 칸을 몰라도
+// **자기끼리는 반드시 같은 자리**이므로 이 프로젝트의 1번 모델(같은 칸 합연산)이 그대로 적용된다.
+// 이걸 안 하면 리더가 이미 든 스킬을 조이너로 다시 집을 때 페널티가 0 이 된다
+// (레니 60/40 자기 재선택 ×1.690 · 손실 38.5% — 2026-09-14 검증에서 8행 확인).
+function nbAdd(v,have){return (1+(have+1)*v)/(1+have*v);}
 // X(병종 한정) 스킬의 환산 지분 — 딜은 딜 지분, 생존은 병력 지분
 function xShare(q,r){return q.k==="sur"?tgtRatio(q.tgt,r)/100:dmgShare(q.tgt,r);}
 const NA_SHARE=.8; // 일반공격이 총딜에서 차지하는 비중 가정
@@ -243,15 +249,19 @@ function calc(){
        // bk 가 있으면 같은 스탯이라 칸에서 잰다 — 안 그러면 이 스킬만 1.00 에서 출발해 부풀려진다
        if(x.bk&&buck[x.bk]!==undefined){const b=buck[x.bk],m=(b+x.v*sh)/b;
          detail.push(x.bk+" "+b.toFixed(2)+"→"+(b+x.v*sh).toFixed(2)+" ×"+m.toFixed(3));return m;}
-       return 1+x.v*sh;};
+       if(have)detail.push(L("리더가 이미 들고 있음 → 자기끼리 합연산","already on the leader → adds to itself"));
+       return nbAdd(x.v*sh,have);};
      mul=part(e); if(e.also&&e.also.slot==="X")mul*=part(e.also);
    }else if(e.slot==="An"){
      mul=1+e.v*NA_SHARE;detail.push(L("일반공격 비중 "+(NA_SHARE*100)+"% 가정","assumes normal attacks are "+(NA_SHARE*100)+"% of damage"));
    }else if(e.slot==="AH"){
      // 칸이 아니라 자기 계수다 → 리더가 A칸을 얼마나 채웠든 포화를 겪지 않는다.
-     mul=1+eVal(e,r);
-     detail.push(L("타격 계열 — 칸이 아니라 자기 계수로 곱합니다 (포화 없음)",
-                   "hit-type — multiplies on its own, not through a slot (no saturation)"));
+     mul=nbAdd(eVal(e,r),have);
+     detail.push(have
+       ?L("타격 계열 — 칸은 아니지만 리더가 이미 들고 있어 자기끼리 합연산합니다",
+          "hit-type — not a slot, but the leader already has it, so it adds to itself")
+       :L("타격 계열 — 칸이 아니라 자기 계수로 곱합니다 (다른 칸과는 포화하지 않습니다)",
+          "hit-type — multiplies on its own, not through a slot (does not saturate against other slots)"));
    }else{
      const step=(sl,val)=>{const b=buck[sl];if(b===undefined)return;const m=(b+val)/b;mul*=m;
        detail.push(sl+" "+b.toFixed(2)+"→"+(b+val).toFixed(2)+" ×"+m.toFixed(3));};

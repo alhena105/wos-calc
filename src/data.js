@@ -150,12 +150,8 @@ const HEROES = [
       {n:"Crescent Uplift",slot:"A",v:.20,t:"전 부대 피해량 +20%",te:"all troops damage +20%"},
       {n:"Elemental Resonance",slot:"A",v:.25,t:"전 부대 스킬 피해 +25%",te:"all troops skill damage +25%"}],
  w:{side:"defender",stat:"Defense",name:"Steel Discipline"}},
-// ⚠️ Nightmare Trace 의 bk:"A" 는 **원문 문구 규칙의 유일한 예외**다(2026-09-13).
-// 원문이 "extra damage" 라 규칙대로면 칸이 아닌데, 시트를 정답지로 놓고 스킬 타입을
-// 전수로 쓸어 보니 이 한 건만 두 지표가 같은 방향으로 움직였다 — 자세한 근거는
-// test/fixtures.mjs 의 X_BUCKETED 주석과 CLAUDE.md 정정 이력에 있다.
 {id:"renee",s:1,kr:"레니",en:"Renee",cls:"lancer",gen:6,rar:"leg",
- exp:[{n:"Nightmare Trace",slot:"X",k:"dmg",bk:"A",v:1.0,tgt:"lancer",t:"창병 2턴마다 추가딜 200%",te:"lancers, every 2 turns: +200% extra damage"},
+ exp:[{n:"Nightmare Trace",slot:"X",k:"dmg",v:1.0,tgt:"lancer",t:"창병 2턴마다 추가딜 200%",te:"lancers, every 2 turns: +200% extra damage"},
       {n:"Dreamcatcher",slot:"X",k:"dmg",v:1.5,tgt:"lancer",t:"표식 대상 창병 피해량 +150%",te:"vs marked targets: lancer damage +150%"},
       {n:"Dreamslice",slot:"A",v:.35,t:"표식 대상 전 부대 피해량 +75%",te:"vs marked targets: all troops damage +75%"}],
  w:{side:"rally",stat:"Lethality",name:"Wistful Enchantment"}},
@@ -397,9 +393,15 @@ const HEROES = [
 // "넷을 못 구하면 이것도" 목록이라 **판정에 일절 안 쓴다** — `matchComps` 도 `pick4` 도
 // 안 본다. 화면에만 「🔁 대체 조이너」로 그대로 띄운다. 시트가 그 안에서 순서를 매기지
 // 않았으므로 우리도 매기지 않는다.
-// ⚠️ **대체 칸 2개는 일부러 안 실었다** — g2 `Offense - 50/20/30` 의 "20% ones" 와
-// Gen 5·6 의 "or 25%" 다. 영웅 이름이 아니라 **스킬 계열**을 가리키는 자유 문구라,
-// 영웅 id 로 옮기면 시트에 없는 이름을 지어내는 셈이 된다. 옮길 자료가 없으면 안 옮긴다.
+// ⚠️ **대체 칸 28개는 일부러 안 실었다** — `"20% ones"` 1칸(g2)과 `"or 25%"` **27칸**
+// (Gen 5·6·7·8·9·10·11 에 걸쳐 있다). 영웅 이름이 아니라 **스킬 계열**(25% 증가 계열 ·
+// 20% 감소 계열)을 가리키는 자유 문구라, 영웅 id 로 옮기면 시트에 없는 이름을 지어내는 셈이다.
+// 시트의 비어 있지 않은 Alternative 칸은 69+28 = **97칸**이고 그중 **29% 를 버렸다.**
+// ⚠️ 2026-09-13 에 여기 "2개" 라고 적었다가 다음 날 검증에서 28개로 정정됐다.
+// "2개" 로 적어 두면 다음 사람이 "거의 다 실었다" 로 읽는다 — 「노라 하나뿐」·「제로니모 7행」과
+// 같은 형태의 실수다. **규모는 세어 보고 적는다.**
+// 그래서 **대체 칸이 있었는데 화면이 침묵하는 행이 4개** 있다(전부 alt 가 "or 25%" 단독):
+// g6 48/4/48 · g7 40/0/60 · g8 40/0/60 · g8 48/4/48.
 // ⚠️ Comments 열에도 대체 조이너를 산문으로 적어 둔 행이 있다(예: g6 48/4/48 의
 // "Alternative joiners choice: Jessie, Seeyoon, 2xPatrick"). **그건 안 가져왔다** —
 // 구조가 있는 Alternative 칸만 옮겼다. 필요하면 그때 따로 파싱할 것.

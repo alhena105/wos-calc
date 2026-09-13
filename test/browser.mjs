@@ -381,6 +381,21 @@ ok(await ko.isVisible("#tab-comp"), "편성 탭으로 돌아온다");
 // **편성 탭**의 ⑤ 순위표(자연폭 368px)와 ② 칸 진단표가 본문을 통째로 밀고 있었다
 // (390px 에서 본문 401px). 장비 탭이 .xscroll 로 푼 문제를 편성 탭만 안 풀고 있었다.
 // 2026-09-13 육안 검증에서 발견. 두 탭 다 검사한다.
+// ⚠️ 이 검사는 오랫동안 「↘ 장당 한계 배율」 문단이 **없는** 상태만 지나갔다 — 이 시점 편성이
+// 제로니모·미아·알론소 60/40/0 이라 겹치는 영웅이 없어서다(2026-09-14 검증에서 지적).
+// 실제 위험은 없었지만(문단은 세로로만 자란다) 검사가 안 덮는 자리였다. 겹침 편성으로 바꿔 둔다.
+await ko.evaluate(() => {
+  const set = (id, v) => {
+    const e = document.getElementById(id);
+    e.value = v;
+    e.dispatchEvent(new Event("change"));
+  };
+  set("gcap", "7"); set("hInf", "jeronimo"); set("hLan", "mia"); set("hMar", "gwen");
+});
+await setRatio(ko, "r", [48, 4, 48]);
+ok(/↘/.test(await outText(ko)),
+   "겹침 편성에서 장당 한계 배율 문단이 뜬다 (아래 넘침 검사가 이 상태를 지나간다)");
+
 for (const w of [1400, 768, 430, 390, 360, 320]) {
   const r = await ko.evaluate(width => {
     const st = document.createElement("style");
