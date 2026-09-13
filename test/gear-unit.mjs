@@ -698,6 +698,17 @@ section("렌더");
        (one.match(/class="g-arena/g) || []).length === 2,
        "트랙 눈금이 필요·통행료(축)·통행료(탐험)로 갈라진다",
        one.replace(/title="[^"]*"/g, "").slice(0, 200));
+    // 눈금 툴팁은 title 속성이라 위 검사가 일부러 지우고 본다 — 그래서 조사 오류가
+    // "공격는 보병에게 안 쓰는 축" 으로 오래 남아 있었다(2026-09-13 브라우저 검증에서 발견).
+    // 툴팁도 사용자가 읽는 문장이니 같이 본다.
+    {
+      const tips = [...a.el("gt_infantry_gauntlet").innerHTML.matchAll(/title="([^"]*)"/g)].map(m => m[1])
+        .concat([...a.el("gt_marksman_helmet").innerHTML.matchAll(/title="([^"]*)"/g)].map(m => m[1]));
+      const bad = tips.filter(t => /(공격|체력|치명)는|방어은/.test(t));
+      ok(bad.length === 0, "눈금 툴팁의 조사가 맞다 (공격은 / 방어는)", bad.slice(0, 2).join(" | "));
+      ok(tips.some(t => /공격은 /.test(t)) || tips.some(t => /방어는 /.test(t)),
+         "축이 안 맞는 통행료 툴팁이 실제로 나온다", tips.slice(0, 3).join(" | "));
+    }
     // "다음"은 값이 있는 다음 관문이다. Lv.61 보병 장갑은 Lv.80 이 아니라 Lv.100 을 가리켜야 한다.
     ok(/Lv\.61/.test(one) && /다음 Lv\.100/.test(one),
        "트랙의 '다음'은 값이 있는 관문을 가리킨다", one.slice(-90));
@@ -731,6 +742,16 @@ section("렌더");
   tog.tab("gear").gearCells(FIXTURE.gear); tog.gearRender(); tog.setLang("en");
   const togLeft = [...new Set((tog.gearText().match(/[가-힣][가-힣 ·]*/g) || []))].slice(0, 3);
   ok(!/[가-힣]/.test(tog.gearText()), "한국어로 열고 English 를 눌러도 장비 탭에 한글이 없다", togLeft.join(" | "));
+  // 입출력 안내(#gIoMsg)는 버튼을 눌렀을 때 만들어진 문장이라 다시 그려지지 않는다.
+  // 그래서 "적용했습니다" 가 영어 화면에 남아 있었다 — 지나간 상태 메시지라 지우는 게 맞다.
+  {
+    const io = boot("ko");
+    io.tab("gear").gearCells(FIXTURE.gear); io.gearRender();
+    io.el("gIoMsg").textContent = "적용했습니다.";
+    io.setLang("en");
+    ok(!/[가-힣]/.test(io.el("gIoMsg").textContent || ""),
+       "언어를 바꾸면 입출력 안내가 지워진다", io.el("gIoMsg").textContent);
+  }
 }
 
 // ── 12. 편성 탭 회귀 ───────────────────────────────────────────────────

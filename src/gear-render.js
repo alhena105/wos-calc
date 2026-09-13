@@ -23,6 +23,11 @@ var gEl = function(id){return document.getElementById(id);};
    I18N_TABLES 에 등록해 setLang() 이 다시 부르게 한다. */
 function gearStatic(){
  var set=function(id,html){var e=gEl(id); if(e)e.innerHTML=html;};
+ // 입출력 안내는 눌렀을 때 만들어진 문장이라 다시 그려지지 않는다 — 언어를 바꾸면
+ // "적용했습니다" 가 영어 화면에 남는다(2026-09-13 배포본 브라우저 검증에서 발견).
+ // 지나간 상태 메시지라 번역할 게 아니라 지우는 게 맞다.
+ // (msg() 가 textContent 로 쓰므로 같은 자리를 지운다)
+ {var im=gEl("gIoMsg"); if(im){im.textContent="";im.innerHTML="";}}
  set("tabComp",L("⚙️ 편성","⚙️ Formation")); set("tabGear",L("🛡️ 장비","🛡️ Gear"));
  set("gLbAtk",L('공격 병비 <span class="cap">(보 / 창 / 궁)</span>','Attack ratio <span class="cap">(inf / lan / mar)</span>'));
  set("gLbDef",L('수비 병비 <span class="cap">(보 / 창 / 궁)</span>','Defense ratio <span class="cap">(inf / lan / mar)</span>'));
@@ -152,6 +157,11 @@ function gearStageName(st){
 
 var gearDirName=function(d){return{attack:L("공격","attack"),defense:L("방어","defense"),
  health:L("체력","health"),lethality:L("치명","lethality")}[d]||d;};
+/* 조사 붙이기 — "공격는" 이 툴팁에 뜨고 있었다(2026-09-13 브라우저 검증에서 발견).
+   한글 음절은 0xAC00 부터 28개씩 한 벌이고, 그 안의 순번이 종성 인덱스다. 0 이면 받침 없음. */
+var gearJosa=function(w,withF,withoutF){
+ var c=w.charCodeAt(w.length-1)-0xAC00;
+ return w+(c>=0&&c<11172&&c%28!==0?withF:withoutF);};
 /* 이 병종에게 이 마일스톤이 무엇인가 — 필요 / 보조 / 축이 안 맞는 통행료 / 탐험 통행료 */
 function gearGrade(troop,side,m){
  if(m.tier!=="expedition")return "arena";
@@ -170,7 +180,7 @@ function gearTrack(troop,slot,level,entered){
                     "essential — "+m[side]+" +"+m.bonus+"%");
   else if(g==="sub")t=L("추천 — "+gearDirName(m[side])+" +"+m.bonus+"% (가중 "+GEAR_AXIS_SUB+")",
                         "recommended — "+m[side]+" +"+m.bonus+"% (weight "+GEAR_AXIS_SUB+")");
-  else if(g==="axis")t=L("통행료 — "+gearDirName(m[side])+"는 "+L(GEAR_TROOPS[troop].ko,"")+"에게 안 쓰는 축",
+  else if(g==="axis")t=L("통행료 — "+gearJosa(gearDirName(m[side]),"은","는")+" "+L(GEAR_TROOPS[troop].ko,"")+"에게 안 쓰는 축",
                          "toll — "+m[side]+" is not an axis "+GEAR_TROOPS[troop].en+" use");
   else t=L("통행료 — 탐험은 아레나 전용","toll — exploration is arena only");
   return '<b class="g-'+g+(level>=m.level?" on":"")+
