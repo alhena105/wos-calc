@@ -981,30 +981,40 @@ section("애매하면 시트 우선");
      "SHEET_ROWS 52행이 전부 SHEET_COMPS 에서 찾아진다 (두 표가 어긋나지 않았다)",
      matched + "/" + SHEET_ROWS.length);
 
-  let changed = 0, loss = 0, worst = 0, worstStack = 0, first0 = 0, first1 = 0, hit0 = 0, hit1 = 0, tot = 0;
+  // 시트 행이면 **시트 칸을 그대로 채운다**(2026-09-13, 사용자 결정: 상한 없음).
+  // 그래서 여기서 재는 것은 "얼마나 맞췄나"가 아니라 **얼마를 포기했나**다.
+  let changed = 0, loss = 0, worst = 0, first0 = 0, first1 = 0, hit0 = 0, hit1 = 0, tot = 0;
+  let cellHit = 0, cellTot = 0;
   for (const row of SHEET_ROWS) {
-    const off = pick(row, 0), on = pick(row, 0.02);
+    const off = pick(row, 0), on = pick(row, 1);
     if (off.ids.join() !== on.ids.join()) changed++;
     const d = (off.v - on.v) / off.v * 100;
-    // 스택 칸을 강제로 따른 행은 **여유폭 밖**이 정상이다 — 그 규칙이 일부러 여유폭을 안 본다.
-    // 두 상한을 섞으면 "여유폭이 지켜지는가"를 아무도 안 지키게 된다. 그래서 갈라서 센다.
-    const stacked = on.ids.some((x, i) => on.ids.indexOf(x) !== i);
-    if (stacked) { if (d > worstStack) worstStack = d; }
-    else { loss += d; if (d > worst) worst = d; }
+    loss += d; if (d > worst) worst = d;
     if (row.top.some(x => off.ids.includes(x))) first0++;
     if (row.top.some(x => on.ids.includes(x))) first1++;
-    for (const j of row.pri) { tot++; if (off.ids.includes(j)) hit0++; if (on.ids.includes(j)) hit1++; }
+    for (const j2 of row.pri) { tot++; if (off.ids.includes(j2)) hit0++; if (on.ids.includes(j2)) hit1++; }
+    // 시트 「칸」 기준 — 이게 이 기능이 실제로 하는 일이다
+    const a = boot("ko").leaders(row.lead[0] || "", row.lead[1] || "", row.lead[2] || "").mine(row.r);
+    const c = JSON.parse(a.js("JSON.stringify(matchComp(" + JSON.stringify(row.lead) +
+      ",norm(" + row.r.join(",") + ")))"));
+    if (c) {
+      const used = [];
+      on.ids.forEach(n => { for (let k = 0; k < c.j.length; k++) if (!used.includes(k) && c.j[k].includes(n)) { used.push(k); break; } });
+      cellHit += used.length; cellTot += c.j.length;
+    }
   }
   note("명단이 바뀐 행 " + changed + "/" + SHEET_ROWS.length +
-       " · 여유폭 규칙 손실 평균 " + (loss / SHEET_ROWS.length).toFixed(3) + "% · 최대 " + worst.toFixed(2) + "%");
-  note("스택 칸을 강제로 따른 행의 최대 손실 " + worstStack.toFixed(2) + "% (여유폭 밖이 정상)");
+       " · 배율 손실 평균 " + (loss / SHEET_ROWS.length).toFixed(2) + "% · 최대 " + worst.toFixed(1) + "%");
+  note("시트 칸 적중 " + cellHit + "/" + cellTot + " (" + (cellHit / cellTot * 100).toFixed(1) + "%)");
   note("(참고 · 검증 아님) 시트 #1 재현 " + (first0 / SHEET_ROWS.length * 100).toFixed(1) + "% → " +
        (first1 / SHEET_ROWS.length * 100).toFixed(1) + "% · 겹침 " +
        (hit0 / tot * 100).toFixed(1) + "% → " + (hit1 / tot * 100).toFixed(1) + "%");
-  ok(worst <= 2.5, "여유폭 규칙으로 잃는 배율이 2% 근처를 넘지 않는다", worst.toFixed(2) + "%");
-  // 스택 강제는 여유폭을 안 보지만 무한정은 아니다. 실측 7.97% 에서 여유를 두고 상한을 건다 —
-  // 넘어가면 SHEET_COMPS 나 노라 데이터가 바뀐 것이니 다시 봐야 한다.
-  ok(worstStack <= 9, "스택 칸을 강제로 따르는 대가가 9% 를 넘지 않는다", worstStack.toFixed(2) + "%");
+  // 시트 칸은 거의 다 채워야 한다. 못 채우는 칸은 리더 중복처럼 **넣을 수 없는** 자리뿐이다.
+  ok(cellHit / cellTot >= 0.97, "시트 행에서는 시트 칸을 97% 이상 그대로 채운다",
+     (cellHit / cellTot * 100).toFixed(1) + "%");
+  // 대가에는 상한을 안 걸기로 했다(사용자 결정). 다만 **터무니없어지면** 알아야 하므로
+  // 실측 19.0% 에서 여유를 둔 감시선만 남긴다 — 넘으면 SHEET_COMPS 나 모델이 바뀐 것이다.
+  ok(worst <= 25, "시트를 따르는 대가가 25% 를 넘는 행은 없다", worst.toFixed(1) + "%");
   ok(changed >= 10, "시트 행에서 실제로 판단이 바뀐다", String(changed));
   ok(hit1 > hit0 && first1 >= first0, "따르게 했으니 시트와 더 가까워진다", hit1 + " vs " + hit0);
 
@@ -1043,7 +1053,7 @@ section("애매하면 시트 우선");
     ok(dupRows >= 3, "노라 중복이 실제로 쓰이는 행이 있다 (예외가 죽어 있지 않다)", String(dupRows));
     let three = 0;
     for (const row of SHEET_ROWS) {
-      const ids = pick(row, 0.02).ids;
+      const ids = pick(row, 1).ids;
       if (ids.filter(x => x === "norah").length >= 3) three++;
     }
     ok(three >= 3, "시트가 노라를 3칸 적은 행에서 실제로 3장을 뽑는다", String(three));
@@ -1071,7 +1081,7 @@ section("애매하면 시트 우선");
   // ④ 사용자가 잡은 자리: 로건·필리·진먼 60/40/0 Gen 3 → 시트는 미아·패트릭·제시*·서윤
   {
     const row = {lead: ["logan", "philly", "zinman"], r: [60, 40, 0], gen: 3};
-    const on = pick(row, 0.02);
+    const on = pick(row, 1);
     ok(on.ids.includes("patrick") && on.ids.includes("mia") &&
        on.ids.includes("seoyoon") && on.ids.some(x => ["jessie", "jasser", "jeronimo"].includes(x)),
        "로건·필리·진먼 60/40 에서 시트의 네 칸을 그대로 채운다", on.ids.join(","));

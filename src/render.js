@@ -3,10 +3,11 @@ const esc=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[
 const hpic=(h,cls)=>'<img class="hpic'+(cls?" "+cls:"")+'" loading="lazy" alt="" src="img/heroes/'+
  encodeURIComponent(h.id)+'.webp" onerror="this.remove()">';
 const sTag=s=>'<span class="slot s-'+(["A","B","E","F","G","C","D"].includes(s)?s:"X")+'">'+s+'</span>';
-// 애매한 차이의 기준 — 최고값의 (1−SHEET_EDGE) 안이면 "가를 수 없다"고 본다.
-// 최상위 let 이다 — 검사가 0 으로 끄고 **순수 모델**의 시트 재현율을 따로 재야 하기 때문이다.
+// 시트 행이 맞으면 그 행의 조이너 칸을 그대로 따를지 여부. 0 이면 시트를 전혀 안 본다.
+// 최상위 let 인 이유 — 검사가 0 으로 끄고 **순수 모델**의 시트 재현율을 따로 재야 하기 때문이다.
 // 시트를 따른 상태에서 재는 재현율은 순환논이라 검증이 아니다.
-let SHEET_EDGE=.02;
+// 이름은 예전 "여유폭 2%" 시절의 잔재다 — 지금은 **켜고/끄고** 스위치로만 쓴다.
+let SHEET_EDGE=1;
 const statKr=i18nFill({},function(){return{Attack:L("공격력","Attack"),Defense:L("방어력","Defense"),Lethality:L("파괴력","Lethality"),Health:L("체력","Health")};});
 
 function render(d){
@@ -166,57 +167,36 @@ function render(d){
  //
  // 동률이면 pool 순서가 이긴다 — pool 은 이미 투자 문턱(시트 등재 → 에픽 → 낮은 세대)으로
  // 정렬돼 있으므로 그 정책이 그대로 지켜진다.
- // 애매하면 시트를 따른다 — 입력이 시트 행과 맞을 때만.
- // 매 단계에서 최고값의 (1−SHEET_EDGE) 안에 드는 후보 중 **그 행의 조이너**가 있으면 그쪽을 집는다.
- // 배율을 바꾸는 게 아니라, 거의 같은 둘 중 어느 쪽을 집느냐만 정한다.
- //
- // 여유폭 2% 의 근거는 **우리 모델 자체의 오차**다. 근거 없는 가정 둘을 흔들어 보면
- // (DW.infantry 0.3→0.2/0.5 · NA_SHARE 0.8→0.7/0.9) 추천 4명의 전투 배율이
- // 평균 1.0~1.75% · 최대 2.4~7.0% 움직이고, NA_SHARE 를 ±0.1 만 흔들어도
- // **52행 중 29~35행의 명단이 바뀐다.** 그 안쪽 차이는 우리가 가를 수 없다 → 시트를 따른다.
- // 실측 대가: 전투 배율 평균 −0.27% · 최대 −2.09% (여유폭과 같은 크기다).
- // 시트 행의 조이너는 **칸 단위**다. 아직 안 채운 칸을 메우는 후보만 우대한다 —
- // 그래야 "제시* 칸"에 제시와 제셀을 둘 다 넣고 시트대로라고 우기는 일이 없다.
- // stack:1 인 영웅(노라)만 두 번 이상 고를 수 있다. 근거는 data.js 주석 참고 —
- // 시트 세대 탭이 노라만 2~3장 겹쳐 쓰고 다른 영웅은 한 번도 안 겹친다.
- // ⚠️ "고를 수 있다"지 "쌓아라"가 아니다. 둘째 노라는 같은 A·D 칸에 합연산으로 들어가
- // 자기끼리 포화하므로, 모델이 더 낫다고 볼 때만 뽑힌다(순수 계산에서는 사실상 안 뽑힌다).
+ // 시트 행과 맞으면 그 행의 조이너를 그대로 쓴다 — 이 프로젝트 1번 원칙을 그대로 옮긴 것이다.
+ // 예전에는 "애매한 2% 안에서만" 였는데, 그러면 제시군 14칸·가토 5칸 같은 자리를 못 따라가고
+ // 예외를 하나씩 늘리게 된다(노라 중복 → 노라 3장 → 제시군 …). 규칙 하나로 정리했다.
+ // 대가는 숨기지 않는다 — 계산만으로 고른 답은 바로 아래 #recAll 에 그대로 남아 있다.
  const canRepeat=(out,c)=>c.h.stack||out.indexOf(c)<0;
+ // 시트 행이면 **시트 칸을 그대로 채운다.** 칸 안에서 누구를 쓸지만 계산이 고른다
+ // (제시* 칸이면 제시·제셀·제로니모 중 조합 배율이 가장 커지는 하나).
+ // 이게 이 프로젝트 1번 원칙의 곧이곧대로다 — 예외 목록을 늘리는 대신 규칙 하나로 정리했다.
+ // 못 채우는 칸(리더 중복 등)과 칸이 넷보다 적을 때 남는 자리는 아래 탐욕이 메운다.
+ const fillCells=(list,cells,out)=>{
+  cells.forEach(cell=>{
+   if(out.length>=4)return;
+   let best=null,bv=-1;
+   cell.forEach(id=>{
+    const c=list.filter(z=>z.h.id===id)[0];
+    if(!c||!canRepeat(out,c))return;
+    const v=comboAll(out.concat([c]));
+    if(v>bv+1e-9){bv=v;best=c;}});
+   if(best)out.push(best);});
+ };
  const pick4=(list,useSheet)=>{
   const cells=useSheet&&comp?comp.j:null;
   const out=[];
-  for(let k=0;k<4;k++){
+  if(cells)fillCells(list,cells,out);
+  for(let k=out.length;k<4;k++){
    let best=null,bv=-1;
    list.forEach(c=>{if(!canRepeat(out,c))return;
     const v=comboAll(out.concat([c]));
     if(v>bv+1e-9){bv=v;best=c;}});
    if(!best)break;
-   if(cells&&SHEET_EDGE>0){
-    // 이미 out 이 채운 칸은 뺀다 — **한 명이 한 칸만** 먹는다(먼저 비어 있는 칸부터).
-    // 노라를 두 장 골랐으면 노라 칸도 두 개가 찬다 — 시트가 세 칸을 노라로 적은 행이 그 자리다.
-    const used=[];
-    out.forEach(x=>{for(let i=0;i<cells.length;i++)
-      if(used.indexOf(i)<0&&cells[i].indexOf(x.h.id)>=0){used.push(i);break;}});
-    const opens=cells.filter((cell,i)=>used.indexOf(i)<0);
-    // 시트가 **같은 영웅을 또** 요구하는 칸(노라 칸)은 여유폭을 묻지 않고 따른다.
-    // 시트가 노라를 3칸 적어 둔 행이 6개인데, 셋째 노라는 우리 모델에서 −3% 라 2% 여유폭으로는
-    // 절대 안 잡힌다. 여유폭을 3.5% 로 넓히면 잡히긴 하지만 **무관한 행 8개가 같이 흔들리고**
-    // 손실이 평균 0.36 → 0.98% 로 뛴다 → 그 칸만 콕 집어 따르는 쪽이 싸다.
-    // ⚠️ 단, **모델이 이미 그 영웅을 한 번은 뽑았을 때만** 늘린다. 시트만 보고 처음부터
-    // 밀어 넣지는 않는다 — "모델도 쓸 만하다고 본 영웅을 시트가 더 쓰라고 한다"는 자리에서만 따른다.
-    const forced=opens.filter(cell=>cell.length===1&&byId[cell[0]]&&byId[cell[0]].stack)
-      .map(cell=>list.filter(c=>c.h.id===cell[0])[0])
-      .filter(c=>c&&out.indexOf(c)>=0)[0];
-    if(forced){best=forced;}
-    else{
-     let alt=null,av=-1;
-     list.forEach(c=>{if(!canRepeat(out,c))return;
-      if(!opens.some(cell=>cell.indexOf(c.h.id)>=0))return;
-      const v=comboAll(out.concat([c]));
-      if(v>=bv*(1-SHEET_EDGE)-1e-12&&v>av){av=v;alt=c;}});
-     if(alt)best=alt;
-    }
-   }
    out.push(best);}
   return out;};
  // ① 순수 계산 — 시트 우선을 **끄고** 둔다. 이게 보조 패널(#recAll)의 존재 이유다:
@@ -224,7 +204,7 @@ function render(d){
  const calcTop=pick4(pool,false);
  // 시트 등재 영웅은 에픽 8명이 gen 0 이라 gcap 을 아무리 낮춰도 넷은 남는다.
  // 그래도 빈 경우엔 계산 순위로 되돌린다 — 화면이 비는 것보다 낫다.
- const sheetTop=pick4(poolS,true);
+ const sheetTop=pick4(poolS,SHEET_EDGE>0);
  const top=sheetTop.length?sheetTop:calcTop;
  o+='<div class="callout co-key" id="rec"><h3>'+L("⭐ 추천 조이너 4명","⭐ Recommended four joiners")+
   ' <span class="tag t-ok">'+L("시트 등재만","sheet-listed only")+'</span></h3><p><b>'+top.map(x=>hpic(x.h,"sm")+esc(HN(x.h))).join(" · ")+
@@ -233,17 +213,17 @@ function render(d){
   '<p class="cap">'+L("여기 나오는 건 <b>Ton 시트 조이너 명단에 오른 영웅만</b>입니다. 계산 순위 1~4위를 그대로 쓰지 않는 이유는 <b>투자 문턱</b> 때문입니다 — 이론 순위가 높아도 전설은 만렙 보유자가 적고, 만렙 찍은 사람은 대개 이미 그 영웅을 리더로 쓰고 있어 조이너로 못 뺍니다. 시트 52행과 대조했더니 <b>이쪽이 #1 재현 92.3% · 겹침 61.4%</b> 로, 계산 순위 그대로(86.5% · 51.8%)보다 낫고 <b>한 행도 나빠지지 않았습니다</b>.",
      "These are only heroes on the Ton sheet’s joiner list. The raw top four is not used because of the <b>investment threshold</b>: legendaries are rarely maxed, and whoever did max one is usually already running it as a leader. Checked against all 52 sheet rows, this list reproduces the sheet’s #1 joiner <b>92.3%</b> of the time with <b>61.4%</b> overlap, against 86.5% / 51.8% for the raw ranking — and it was never worse on any row.")+"</p>"+
   (comp?'<p class="cap">'+L("📋 이 편성은 <b>Ton 시트 Gen "+comp.g+" 행</b>에 있습니다(병비 "+comp.rs.map(v=>v.join("/")).join(" · ")+"). 시트가 적은 조이너는 <b>"+
-     comp.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+"</b> 입니다. 계산이 <b>2% 안쪽으로 애매하면 시트 쪽을 집습니다</b> — 우리 모델의 자체 오차가 딱 그 크기라(근거 없는 가정 <code>DW.infantry</code>·<code>NA_SHARE</code> 를 흔들면 배율이 1~2% 움직이고 절반 넘는 행의 명단이 바뀝니다) 그 안쪽은 계산이 가를 수 없기 때문입니다. <b>시트에 없는 편성에서는 이 보정이 걸리지 않습니다.</b>",
+     comp.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+"</b> 입니다. <b>시트 행이면 그 칸을 그대로 따릅니다</b> — 칸 안에서 누구를 쓸지만 계산이 고릅니다(“제시*” 칸이면 제시·제셀·제로니모 중 하나). 이 계산기의 1번 원칙이 <b>“계산이 시트와 엇갈리면 시트를 따른다”</b> 이기 때문입니다. 그 대가는 숨기지 않습니다 — 계산만으로 고른 답이 바로 아래 <b>「🧮 계산 순위 그대로」</b> 에 그대로 있습니다. <b>시트에 없는 편성에서는 아무 일도 일어나지 않습니다</b> — 그게 보통입니다.",
      "📋 This lineup is <b>row Gen "+comp.g+" of the Ton sheet</b> (ratios "+comp.rs.map(v=>v.join("/")).join(", ")+"), whose joiners are <b>"+
-     comp.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+"</b>. Where our figures are <b>within 2%, the sheet wins</b> — that is the size of our own error bar (nudging the unfounded <code>DW.infantry</code> and <code>NA_SHARE</code> assumptions moves the multiplier 1–2% and changes over half the rows), so the model cannot separate them. <b>No such nudge is applied to lineups the sheet does not cover.</b>")+"</p>":"")+
+     comp.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+"</b>. <b>On a row the sheet covers we fill its cells verbatim</b> — the numbers only decide who fills a cell that lists alternatives (a “Jessie*” cell takes Jessie, Jasser or Jeronimo), because this calculator’s first rule is <b>“when the numbers disagree with the sheet, follow the sheet”</b>. The cost is not hidden — what the numbers alone would pick is in <b>🧮 Raw ranking</b> just below. <b>Nothing is applied to lineups the sheet does not cover</b>, which is the usual case.")+"</p>":"")+
   '<p class="cap">'+L("넷은 ⑤ 순위 상위 4명을 그냥 자른 게 아니라, <b>포화를 보며 한 명씩</b> 골랐습니다 — 매번 “여기에 더했을 때 전투 배율이 가장 커지는 한 명”입니다. 자르기만 하면 <b>제시·제셀·제로니모처럼 같은 A칸에 들어가는 영웅이 나란히 뽑힙니다</b>(각자 ×1.250 이지만 둘째는 ×1.200, 셋째는 ×1.167 로 떨어집니다). 그래서 순위표 1~4위와 명단이 다를 수 있습니다.",
      "The four are not the top four of ranking ⑤ — each is picked in turn as <b>whoever raises the combined multiplier most</b>, given the ones already chosen. Plain truncation lines up heroes that share a slot (Jessie, Jasser and Jeronimo all fill A: ×1.250, then ×1.200, then ×1.167). So this list can differ from rows 1–4 of the table.")+"</p>"+
   (top.filter((x,i)=>top.indexOf(x)!==i).length?'<p class="cap">'+
    L("같은 영웅이 두 번 나온 것은 <b>노라만 허용</b>하기 때문입니다 — 시트 세대 탭이 노라만 2~3장 겹쳐 쓰고 다른 영웅은 한 번도 겹치지 않습니다(볼트 「랠리 참여자 영웅 가이드」도 “스택 시에도 효율이 좋은 특수 케이스”라고 적었습니다). 둘째 노라도 같은 A·D 칸에 합연산으로 들어가 <b>자기끼리 포화</b>하므로, 그래도 이득일 때만 뽑힙니다.",
      "The same hero appears twice because <b>only Norah may repeat</b> — the sheet stacks her two or three deep in ten rows and never doubles anyone else (the vault guide calls her “a special case that stays efficient when stacked”). A second Norah still adds into the same A and D slots, so it <b>saturates against itself</b> and is only taken when it still wins.")+"</p>":"")+
   (top.filter((x,i)=>top.indexOf(x)!==i).length>=2?'<p class="cap">'+
-   L("노라가 <b>세 장</b>인 것은 <b>시트가 이 행에 노라 칸을 셋 적었기 때문</b>입니다. 셋째 노라는 우리 계산으로는 <b>−3% 쯤 손해</b>라 원래는 안 뽑히는데, 시트가 명시적으로 요구하는 칸이라 <b>여유폭을 묻지 않고 따랐습니다</b>. 계산만으로 고르면 어떻게 되는지는 <b>바로 아래 「🧮 계산 순위 그대로」</b> 에 있습니다 — 그 차이가 시트를 따른 대가입니다.",
-     "Norah appears <b>three times</b> because <b>the sheet writes three Norah cells for this row</b>. By our numbers the third copy is worth about <b>−3%</b>, so it would never be chosen on merit; the sheet asks for it explicitly, so we follow without applying the 2% test. What the numbers alone would pick is in <b>🧮 Raw ranking</b> just below — that gap is what following the sheet costs.")+"</p>":"")+
+   L("노라가 <b>세 장</b>인 것은 <b>시트가 이 행에 노라 칸을 셋 적었기 때문</b>입니다. 셋째 노라는 우리 계산으로는 <b>−3% 쯤 손해</b>라 계산만으로는 안 뽑힙니다. 그 차이가 <b>시트를 따른 대가</b>이고, 계산만으로 고른 답은 아래 <b>「🧮 계산 순위 그대로」</b> 에 있습니다.",
+     "Norah appears <b>three times</b> because <b>the sheet writes three Norah cells for this row</b>. By our numbers the third copy is worth about <b>−3%</b>, so it would never be chosen on merit — that gap is what following the sheet costs here, and what the numbers alone would pick is in <b>🧮 Raw ranking</b> below.")+"</p>":"")+
   '<p class="cap">'+L("위 배율은 네 명의 단독 배율을 곱한 값이 아니라 <b>같은 칸에 겹치는 분을 합쳤을 때</b>의 값입니다. 순위표의 배율을 넣는 순서대로 곱하면 더 크게 나오는데, 그건 포화를 빼먹은 숫자입니다. 그리고 <b>생존 칸도 같은 무게로 셉니다</b> — 전투비를 양쪽 식으로 펴면 <code>(내딜증 × 내감소) ÷ (상대딜증 × 상대감소)</code> 라, 내 딜 칸과 내 감소 칸이 결과에 똑같이 곱해집니다.",
      "This multiplier is not the product of the four individual figures — it is what you get after <b>adding up the parts that land in the same slot</b>. Multiplying the ranking figures together gives a larger number that ignores saturation. <b>Survival slots count the same</b>: expand the kill ratio for both sides and it reduces to <code>(my damage-up × my reduction) ÷ (theirs × theirs)</code>, so your damage slots and your reduction slots multiply the outcome equally.")+"</p>"+
   (rank.filter(x=>x.dup).length?'<p class="cap">'+L("🚫 리더 중복 금지: ","🚫 Cannot double as joiners: ")+rank.filter(x=>x.dup).map(x=>esc(HN(x.h))).join(" · ")+"</p>":"")+"</div>"+
