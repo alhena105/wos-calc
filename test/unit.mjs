@@ -975,7 +975,7 @@ section("애매하면 시트 우선");
   let matched = 0;
   for (const row of SHEET_ROWS) {
     const a = boot("ko").leaders(row.lead[0] || "", row.lead[1] || "", row.lead[2] || "").mine(row.r);
-    if (a.js("!!matchComp(" + JSON.stringify(row.lead) + ",norm(" + row.r.join(",") + "))")) matched++;
+    if (a.js("!!matchComp(" + JSON.stringify(row.lead) + ",norm(" + row.r.join(",") + ")," + row.gen + ")")) matched++;
   }
   ok(matched === SHEET_ROWS.length,
      "SHEET_ROWS 52행이 전부 SHEET_COMPS 에서 찾아진다 (두 표가 어긋나지 않았다)",
@@ -995,8 +995,9 @@ section("애매하면 시트 우선");
     for (const j2 of row.pri) { tot++; if (off.ids.includes(j2)) hit0++; if (on.ids.includes(j2)) hit1++; }
     // 시트 「칸」 기준 — 이게 이 기능이 실제로 하는 일이다
     const a = boot("ko").leaders(row.lead[0] || "", row.lead[1] || "", row.lead[2] || "").mine(row.r);
+    // 화면과 같은 행을 봐야 한다 — gcap 을 빼면 다른 세대 행이 잡힌다(2026-09-13 버그)
     const c = JSON.parse(a.js("JSON.stringify(matchComp(" + JSON.stringify(row.lead) +
-      ",norm(" + row.r.join(",") + ")))"));
+      ",norm(" + row.r.join(",") + ")," + row.gen + "))"));
     if (c) {
       const used = [];
       on.ids.forEach(n => { for (let k = 0; k < c.j.length; k++) if (!used.includes(k) && c.j[k].includes(n)) { used.push(k); break; } });
@@ -1022,15 +1023,38 @@ section("애매하면 시트 우선");
   const odd = {lead: ["flint", "mia", "bradley"], r: [33, 34, 33], gen: 17};
   {
     const a = boot("ko").leaders(odd.lead[0], odd.lead[1], odd.lead[2]).mine(odd.r);
-    ok(!a.js("!!matchComp(" + JSON.stringify(odd.lead) + ",norm(" + odd.r.join(",") + "))"),
+    ok(!a.js("!!matchComp(" + JSON.stringify(odd.lead) + ",norm(" + odd.r.join(",") + ")," + odd.gen + ")"),
        "시트에 없는 조합은 매칭되지 않는다");
     ok(pick(odd, 0).ids.join() === pick(odd, 0.02).ids.join(),
        "매칭이 없으면 시트 우선이 결과를 바꾸지 않는다", pick(odd, 0.02).ids.join());
   }
+  // ①b 같은 리더·병비를 쓰는 행이 두 세대에 있으면 **세대가 맞는 쪽**을 잡아야 한다.
+  // 예전에는 gcap 을 안 봐서 먼저 나온 Gen 7 행이 이겼고, 시트가 Gen 8 에 적어 둔 헨드릭 대신
+  // Gen 7 의 패트릭이 나왔다. gcap 을 넘는 행은 아예 안 쓰고, 남은 것 중 세대가 가장 높은 행을 쓴다.
+  {
+    const lead = ["jeronimo", "mia", "bradley"], rr = [48, 4, 48];
+    const at = g => {
+      const a = boot("ko").leaders(lead[0], lead[1], lead[2]).mine(rr);
+      return JSON.parse(a.js("JSON.stringify(matchComp(" + JSON.stringify(lead) +
+        ",norm(" + rr.join(",") + ")," + g + "))"));
+    };
+    ok(at(7) && at(7).g === 7, "Gen 7 로 놓으면 Gen 7 행이 잡힌다", at(7) && String(at(7).g));
+    ok(at(8) && at(8).g === 8, "Gen 8 로 놓으면 Gen 8 행이 잡힌다 (예전엔 Gen 7 이 이겼다)",
+       at(8) && String(at(8).g));
+    ok(!at(6), "Gen 6 로 놓으면 (그 리더 조합의 행이 Gen 7 부터라) 안 잡힌다");
+    // 그 결과가 실제 추천에 나타난다 — 시트 Gen 8 행의 4번 칸은 헨드릭이다
+    const a = boot("ko").leaders(lead[0], lead[1], lead[2]).mine(rr);
+    a.el("gcap").value = "8";
+    const html = a.render(), af = html.slice(html.indexOf('id="rec"'));
+    const ids = [...(/<p><b>([\s\S]*?)<\/b><\/p>/.exec(af) || ["", ""])[1]
+      .matchAll(/heroes\/([a-z-]+)\.webp/g)].map(m => m[1]);
+    ok(ids.includes("hendrik"),
+       "Gen 8 제로니모·미아·브레들리 48/4/48 에서 헨드릭이 들어간다 (시트 Gen 8 행의 칸)", ids.join(","));
+  }
   // ② 리더는 맞는데 병비가 멀면 매칭되지 않는다 (허용 오차 6)
   {
     const a = boot("ko").leaders("logan", "philly", "zinman").mine([10, 10, 80]);
-    ok(!a.js('!!matchComp(["logan","philly","zinman"],norm(10,10,80))'),
+    ok(!a.js('!!matchComp(["logan","philly","zinman"],norm(10,10,80),3)'),
        "리더가 같아도 병비가 멀면 매칭되지 않는다");
   }
   // ③ 중복은 stack:1 인 영웅(노라)에게만 허용된다
