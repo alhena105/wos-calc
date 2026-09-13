@@ -1727,10 +1727,10 @@ function render(d){
   // 나머지를 감추면 "시트를 따른다"는 말이 반쪽이 된다 — 다른 답도 그대로 보여준다.
   (rivals&&rivals.length?'<p class="cap">'+L("⚖️ <b>시트가 이 편성에 답을 "+(rivals.length+1)+"개 적어 뒀습니다.</b> 위는 그중 하나이고, 나머지는 <b>"+
      rivals.map(c=>c.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")).join("</b> / <b>")+
-     "</b> 입니다. 시트가 어느 쪽을 우선하라고 적어 두지 않았으므로 <b>우리도 고르지 않습니다</b> — 위 칸은 세대 → 병비 근접 → 시트가 “META” 라고 표시한 쪽 순으로 하나를 집어 채운 것뿐입니다. 공격/수비 라벨로는 갈리지 않습니다(전무는 영웅에 붙어 있고, 위젯은 SkillMod 칸에 들어가지 않아 조이너 순위를 바꾸지 않습니다).",
+     "</b> 입니다. 시트가 어느 쪽을 우선하라고 적어 두지 않았으므로 <b>우리도 고르지 않습니다</b> — 위 칸은 세대 → 병비 근접 → 시트가 “META” 라고 표시한 쪽 → <b>그래도 갈리지 않으면 시트에 먼저 적힌 행</b> 순으로 하나를 집어 채운 것뿐입니다. 공격/수비 라벨로는 갈리지 않습니다(전무는 영웅에 붙어 있고, 위젯은 SkillMod 칸에 들어가지 않아 조이너 순위를 바꾸지 않습니다).",
      "⚖️ <b>The sheet gives "+(rivals.length+1)+" answers for this lineup.</b> The one above is one of them; the other(s) are <b>"+
      rivals.map(c=>c.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")).join("</b> / <b>")+
-     "</b>. The sheet does not say which takes precedence, so <b>neither do we</b> — the cells above were chosen only by generation, then closest ratio, then whichever row the sheet labels “META”. The offense/defense label does not separate them: exclusive weapons belong to the heroes, and widgets never enter a SkillMod slot, so they do not change joiner ranking.")+"</p>":"")+
+     "</b>. The sheet does not say which takes precedence, so <b>neither do we</b> — the cells above were chosen only by generation, then closest ratio, then whichever row the sheet labels “META”, and <b>failing all that, whichever the sheet lists first</b>. The offense/defense label does not separate them: exclusive weapons belong to the heroes, and widgets never enter a SkillMod slot, so they do not change joiner ranking.")+"</p>":"")+
   '<p class="cap">'+L("넷은 ⑤ 순위 상위 4명을 그냥 자른 게 아니라, <b>포화를 보며 한 명씩</b> 골랐습니다 — 매번 “여기에 더했을 때 전투 배율이 가장 커지는 한 명”입니다. 자르기만 하면 <b>제시·제셀·제로니모처럼 같은 A칸에 들어가는 영웅이 나란히 뽑힙니다</b>(각자 ×1.250 이지만 둘째는 ×1.200, 셋째는 ×1.167 로 떨어집니다). 그래서 순위표 1~4위와 명단이 다를 수 있습니다.",
      "The four are not the top four of ranking ⑤ — each is picked in turn as <b>whoever raises the combined multiplier most</b>, given the ones already chosen. Plain truncation lines up heroes that share a slot (Jessie, Jasser and Jeronimo all fill A: ×1.250, then ×1.200, then ×1.167). So this list can differ from rows 1–4 of the table.")+"</p>"+
   (top.filter((x,i)=>top.indexOf(x)!==i).length?'<p class="cap">'+

@@ -1189,10 +1189,17 @@ section("애매하면 시트 우선");
     }
     // 전수 조사 — 같은 입력에 칸이 다른 행이 걸리는 자리를 기계적으로 훑는다.
     // 이 검사가 있어야 새 세대를 추가하다 같은 충돌을 또 만들어도 바로 드러난다.
+    //
+    // ⚠️ 이 자리를 오래 못 본 이유는 **스윕의 종류**였지 대안 여부가 아니었다(2026-09-13 정정).
+    // 53행 스윕은 "각 행을 그 행의 리더로 돌려 칸이 채워지는가"만 봤다. 그러면 어느 행이든
+    // 자기 리더로는 자기가 잡히니 **충돌 자체를 볼 수 없다.** 필요한 건 아래처럼
+    // "한 입력에 행이 둘 이상 걸리는가"를 묻는 스윕이다.
+    // (대안까지 밟는 것은 그와 별개로 더 튼튼한 것뿐이다 — g8 가토는 Defense 행의 첫 후보라
+    //  첫 후보만 밟아도 잡힌다. 대안 루프는 앞으로 대안으로만 드러날 충돌을 위한 보험이다.)
     {
       const found = [];
       for (const c of comps) for (const rs of c.rs) {
-        // 리더 자리마다 **대안까지 전부** 밟는다 — 첫 후보만 넣으면 g8 가토를 놓친다
+        // 리더 자리마다 **대안까지 전부** 밟는다
         const alt = c.l.map(cell => cell.length ? cell : [""]);
         for (const a0 of alt[0]) for (const a1 of alt[1]) for (const a2 of alt[2]) {
           const q = JSON.stringify([a0, a1, a2]);
@@ -1204,7 +1211,9 @@ section("애매하면 시트 우선");
       const uniq = [...new Set(found)];
       note("시트가 답을 둘 이상 적어 둔 입력 " + uniq.length + "가지: " + uniq.join(" · "));
       // 지금 아는 것은 g8 가토 계열과 g12 60/20/20 뿐이다. 늘어나면 알아야 한다.
-      ok(uniq.every(s => /^g8 60\/40\/0 gatot|^g12 60\/20\/20/.test(s)),
+      // 리더까지 박는다 — 같은 세대·병비에 **다른 리더 조합**으로 새 충돌이 생기면 걸려야 한다
+      const KNOWN = ["g8 60/40/0 gatot+sonya+bradley", "g12 60/20/20 herbjorg+lloyd+ligeia"];
+      ok(uniq.every(s => KNOWN.indexOf(s) >= 0) && uniq.length === KNOWN.length,
          "칸이 갈리는 자리는 아는 둘(g8 가토 · g12 60/20/20)뿐이다", uniq.join(" · "));
       // 그리고 그 자리마다 화면이 실제로 알리는지 확인 (조용히 하나를 고르면 안 된다)
       for (const s of uniq) {
