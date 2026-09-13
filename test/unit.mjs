@@ -1108,7 +1108,21 @@ section("애매하면 시트 우선");
   // 시트 행이면 **시트 칸을 그대로 채운다**(2026-09-13, 사용자 결정: 상한 없음).
   // 그래서 여기서 재는 것은 "얼마나 맞췄나"가 아니라 **얼마를 포기했나**다.
   let changed = 0, loss = 0, worst = 0, first0 = 0, first1 = 0, hit0 = 0, hit1 = 0, tot = 0;
-  let cellHit = 0, cellTot = 0;
+  let cellHit = 0, cellHit0 = 0, cellTot = 0;
+  // 픽 4명을 칸 4개에 **최대로** 배정한다. 앞에서부터 그리디로 채우면 순수 계산 쪽이
+  // 순서 때문에 억울하게 낮게 잡힌다 — 두 모드를 같은 잣대로 재야 비교가 성립한다.
+  const maxFill = (picks, cells) => {
+    let best = 0;
+    const go = (used, i, n) => {
+      if (n + (picks.length - i) <= best) return;
+      if (i === picks.length) { if (n > best) best = n; return; }
+      for (let k = 0; k < cells.length; k++)
+        if (!used[k] && cells[k].includes(picks[i])) { used[k] = 1; go(used, i + 1, n + 1); used[k] = 0; }
+      go(used, i + 1, n);
+    };
+    go(cells.map(() => 0), 0, 0);
+    return best;
+  };
   for (const row of SHEET_ROWS) {
     const off = pick(row, 0), on = pick(row, 1);
     if (off.ids.join() !== on.ids.join()) changed++;
@@ -1123,20 +1137,33 @@ section("애매하면 시트 우선");
     const c = JSON.parse(a.js("JSON.stringify(matchComp(" + JSON.stringify(row.lead) +
       ",norm(" + row.r.join(",") + ")," + row.gen + "))"));
     if (c) {
-      const used = [];
-      on.ids.forEach(n => { for (let k = 0; k < c.j.length; k++) if (!used.includes(k) && c.j[k].includes(n)) { used.push(k); break; } });
-      cellHit += used.length; cellTot += c.j.length;
+      cellHit += maxFill(on.ids, c.j);    // 시트 우선 ON — 베낀 것이므로 100% 가 당연하다
+      cellHit0 += maxFill(off.ids, c.j);  // 시트 우선 OFF — 이쪽이 진짜 일치율이다
+      cellTot += c.j.length;
     }
   }
   note("명단이 바뀐 행 " + changed + "/" + SHEET_ROWS.length +
        " · 배율 손실 평균 " + (loss / SHEET_ROWS.length).toFixed(2) + "% · 최대 " + worst.toFixed(1) + "%");
-  note("시트 칸 적중 " + cellHit + "/" + cellTot + " (" + (cellHit / cellTot * 100).toFixed(1) + "%)");
+  // ⚠️ 이 두 줄을 붙여 읽지 말 것 — 같은 칸을 재지만 **묻는 게 다르다.**
+  //   위: 시트를 베끼도록 만들어 놓고 베꼈는지 본다 → 100% 가 나오는 게 당연하다(순환논).
+  //   아래: 시트를 전혀 안 보고 계산만으로 골랐을 때 시트 칸에 얼마나 떨어지는가 → 이게 일치율이다.
+  // 예전에는 위 줄만 "시트 칸 적중 100.0%" 로 찍혀서 로그만 보면 "다 맞았다" 로 읽혔다(2026-09-13).
+  note("시트 칸 복사 확인 (SHEET_EDGE=1) " + cellHit + "/" + cellTot +
+       " (" + (cellHit / cellTot * 100).toFixed(1) + "%) — 순환논 · 검증 아님");
+  note("진짜 일치   (순수 계산 SHEET_EDGE=0) " + cellHit0 + "/" + cellTot +
+       " (" + (cellHit0 / cellTot * 100).toFixed(1) + "%)");
   note("(참고 · 검증 아님) 시트 #1 재현 " + (first0 / SHEET_ROWS.length * 100).toFixed(1) + "% → " +
        (first1 / SHEET_ROWS.length * 100).toFixed(1) + "% · 겹침 " +
        (hit0 / tot * 100).toFixed(1) + "% → " + (hit1 / tot * 100).toFixed(1) + "%");
   // 시트 칸은 거의 다 채워야 한다. 못 채우는 칸은 리더 중복처럼 **넣을 수 없는** 자리뿐이다.
-  ok(cellHit / cellTot >= 0.97, "시트 행에서는 시트 칸을 97% 이상 그대로 채운다",
+  // 이건 회귀 검사다 — matchComp 이나 pick4 의 시트 따라가기가 깨지면 여기서 잡힌다.
+  // **모델이 시트와 맞는지 보는 검사가 아니다.** 그건 바로 아래 줄이다.
+  ok(cellHit / cellTot >= 0.97, "시트 따라가기가 시트 칸을 97% 이상 베낀다 (복사 확인 · 검증 아님)",
      (cellHit / cellTot * 100).toFixed(1) + "%");
+  // 진짜 하한선. 순수 모델이 시트에서 멀어지면 여기가 먼저 내려간다.
+  // 실측에서 여유를 두고 잡았다 — 올라가면 하한선도 같이 올린다.
+  ok(cellHit0 / cellTot >= 0.60, "순수 계산만으로도 시트 칸의 60% 이상에 떨어진다",
+     (cellHit0 / cellTot * 100).toFixed(1) + "%");
   // 대가에는 상한을 안 걸기로 했다(사용자 결정). 다만 **터무니없어지면** 알아야 하므로
   // 감시선만 남긴다. 실측 37.6% — 가장 큰 자리는 G6 60/40/0 제로니모·레니·그렉 이고,
   // 레니의 Nightmare Trace(X 추가딜, v=1.0, 포화 없음)가 ×1.690 이라 순수 계산이 크게 앞선다.
@@ -1183,6 +1210,67 @@ section("애매하면 시트 우선");
     ok(!a.js('!!matchComp(["logan","philly","zinman"],norm(10,10,80),3)'),
        "리더가 같아도 병비가 멀면 매칭되지 않는다");
   }
+  // ②a-2 시트의 Alternative 칸 — 실어는 두되 판정에는 절대 안 들어간다 (2026-09-13)
+  //     예전에는 이 정보가 데이터에 아예 없어서, 시트가 "넷을 못 구하면 이것도" 라고
+  //     적어 준 69칸이 통째로 버려져 있었다. 화면에만 띄우고 순위에는 안 쓴다.
+  {
+    const rows = E.SHEET_COMPS;
+    const withAlt = rows.filter(c => c.alt && c.alt.length);
+    note("Alternative 칸을 실은 행 " + withAlt.length + "/" + rows.length +
+         " · 칸 " + withAlt.reduce((a, c) => a + c.alt.length, 0) + "개");
+    ok(withAlt.length >= 45, "시트의 Alternative 칸이 실려 있다", withAlt.length + "행");
+    // 영웅 id 가 실재하는가 — 오타 하나면 화면에 undefined 가 찍힌다
+    const badId = [];
+    rows.forEach(c => (c.alt || []).forEach(cell => cell.forEach(id => {
+      if (!E.byId[id]) badId.push(c.g + ":" + id);
+    })));
+    ok(badId.length === 0, "alt 의 영웅 id 가 전부 실재한다", badId.join(", "));
+    // 빈 칸을 실어 두면 화면에 빈 볼드가 찍힌다
+    ok(rows.every(c => !c.alt || c.alt.every(cell => cell.length > 0)),
+       "alt 에 빈 칸이 없다");
+
+    // ⚠️ 핵심: alt 는 판정에 일절 안 들어간다.
+    //    alt 에만 있고 j 에는 없는 영웅이 추천에 뽑히면, 그건 alt 때문이 아니라
+    //    계산이 원래 고른 것이어야 한다 — alt 를 지워도 결과가 같아야 한다는 뜻이다.
+    const row = rows.find(c => c.alt && c.alt.length &&
+      c.alt.some(cell => cell.some(id => !c.j.flat().includes(id))));
+    ok(!!row, "alt 에만 있는 영웅이 있는 행이 존재한다 (검사가 헛돌지 않는다)");
+    if (row) {
+      const pick = strip => {
+        const a = boot("ko").leaders(row.l[0][0] || "", row.l[1][0] || "", row.l[2][0] || "").mine(row.rs[0]);
+        a.el("gcap").value = String(row.g);
+        if (strip) a.js("SHEET_COMPS.forEach(c=>{delete c.alt;})");
+        const html = a.render();
+        const i = html.indexOf('id="rec"');
+        const b = /<p><b>([\s\S]*?)<\/b><\/p>/.exec(html.slice(i));
+        return b ? [...b[1].matchAll(/heroes\/([a-z-]+)\.webp/g)].map(m => m[1]).join(",") : "";
+      };
+      ok(pick(false) === pick(true),
+         "alt 를 통째로 지워도 추천이 그대로다 (판정에 안 들어간다)",
+         pick(false) + " vs " + pick(true));
+    }
+
+    // 화면 — 있는 행에는 뜨고, 없는 행에는 안 뜬다. 한/영 양쪽.
+    const seeK = (lang, lead, r, g) => {
+      const a = boot(lang).leaders(lead[0], lead[1], lead[2]).mine(r);
+      a.el("gcap").value = String(g);
+      return a.paras().filter(x => x.includes("🔁"));
+    };
+    const p1 = seeK("ko", ["jeronimo", "molly", "zinman"], [60, 40, 0], 1);
+    ok(p1.length === 1 && p1[0].includes("제시") && p1[0].includes("서윤"),
+       "대체 조이너 문단이 한국어로 뜬다", p1[0] || "없음");
+    const p2 = seeK("en", ["jeronimo", "molly", "zinman"], [60, 40, 0], 1);
+    ok(p2.length === 1 && p2[0].includes("Jessie") && p2[0].includes("Seo-yoon"),
+       "대체 조이너 문단이 영어로 뜬다 (한글이 새지 않는다)", p2[0] || "없음");
+    ok(!/[가-힣]/.test(p2[0] || ""), "영어 화면의 대체 조이너 문단에 한글이 없다", p2[0] || "");
+    // 대체 칸이 없는 행(g3 로건·필리·진먼)에서는 문단 자체가 없어야 한다
+    ok(seeK("ko", ["logan", "philly", "zinman"], [60, 40, 0], 3).length === 0,
+       "대체 칸이 없는 행에는 그 문단이 안 뜬다");
+    // 순위에 안 들어간다는 문구를 지우면 안 된다 — 이게 이 문단의 요점이다
+    ok((p1[0] || "").includes("순위 계산에는 넣지 않았습니다"),
+       "'순위에 안 넣는다' 는 단서가 문단에 남아 있다");
+  }
+
   // ②b 시트가 한 입력에 답을 둘 적어 둔 자리 — 감추지 않고 드러내는가 (2026-09-13)
   //     발견 경위: 시트 CSV 를 다시 파싱해 SHEET_COMPS 와 대조하다 나왔다.
   //     matchComp 이 하나만 돌려주던 시절엔 배열에서 먼저 나온 행이 조용히 이겼다.

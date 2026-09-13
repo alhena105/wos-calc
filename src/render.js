@@ -224,6 +224,15 @@ function render(d){
      comp.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+"</b> 입니다. <b>시트 행이면 그 칸을 그대로 따릅니다</b> — 칸 안에서 누구를 쓸지만 계산이 고릅니다(“제시*” 칸이면 제시·제셀·제로니모 중 하나). 이 계산기의 1번 원칙이 <b>“계산이 시트와 엇갈리면 시트를 따른다”</b> 이기 때문입니다. 그 대가는 숨기지 않습니다 — 계산만으로 고른 답이 바로 아래 <b>「🧮 계산 순위 그대로」</b> 에 그대로 있습니다. <b>시트에 없는 편성에서는 아무 일도 일어나지 않습니다</b> — 그게 보통입니다.",
      "📋 This lineup is <b>row Gen "+comp.g+" of the Ton sheet</b> (ratios "+comp.rs.map(v=>v.join("/")).join(", ")+"), whose joiners are <b>"+
      comp.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+"</b>. <b>On a row the sheet covers we fill its cells verbatim</b> — the numbers only decide who fills a cell that lists alternatives (a “Jessie*” cell takes Jessie, Jasser or Jeronimo), because this calculator’s first rule is <b>“when the numbers disagree with the sheet, follow the sheet”</b>. The cost is not hidden — what the numbers alone would pick is in <b>🧮 Raw ranking</b> just below. <b>Nothing is applied to lineups the sheet does not cover</b>, which is the usual case.")+"</p>":"")+
+  // 시트는 조이너 넷 옆에 "Alternative #1~#3" 칸을 따로 둔다(48/54 행 · 69칸).
+  // 넷을 못 구할 때 쓰라는 목록이라 **순위에도 pick4 에도 넣지 않는다** — 시트가 그 셋에
+  // 순서를 매기지 않았으므로 우리도 매기지 않고 그대로 보여주기만 한다.
+  (comp&&comp.alt&&comp.alt.length?'<p class="cap">'+L("🔁 시트는 이 행에 <b>대체 조이너</b>도 적어 뒀습니다 — <b>"+
+     comp.alt.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+
+     "</b>. 위 넷을 못 구할 때 쓰라는 칸이라 <b>순위 계산에는 넣지 않았습니다</b> — 시트가 그 안에서 순서를 매기지 않았기 때문입니다.",
+     "🔁 The sheet also lists <b>alternative joiners</b> for this row — <b>"+
+     comp.alt.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+
+     "</b>. They are for when the four above are unavailable, so they are <b>kept out of the ranking</b> — the sheet does not order them either.")+"</p>":"")+
   // 시트가 같은 리더·병비에 답을 둘 이상 적어 둔 자리가 있다. 우리가 몰래 하나를 고르고
   // 나머지를 감추면 "시트를 따른다"는 말이 반쪽이 된다 — 다른 답도 그대로 보여준다.
   (rivals&&rivals.length?'<p class="cap">'+L("⚖️ <b>시트가 이 편성에 답을 "+(rivals.length+1)+"개 적어 뒀습니다.</b> 위는 그중 하나이고, 나머지는 <b>"+
