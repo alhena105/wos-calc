@@ -207,6 +207,29 @@ function render(d){
    if(!best)break;
    out.push(best);}
   return out;};
+ // 같은 영웅을 겹쳐 넣은 자리의 **이 편성 실제 값**을 찍는다 (2026-09-13).
+ // 예전에는 아래 문단이 "둘째 장도 자기끼리 포화하므로 이득일 때만 집습니다" 라고 **주장만** 하고,
+ // 예로 든 숫자는 일반론(제시 둘째 ×1.200)이거나 **다른 편성**(Gen 1 패트릭 ×1.185)이었다.
+ // 노라 3장을 추천받은 사람이 자기 편성의 2·3장째가 얼마인지 화면에서 알 수 없었다.
+ // ⚠️ 순서는 **고른 순서 그대로**여야 한다 — 그래야 네 장의 한계 배율을 모두 곱했을 때
+ // 위에 찍힌 전투 배율이 된다(정의상 그렇다). 정렬하거나 재배치하지 말 것.
+ // ⚠️ 한 영웅의 기여는 **S1 스킬 하나**다(⑤ 표 머리말 "S1만 기여"). 영웅의 스킬을 전부
+ // 먹여서 재면 전혀 다른 숫자가 나온다 — 실제로 그렇게 잘못 재어 본 적이 있다.
+ const stackNote=list=>{
+  const mg=[];let prev=1;
+  list.forEach((c,i)=>{const v=comboAll(list.slice(0,i+1));mg.push(v/prev);prev=v;});
+  const done=[],out=[];
+  list.forEach(c=>{
+   if(done.indexOf(c.h.id)>=0)return;
+   done.push(c.h.id);
+   const ix=[];list.forEach((z,k)=>{if(z.h.id===c.h.id)ix.push(k);});
+   if(ix.length<2)return;
+   out.push("<b>"+esc(HN(c.h))+"</b> "+ix.map(k=>"×"+mg[k].toFixed(3)).join(" → "));});
+  return out.length?'<p class="cap">'+
+   L("↘ 같은 영웅을 겹쳐 넣은 자리입니다. <b>이 편성의 실제 값</b>은 ","↘ Some heroes are stacked here. <b>In this lineup</b> they actually add ")+
+   out.join(" · ")+
+   L(" — 같은 칸에 합연산으로 들어가 <b>장마다 줄어듭니다</b>. 네 장의 한계 배율을 모두 곱하면 위의 전투 배율이 됩니다.",
+     " — copies land in the same slot additively, so <b>each one adds less</b>. Multiplying all four marginals gives the combat multiplier above.")+"</p>":"";};
  // ① 순수 계산 — 시트 우선을 **끄고** 둔다. 이게 보조 패널(#recAll)의 존재 이유다:
  // 시트를 따르느라 얼마를 포기했는지를 사용자가 볼 수 있어야 한다(노라 3장 행은 최대 8% 다).
  const calcTop=pick4(pool,false);
@@ -218,6 +241,7 @@ function render(d){
   ' <span class="tag t-ok">'+L("시트 등재만","sheet-listed only")+'</span></h3><p><b>'+top.map(x=>hpic(x.h,"sm")+esc(HN(x.h))).join(" · ")+
   '</b></p><p class="cap">'+L("전투 배율 ×","Combat multiplier ×")+comboAll(top).toFixed(3)+
   L(" · 리더가 쓰는 영웅도 조이너로 들어올 수 있습니다 — 다른 연맹원이 자기 것을 데려오는 것이라 막지 않습니다."," · a hero already run by a leader can still join — a different alliance member brings their own copy, so it is not blocked.")+"</p>"+
+  stackNote(top)+
   '<p class="cap">'+L("여기 나오는 건 <b>Ton 시트 조이너 명단에 오른 영웅만</b>입니다. 계산 순위 1~4위를 그대로 쓰지 않는 이유는 <b>투자 문턱</b> 때문입니다 — 이론 순위가 높아도 전설은 만렙 보유자가 적고, 만렙 찍은 사람은 대개 이미 그 영웅을 리더로 쓰고 있어 조이너로 못 뺍니다. 시트 52행과 대조했더니 <b>이쪽이 #1 재현 92.3% · 겹침 59.2%</b> 로, 계산 순위 그대로(84.6% · 50.4%)보다 낫고 <b>한 행도 나빠지지 않았습니다</b>.",
      "These are only heroes on the Ton sheet’s joiner list. The raw top four is not used because of the <b>investment threshold</b>: legendaries are rarely maxed, and whoever did max one is usually already running it as a leader. Checked against all 52 sheet rows, this list reproduces the sheet’s #1 joiner <b>92.3%</b> of the time with <b>59.2%</b> overlap, against 84.6% / 50.4% for the raw ranking — and it was never worse on any row.")+"</p>"+
   (comp?'<p class="cap">'+L("📋 이 편성은 <b>Ton 시트 Gen "+comp.g+" 행</b>에 있습니다(병비 "+comp.rs.map(v=>v.join("/")).join(" · ")+"). 시트가 적은 조이너는 <b>"+
@@ -260,6 +284,7 @@ function render(d){
     (x.h.s?"":' <span class="tag t-warn">'+L("이론","theory")+'</span>')).join(" · ")+
    '</b></p><p class="cap">'+L("전투 배율 ×","Combat multiplier ×")+comboAll(calcTop).toFixed(3)+
    L(" — 시트 명단도 시트 행도 보지 않고 <b>계산만으로</b> 고르면 이렇게 됩니다. 위 추천보다 배율이 높으면, 그 차가 <b>시트를 따르느라 포기한 양</b>입니다."," — picked on the numbers alone, ignoring both the sheet’s joiner list and its rows. If this beats the recommendation above, the gap is what following the sheet costs.")+'</p>'+
+   stackNote(calcTop)+
    '<p class="cap">'+L('여기 <span class="tag t-warn">이론</span> 배지가 붙은 영웅은 시트 조이너 명단에 없습니다. <b>배율이 틀렸다는 뜻이 아니라</b>, 그 영웅이 실제로 Lv.5 로 올라와 조이너로 들어올 가능성이 낮다는 뜻입니다. <b>연맹원이 이미 그 영웅을 만렙으로 갖고 있다면 이쪽을 쓰는 게 맞습니다.</b>',
      'Heroes tagged <span class="tag t-warn">theory</span> here are not on the sheet’s joiner list. That does <b>not</b> mean the multiplier is wrong — only that such a hero is unlikely to actually show up maxed as a joiner. <b>If someone in your alliance already has it maxed, this is the list to use.</b>')+'</p></div>':"")+"</div>";
 

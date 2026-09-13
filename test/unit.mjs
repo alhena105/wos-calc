@@ -1210,6 +1210,40 @@ section("애매하면 시트 우선");
     ok(!a.js('!!matchComp(["logan","philly","zinman"],norm(10,10,80),3)'),
        "리더가 같아도 병비가 멀면 매칭되지 않는다");
   }
+  // ②a-3 겹쳐 넣은 영웅의 장당 한계 배율을 **이 편성의 실제 값**으로 찍는가 (2026-09-13)
+  //      예전에는 문단이 "둘째 장도 자기끼리 포화한다" 고 주장만 하고, 숫자는 일반론이거나
+  //      다른 편성 예시였다. 노라 3장을 받은 사람이 자기 2·3장째를 화면에서 못 봤다.
+  {
+    const a = boot("ko").leaders("jeronimo", "mia", "gwen").mine([48, 4, 48]);
+    a.el("gcap").value = "7";
+    const html = a.render();
+    const line = a.paras().filter(x => x.includes("↘"))[0] || "";
+    ok(line.includes("노라"), "겹쳐 넣은 영웅의 장당 값 문단이 뜬다", line.slice(0, 80));
+    const mg = [...line.matchAll(/×([\d.]+)/g)].map(m => +m[1]);
+    ok(mg.length === 3, "노라 3장이면 값이 셋 찍힌다", mg.join(","));
+    ok(mg.every((v, i) => i === 0 || v < mg[i - 1]),
+       "장마다 값이 줄어든다 (포화가 실제로 반영돼 있다)", mg.join(" → "));
+    // 핵심 교차검증 — 첫 장의 값은 ⑤ 순위표의 그 영웅 배율과 같아야 한다.
+    // 다르면 둘 중 하나가 다른 것을 재고 있다는 뜻이다(영웅의 스킬을 전부 먹여서
+    // 재면 여기가 어긋난다 — 실제로 그렇게 잘못 재어 본 적이 있다).
+    const row = html.split("<tr").filter(x => x.includes("norah.webp"))[0] || "";
+    const cells = [...row.split("</tr>")[0].matchAll(/×([\d.]+)/g)].map(m => +m[1]);
+    ok(cells.length > 0 && Math.abs(cells[cells.length - 1] - mg[0]) < 1e-9,
+       "첫 장의 값이 ⑤ 순위표의 그 영웅 배율과 같다 (S1 하나만 센다)",
+       "표 " + cells[cells.length - 1] + " vs 문단 " + mg[0]);
+    // 겹치지 않는 편성에서는 문단 자체가 없어야 한다
+    const b = boot("ko").leaders("logan", "philly", "zinman").mine([60, 40, 0]);
+    b.el("gcap").value = "3";
+    ok(b.paras().filter(x => x.includes("↘")).length === 0,
+       "겹치는 영웅이 없으면 그 문단이 안 뜬다");
+    // 영어
+    const e = boot("en").leaders("jeronimo", "mia", "gwen").mine([48, 4, 48]);
+    e.el("gcap").value = "7";
+    const el = e.paras().filter(x => x.includes("↘"))[0] || "";
+    ok(el.includes("Norah") && !/[가-힣]/.test(el),
+       "영어 화면에도 뜨고 한글이 새지 않는다", el.slice(0, 80));
+  }
+
   // ②a-2 시트의 Alternative 칸 — 실어는 두되 판정에는 절대 안 들어간다 (2026-09-13)
   //     예전에는 이 정보가 데이터에 아예 없어서, 시트가 "넷을 못 구하면 이것도" 라고
   //     적어 준 69칸이 통째로 버려져 있었다. 화면에만 띄우고 순위에는 안 쓴다.
