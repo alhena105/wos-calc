@@ -178,7 +178,7 @@ input[type=range]{padding:0;accent-color:var(--accent);background:none;border:no
 #gSteps tr.gband td{background:var(--card2);color:var(--mut);font-size:11px;letter-spacing:.04em;
  font-weight:700;padding:5px 10px;border-top:1px solid var(--line)}
 .pc{white-space:nowrap}
-.xscroll>table{min-width:520px}
+#tab-gear .xscroll>table{min-width:520px}
 textarea{width:100%;background:var(--card2);color:var(--ink);border:1px solid var(--line);
  border-radius:9px;padding:9px 10px;font-size:12px;font-family:ui-monospace,Menlo,Consolas,monospace;
  min-height:120px;margin-top:8px}
@@ -1477,7 +1477,7 @@ function render(d){
  let o="";
  const modeKr=mode==="rally"?L("공성(랠리)","Rally (offense)"):L("수성(개리슨)","Garrison (defense)");
  o+='<h2>'+L("① 리더 구성","① Leaders")+' <span>'+modeKr+L(" · 병비 "," · ratio ")+r.inf.toFixed(0)+"/"+r.lan.toFixed(0)+"/"+r.mar.toFixed(0)+'</span></h2>';
- o+='<div class="panel"><table><thead><tr><th>'+L("슬롯","Slot")+'</th><th>'+L("영웅","Hero")+'</th><th>'+L("원정 3스킬","Expedition skills")+'</th><th>'+L("전무","Gear")+'</th></tr></thead><tbody>';
+ o+='<div class="panel"><div class="xscroll"><table><thead><tr><th>'+L("슬롯","Slot")+'</th><th>'+L("영웅","Hero")+'</th><th>'+L("원정 3스킬","Expedition skills")+'</th><th>'+L("전무","Gear")+'</th></tr></thead><tbody>';
  [L("보병","Infantry"),L("창병","Lancer"),L("궁병","Marksman")].forEach((c,i)=>{const p=picks[i];
   if(!p.hero){o+='<tr><td class="b">'+c+'</td><td class="note" colspan="3">'+L("미선택","not selected")+'</td></tr>';return;}
   const sk=p.hero.exp.map(e=>{
@@ -1487,7 +1487,7 @@ function render(d){
         '<span class="tag t-'+(st==="dead"?"bad":st==="weak"?"warn":"ok")+'">'+tgtName[e.tgt]+" "+tgtRatio(e.tgt,r).toFixed(0)+"%</span></div>";}
     return"<div>"+sTag(e.slot)+esc(L(e.t,e.te||e.t))+(e.also?" "+sTag(e.also.slot):"")+"</div>";}).join("");
   o+='<tr><td class="b">'+c+'</td><td class="b"><span class="hrow">'+hpic(p.hero,"lg")+"<span>"+esc(HN(p.hero))+"</span></span>"+'<div class="note">'+(LANG==="en"?"":esc(p.hero.en)+" · ")+"Gen "+p.hero.gen+"</div></td><td>"+sk+"</td><td>Lv."+p.wl+"</td></tr>";});
- o+="</tbody></table></div>";
+ o+="</tbody></table></div></div>";
 
  // Gen 10+ 서버에서 창병이 0 면 창병 T12 가 아예 안 켜진다.
  // 근거는 Ton 시트 "Gen 10+" 탭 머리의 T12 CHANGES 줄 하나다 — 임계값을
@@ -1501,7 +1501,7 @@ function render(d){
      "Source: the Ton sheet, “Gen 10+” tab, T12 CHANGES. Set the server generation cap to 9 or below and this warning goes away.")+"</p></div>";
 
  // 칸 진단
- o+='<h2>'+L("② SkillMod 칸 진단","② SkillMod slot diagnosis")+' <span>'+L("포화도","saturation")+'</span></h2><div class="panel"><table><thead><tr><th>'+L("칸","Slot")+'</th><th>'+L("이름","Name")+'</th><th>'+L("값","Value")+'</th><th>'+L("포화","Saturation")+'</th><th>'+L("구성","Sources")+'</th></tr></thead><tbody>';
+ o+='<h2>'+L("② SkillMod 칸 진단","② SkillMod slot diagnosis")+' <span>'+L("포화도","saturation")+'</span></h2><div class="panel"><div class="xscroll"><table><thead><tr><th>'+L("칸","Slot")+'</th><th>'+L("이름","Name")+'</th><th>'+L("값","Value")+'</th><th>'+L("포화","Saturation")+'</th><th>'+L("구성","Sources")+'</th></tr></thead><tbody>';
  const used=ORDER.filter(s=>buck[s]>1);
  const empty=ORDER.filter(s=>buck[s]===1);
  used.sort((a,b)=>buck[b]-buck[a]).forEach(s=>{
@@ -1509,7 +1509,7 @@ function render(d){
   o+='<tr'+(v>=1.6?' class="hi"':"")+"><td>"+sTag(s)+'</td><td>'+SLOTS[s].n+'<div class="note">'+(SLOTS[s].k==="dmg"?L("딜","damage"):L("생존","survival"))+
    '</div></td><td class="big">'+v.toFixed(2)+'</td><td><span class="tag t-'+(v>=1.6?"bad":v>=1.4?"warn":"ok")+'">'+sat+
    '</span><div class="bar"><i style="width:'+pc.toFixed(0)+'%"></i></div></td><td class="note">'+src[s].map(esc).join("<br>")+"</td></tr>";});
- o+="</tbody></table>";
+ o+="</tbody></table></div>";
  if(empty.length)o+='<div class="callout co-ok"><h3>'+L("🟢 빈 칸 — 조이너 1순위 후보","🟢 Empty slots — top joiner targets")+'</h3><p>'+
    empty.map(s=>'<span class="pill">'+s+" "+SLOTS[s].n+"</span>").join("")+"</p></div>";
  // AH(타격 계열)는 칸이 아니라 위 표에 안 나온다. 안 보이면 "왜 이 스킬이 표에 없나" 가 되므로
@@ -1523,12 +1523,12 @@ function render(d){
  o+="</div>";
 
  // 위젯
- o+='<h2>'+L("③ 위젯","③ Widgets")+' <span>'+(mode==="rally"?L("집결(Rally)","Rally"):L("수비(Defender)","Defender"))+L("용만 발동","-side only")+'</span></h2>'+'<div class="panel"><table><thead><tr><th>'+L("영웅","Hero")+'</th><th>'+L("위젯 스킬","Widget skill")+'</th><th>'+L("스탯","Stat")+'</th><th>'+L("방향","Side")+'</th><th>Lv</th><th>'+L("효과","Effect")+'</th></tr></thead><tbody>';
+ o+='<h2>'+L("③ 위젯","③ Widgets")+' <span>'+(mode==="rally"?L("집결(Rally)","Rally"):L("수비(Defender)","Defender"))+L("용만 발동","-side only")+'</span></h2>'+'<div class="panel"><div class="xscroll"><table><thead><tr><th>'+L("영웅","Hero")+'</th><th>'+L("위젯 스킬","Widget skill")+'</th><th>'+L("스탯","Stat")+'</th><th>'+L("방향","Side")+'</th><th>Lv</th><th>'+L("효과","Effect")+'</th></tr></thead><tbody>';
  if(!wg.length)o+='<tr><td colspan="6" class="note">'+L("전용무기 보유 영웅 없음 (에픽은 전용무기가 없습니다)","No hero with exclusive gear (epics have none)")+'</td></tr>';
  wg.forEach(x=>{o+="<tr"+(x.fire?' class="hi"':' class="dead"')+"><td class=\"b\">"+esc(HN(x.hero))+"</td><td class=\"cap\">"+esc(x.w.name)+
   "</td><td>"+statKr[x.w.stat]+"</td><td>"+(x.w.side==="rally"?L("집결","Rally"):L("수비","Defender"))+
   '</td><td>'+x.lv+'</td><td>'+(x.fire?'<span class="big">+'+x.pct+"%</span>":'<span class="tag t-bad">'+(x.lv<2?L("Lv.2 미만","below Lv.2"):L("방향 불일치 → 0","wrong side → 0"))+"</span>")+"</td></tr>";});
- o+="</tbody></table>";
+ o+="</tbody></table></div>";
  const sk=Object.keys(wstat);
  if(sk.length){
   const dup=sk.filter(s=>wg.filter(x=>x.fire&&x.w.stat===s).length>1);
@@ -1540,11 +1540,11 @@ function render(d){
 
  // 병종 전용
  if(cls.length){
-  o+='<h2>'+L("④ 병종 전용 · 주기형 스킬 판정","④ Class-locked and periodic skills")+'</h2><div class="panel"><table><thead><tr><th>'+L("영웅","Hero")+'</th><th>'+L("스킬","Skill")+'</th><th>'+L("대상","Target")+'</th><th>'+L("현재 비중","Current share")+'</th><th>'+L("판정","Verdict")+'</th></tr></thead><tbody>';
+  o+='<h2>'+L("④ 병종 전용 · 주기형 스킬 판정","④ Class-locked and periodic skills")+'</h2><div class="panel"><div class="xscroll"><table><thead><tr><th>'+L("영웅","Hero")+'</th><th>'+L("스킬","Skill")+'</th><th>'+L("대상","Target")+'</th><th>'+L("현재 비중","Current share")+'</th><th>'+L("판정","Verdict")+'</th></tr></thead><tbody>';
   cls.forEach(c=>{o+="<tr"+(c.st==="dead"?' class="dead"':c.st==="ok"?' class="hi"':"")+'><td class="b">'+esc(HN(c.hero))+"</td><td>"+esc(c.e.n)+
    '<div class="note">'+esc(L(c.e.t,c.e.te||c.e.t))+"</div></td><td>"+tgtName[c.e.tgt]+"</td><td>"+c.v.toFixed(0)+
    '%</td><td><span class="tag t-'+(c.st==="dead"?"bad":c.st==="weak"?"warn":"ok")+'">'+c.lbl+"</span></td></tr>";});
-  o+="</tbody></table>";
+  o+="</tbody></table></div>";
   const dead=cls.filter(c=>c.st==="dead");
   if(dead.length)o+='<div class="callout co-warn"><h3>'+L("⚠️ 죽은 스킬 ","⚠️ Dead skills: ")+dead.length+L("개","")+"</h3><p>"+
     dead.map(c=>"<b>"+esc(HN(c.hero))+" "+esc(c.e.n)+"</b> — "+tgtName[c.e.tgt]+L(" 비중 "," share ")+c.v.toFixed(0)+"%").join("<br>")+
@@ -1563,7 +1563,7 @@ function render(d){
   o+="</div>";}
 
  // 조이너
- o+='<h2>'+L("⑤ 조이너 한계 배율 순위","⑤ Joiner marginal multiplier ranking")+' <span>'+L("S1만 기여 · 상위 4명만 채택","only S1 counts · top 4 are taken")+(gcap<99?(LANG==="en"?' · Gen '+gcap+' and below':' · Gen '+gcap+' 이하'):'')+'</span></h2><div class="panel"><table><thead><tr><th>#</th><th>'+L("조이너","Joiner")+'</th><th>'+L("S1 스킬","S1 skill")+'</th><th>'+L("칸","Slot")+'</th><th>'+L("계산","Working")+'</th><th>'+L("배율","Multiplier")+'</th></tr></thead><tbody>';
+ o+='<h2>'+L("⑤ 조이너 한계 배율 순위","⑤ Joiner marginal multiplier ranking")+' <span>'+L("S1만 기여 · 상위 4명만 채택","only S1 counts · top 4 are taken")+(gcap<99?(LANG==="en"?' · Gen '+gcap+' and below':' · Gen '+gcap+' 이하'):'')+'</span></h2><div class="panel"><div class="xscroll"><table><thead><tr><th>#</th><th>'+L("조이너","Joiner")+'</th><th>'+L("S1 스킬","S1 skill")+'</th><th>'+L("칸","Slot")+'</th><th>'+L("계산","Working")+'</th><th>'+L("배율","Multiplier")+'</th></tr></thead><tbody>';
  rank.slice(0,14).forEach((x,i)=>{
   const dmg=x.e.slot!=="X"&&SLOTS[x.e.slot]&&SLOTS[x.e.slot].k==="dmg";
   o+="<tr"+(i<4?' class="hi"':x.mul<=1.001?' class="dead"':"")+"><td>"+(i+1)+'</td><td class="b"><span class="hrow">'+hpic(x.h)+"<span>"+esc(HN(x.h))+"</span></span>"+
@@ -1571,7 +1571,7 @@ function render(d){
    '</td><td class="cap">'+esc(L(x.e.t,x.e.te||x.e.t))+"</td><td>"+(x.e.slot==="X"?sTag("X")+(x.e.bk?sTag(x.e.bk):""):sTag(x.e.slot)+(x.e.also?sTag(x.e.also.slot):""))+
    (x.cond?'<div class="note">'+x.cond.split("|")[1]+"</div>":"")+'</td><td class="note">'+x.detail.map(esc).join("<br>")+
    '</td><td class="big">×'+x.mul.toFixed(3)+'<div class="note">'+(x.e.slot==="X"?L("조건부","conditional"):dmg?L("딜","damage"):L("생존","survival"))+"</div></td></tr>";});
- o+="</tbody></table>";
+ o+="</tbody></table></div>";
  o+='<p class="cap">'+L("배율이 같으면 <b>투자 문턱</b>으로 가릅니다 — <b>시트 등재 → 에픽 → 낮은 세대</b> 순. 계산이 더 못 가르는 자리라, 실제로 Lv.5 까지 올라와 있을 가능성이 높은 쪽을 앞세웁니다. 값을 바꾸는 게 아니라 같은 값 안에서만 순서를 정합니다.",
    "Equal multipliers are broken by the <b>investment threshold</b> — <b>sheet-listed first, then epics, then lower generations</b>. The model cannot separate them, so the tie goes to whoever is more likely to actually be maxed. This only orders within a tie; it never changes a value.")+"</p>";
  // 감소 계열이 왜 25% 증가에 지는지 — 근거는 볼트 「랠리 조이너 선정 규칙·개리슨 운영 (Ton)」 §5·§8.
@@ -1697,7 +1697,11 @@ function render(d){
   (top.filter(x=>x.dup).length?'<p class="cap">'+L("⚠️ 리더와 같은 영웅: <b>"+top.filter(x=>x.dup).map(x=>esc(HN(x.h))).join(" · ")+"</b> — 다른 연맹원이 데려오는 것이라 <b>들어올 수 있습니다</b>(시트도 10개 행에서 리더 영웅을 조이너 칸에 적습니다). 다만 그 스킬이 이미 칸에 들어가 있어 <b>한 장 더 얹는 값</b>으로 재어 있습니다.","⚠️ Also a leader: <b>"+top.filter(x=>x.dup).map(x=>esc(HN(x.h))).join(" · ")+"</b> — a different alliance member brings their own copy, so this is <b>allowed</b> (the sheet does it in ten rows). The multiplier already accounts for the leader’s copy already sitting in the slot.")+"</p>":"")+"</div>"+
   (top.map(x=>x.h.id).join()!==calcTop.map(x=>x.h.id).join()?
    '<div class="callout co-tip" id="recAll"><h3>'+L("🧮 계산 순위 그대로","🧮 Raw ranking")+
-   ' <span class="tag t-warn">'+L("이론 포함","includes theory")+'</span></h3><p><b>'+calcTop.map(x=>hpic(x.h,"sm")+esc(HN(x.h))).join(" · ")+
+   // 아래 캡션이 "여기 이론 배지가 붙은 영웅은…" 이라고 가리키므로 배지를 실제로 붙인다.
+   // 안 붙이면 넷 중 누가 시트 밖인지 화면에서 알 수 없다(2026-09-13 배포본 육안 검증에서 발견).
+   ' <span class="tag t-warn">'+L("이론 포함","includes theory")+'</span></h3><p><b>'+
+   calcTop.map(x=>hpic(x.h,"sm")+esc(HN(x.h))+
+    (x.h.s?"":' <span class="tag t-warn">'+L("이론","theory")+'</span>')).join(" · ")+
    '</b></p><p class="cap">'+L("전투 배율 ×","Combat multiplier ×")+comboAll(calcTop).toFixed(3)+
    L(" — 시트 명단도 시트 행도 보지 않고 <b>계산만으로</b> 고르면 이렇게 됩니다. 위 추천보다 배율이 높으면, 그 차가 <b>시트를 따르느라 포기한 양</b>입니다."," — picked on the numbers alone, ignoring both the sheet’s joiner list and its rows. If this beats the recommendation above, the gap is what following the sheet costs.")+'</p>'+
    '<p class="cap">'+L('여기 <span class="tag t-warn">이론</span> 배지가 붙은 영웅은 시트 조이너 명단에 없습니다. <b>배율이 틀렸다는 뜻이 아니라</b>, 그 영웅이 실제로 Lv.5 로 올라와 조이너로 들어올 가능성이 낮다는 뜻입니다. <b>연맹원이 이미 그 영웅을 만렙으로 갖고 있다면 이쪽을 쓰는 게 맞습니다.</b>',

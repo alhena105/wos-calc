@@ -376,6 +376,31 @@ for (const w of [1400, 1024, 800, 600, 390, 320]) {
 await ko.click("#tabComp");
 await ko.waitForTimeout(80);
 ok(await ko.isVisible("#tab-comp"), "편성 탭으로 돌아온다");
+
+// 넘침 검사는 오랫동안 장비 탭에만 걸려 있었다. 배포본을 390px 로 열어 보니
+// **편성 탭**의 ⑤ 순위표(자연폭 368px)와 ② 칸 진단표가 본문을 통째로 밀고 있었다
+// (390px 에서 본문 401px). 장비 탭이 .xscroll 로 푼 문제를 편성 탭만 안 풀고 있었다.
+// 2026-09-13 육안 검증에서 발견. 두 탭 다 검사한다.
+for (const w of [1400, 768, 430, 390, 360, 320]) {
+  const r = await ko.evaluate(width => {
+    const st = document.createElement("style");
+    st.id = "pwnarrow2"; st.textContent = "html{width:" + width + "px!important}";
+    document.head.appendChild(st);
+    const body = document.body.scrollWidth;
+    // 어느 표가 범인인지 같이 남긴다 — .xscroll 안이면 굴러도 되므로 뺀다
+    // html{width:N} 로 폭을 흉내내므로 clientWidth 는 안 따라온다 — 주입한 폭을 기준으로 본다
+    const cw = width, guilty = [];
+    document.querySelectorAll("#tab-comp table").forEach(t => {
+      if (t.closest(".xscroll")) return;
+      if (t.getBoundingClientRect().right > cw + 1)
+        guilty.push([...t.querySelectorAll("thead th")].map(x => x.innerText.trim()).join("/").slice(0, 40));
+    });
+    st.remove();
+    return {body, guilty};
+  }, w);
+  ok(r.body <= w + 2, "편성 탭 " + w + "px 에서 본문이 가로로 넘치지 않는다",
+     r.body + "px" + (r.guilty.length ? " · 범인: " + r.guilty.join(" | ") : ""));
+}
 ok(!/tab=gear/.test(ko.url()), "URL 에서 tab=gear 가 빠진다", ko.url());
 ok(/①/.test(await outText(ko)), "편성 결과가 그대로 있다");
 

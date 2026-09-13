@@ -582,6 +582,15 @@ section("조이너 추천 · T12 경고 (렌더)");
        "두 목록이 실제로 다를 때만 보조 패널이 뜬다", alt.join(",") + " vs " + ids.join(","));
     ok(alt.some(s => !E.HEROES.find(h => h.en.toLowerCase().replace(/ /g, "-") === s).s),
        "보조 패널에는 이론(시트 미등재) 영웅이 들어 있다", alt.join(","));
+    // 캡션이 "여기 [이론] 배지가 붙은 영웅은…" 이라고 가리킨다 — 실제로 붙어 있어야 한다.
+    // 2026-09-13 배포본 육안 검증에서 발견: 넷 중 누가 시트 밖인지 화면에서 알 수 없었다.
+    {
+      const head = html.slice(i, html.indexOf("</b>", i));
+      const theory = alt.filter(s => !E.HEROES.find(h => h.en.toLowerCase().replace(/ /g, "-") === s).s);
+      ok((head.match(/>이론</g) || []).length === theory.length,
+         "보조 패널의 이론 배지 개수가 시트 미등재 영웅 수와 같다",
+         "배지 " + (head.match(/>이론</g) || []).length + " · 미등재 " + theory.join(","));
+    }
   }
   ok(/생존 칸도 같은 무게로 셉니다/.test(html), "생존 칸을 같이 세는 근거가 화면에 있다");
   ok(/같은 칸에 겹치는 분을 합쳤을 때/.test(html),
