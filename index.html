@@ -717,6 +717,11 @@ const HEROES = [
 //    그래서 mode 를 싣지 않는다. 대신 `matchComps()` 가 걸리는 행을 **전부** 돌려주고
 //    화면이 "시트가 답을 둘 적어 뒀다"고 그대로 드러낸다. 우리가 고르지 않는다.
 //
+// ⚠️ **이 배열은 시트 행 순서 그대로 유지한다.** 세대·병비·META 로도 안 갈리는 동률이 남으면
+//    마지막 타이브레이크가 **배열 순서**이고(안정 정렬), 화면은 그걸 "시트에 먼저 적힌 행"이라고
+//    설명한다. 순서를 흐트러뜨리면 그 설명이 거짓이 된다. 실제로 g12 META 행을 복원할 때
+//    쌍둥이 바로 뒤에 끼워 넣었다가 시트 순서와 어긋나서 되돌렸다(2026-09-13).
+//
 // 쓰는 곳은 **하나**다: 입력한 리더·병비가 이 행과 맞으면, 조이너 넷을 고를 때
 // **애매한 차이는 시트 쪽으로 기울인다**(render.js 의 SHEET_EDGE).
 // 배율을 바꾸는 게 아니라 거의 같은 둘 중 어느 쪽을 집느냐만 정한다.
@@ -770,14 +775,14 @@ const SHEET_COMPS = [
  {g:11,l:[["eleonora"],["lloyd","fred"],["bradley"]],rs:[[60,40,0]],j:[["renee"],["mia"],["hendrik"],["reina"]]},
  {g:12,l:[["herbjorg"],["lloyd"],["bradley"]],rs:[[60,40,0]],j:[["mia"],["renee"],["patrick"],["hendrik"]]},
  {g:12,l:[["herbjorg"],["lloyd"],["ligeia"]],rs:[[60,20,20]],j:[["mia"],["patrick"],["norah"],["seoyoon"]]},
- // 시트에 60/20/20 이 두 줄이다. 아래가 "META - Mix Defense - 60/20/20" 쪽 —
- // 2026-09-12 수집 때 중복으로 오분류해서 빠져 있었다(2026-09-13 CSV 재파싱에서 발견).
- {g:12,l:[["herbjorg"],["lloyd"],["ligeia"]],rs:[[60,20,20]],j:[["mia"],["gatot"],["patrick"],["seoyoon"]],meta:1},
  {g:12,l:[["herbjorg"],["molly","philly"],["ligeia"]],rs:[[50,2,48]],j:[["mia"],["patrick"],["norah"],["gatot"]]},
  {g:12,l:[["herbjorg"],["lloyd"],["ligeia"]],rs:[[50,10,40]],j:[["mia"],["patrick"],["norah"],["gatot"]]},
  {g:12,l:[["herbjorg"],["mia"],["rufus"]],rs:[[48,4,48]],j:[["patrick"],["hendrik"],["norah"],["gatot"]]},
  {g:12,l:[["herbjorg"],["karol"],["rufus"]],rs:[[50,10,40]],j:[["mia"],["patrick"],["hendrik"],["norah"]],meta:1},
  {g:12,l:[["herbjorg"],["karol"],["bradley","greg"]],rs:[[60,40,0]],j:[["mia"],["renee"],["gatot"],["hendrik"]]},
+ // 시트 Gen 12 의 **마지막 행** "META - Mix Defense - 60/20/20". 위 60/20/20 행과 리더·병비가
+ // 같고 조이너만 다르다 — 2026-09-12 수집 때 중복으로 오분류해서 빠져 있었다(2026-09-13 발견).
+ {g:12,l:[["herbjorg"],["lloyd"],["ligeia"]],rs:[[60,20,20]],j:[["mia"],["gatot"],["patrick"],["seoyoon"]],meta:1},
 ];
 /* =============================================================================
    gear-data.js — 홍색(전설) 영웅장비 상수
