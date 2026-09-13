@@ -703,9 +703,19 @@ const HEROES = [
 //   g  = 세대 · l = 리더 [보병[], 창병[], 궁병[]] (슬래시 대안을 배열로 다 담았다)
 //   rs = 라벨에 적힌 병비 **전부** ("60/40 or 60/30/10" 이면 둘 다)
 //   j  = 조이너 **칸 단위** [[칸1 후보], [칸2 후보], …]
+//   meta:1 = 시트 라벨이 "META - …" 로 시작하는 행 (시트가 스스로 현재 주류라고 표시한 것)
 //        시트가 "Jessie*" 라고 적은 건 **한 칸**이고 그 칸의 후보가 제시/제셀/제로니모 셀이다.
 //        평평하게 펌치면 제시와 제셀을 둘 다 넣어도 "시트대로"가 돼버린다 — 그러면 이 기능이
 //        해결하려던 문제(같은 칸을 중복으로 잡는 것)를 그대로 놓친다.
+//
+// ⚠️ **시트가 한 입력에 답을 둘 적어 둔 자리가 있다.** 리더도 병비도 같은데 조이너 칸이
+//    다른 행이 둘 있는 경우다(2026-09-13 CSV 재파싱에서 발견):
+//      · g8  60/40/0  가토·소냐·브레들리 — 시트 Defense 행과 Offense 행에 둘 다 걸린다
+//      · g12 60/20/20 헤르보르·로이드·리지아 — 둘 다 Defense 인데 답이 다르다(하나가 META)
+//    **공/수 라벨로는 못 가른다** — 전무 side 는 영웅에 붙어 있어서 같은 3인조는 같은 side 다.
+//    게다가 전무(위젯)는 SkillMod 칸에 안 들어가므로 공/수는 조이너 순위를 바꾸지 않는다.
+//    그래서 mode 를 싣지 않는다. 대신 `matchComps()` 가 걸리는 행을 **전부** 돌려주고
+//    화면이 "시트가 답을 둘 적어 뒀다"고 그대로 드러낸다. 우리가 고르지 않는다.
 //
 // 쓰는 곳은 **하나**다: 입력한 리더·병비가 이 행과 맞으면, 조이너 넷을 고를 때
 // **애매한 차이는 시트 쪽으로 기울인다**(render.js 의 SHEET_EDGE).
@@ -734,7 +744,7 @@ const SHEET_COMPS = [
  {g:6,l:[["jeronimo"],["renee"],["gwen"]],rs:[[50,20,30],[30,20,50]],j:[["jessie","jasser","jeronimo"],["seoyoon"],["mia"],["norah"]]},
  {g:6,l:[["jeronimo","hector"],["mia"],["wayne","gwen"]],rs:[[48,4,48],[40,10,50]],j:[["norah"],["norah"],["norah"],["norah","patrick"]]},
  {g:6,l:[["jeronimo"],["renee"],["greg"]],rs:[[60,40,0],[40,60,0]],j:[["mia"],["patrick"],["jessie","jasser","jeronimo"],["wuming"]]},
- {g:6,l:[["logan"],["philly"],["wayne"]],rs:[[45,5,50],[40,0,60]],j:[["norah"],["norah"],["norah"],["norah","patrick"]]},
+ {g:6,l:[["logan"],["philly"],["wayne"]],rs:[[45,5,50],[40,0,60]],j:[["norah"],["norah"],["norah"],["norah","patrick"]],meta:1},
  {g:6,l:[["hector"],["norah"],["wayne"]],rs:[[45,15,40]],j:[["mia"],["patrick"],["philly"],["lynn"]]},
  {g:6,l:[["hector"],["molly"],["wayne"]],rs:[[50,0,50]],j:[["mia"],["patrick"],["norah"],["norah"]]},
  {g:7,l:[["edith"],["gordon"],["bradley"]],rs:[[60,40,0]],j:[["renee"],["mia"],["reina"],["jessie","jasser","jeronimo"]]},
@@ -760,10 +770,13 @@ const SHEET_COMPS = [
  {g:11,l:[["eleonora"],["lloyd","fred"],["bradley"]],rs:[[60,40,0]],j:[["renee"],["mia"],["hendrik"],["reina"]]},
  {g:12,l:[["herbjorg"],["lloyd"],["bradley"]],rs:[[60,40,0]],j:[["mia"],["renee"],["patrick"],["hendrik"]]},
  {g:12,l:[["herbjorg"],["lloyd"],["ligeia"]],rs:[[60,20,20]],j:[["mia"],["patrick"],["norah"],["seoyoon"]]},
+ // 시트에 60/20/20 이 두 줄이다. 아래가 "META - Mix Defense - 60/20/20" 쪽 —
+ // 2026-09-12 수집 때 중복으로 오분류해서 빠져 있었다(2026-09-13 CSV 재파싱에서 발견).
+ {g:12,l:[["herbjorg"],["lloyd"],["ligeia"]],rs:[[60,20,20]],j:[["mia"],["gatot"],["patrick"],["seoyoon"]],meta:1},
  {g:12,l:[["herbjorg"],["molly","philly"],["ligeia"]],rs:[[50,2,48]],j:[["mia"],["patrick"],["norah"],["gatot"]]},
  {g:12,l:[["herbjorg"],["lloyd"],["ligeia"]],rs:[[50,10,40]],j:[["mia"],["patrick"],["norah"],["gatot"]]},
  {g:12,l:[["herbjorg"],["mia"],["rufus"]],rs:[[48,4,48]],j:[["patrick"],["hendrik"],["norah"],["gatot"]]},
- {g:12,l:[["herbjorg"],["karol"],["rufus"]],rs:[[50,10,40]],j:[["mia"],["patrick"],["hendrik"],["norah"]]},
+ {g:12,l:[["herbjorg"],["karol"],["rufus"]],rs:[[50,10,40]],j:[["mia"],["patrick"],["hendrik"],["norah"]],meta:1},
  {g:12,l:[["herbjorg"],["karol"],["bradley","greg"]],rs:[[60,40,0]],j:[["mia"],["renee"],["gatot"],["hendrik"]]},
 ];
 /* =============================================================================
@@ -1022,11 +1035,13 @@ const COMP_TOL=6;
 // 시트가 Gen 8 에 적어 둔 헨드릭 대신 Gen 7 의 패트릭이 나왔다.
 // 규칙: gcap 을 넘는 행은 아예 안 쓰고, 남은 것 중 **세대가 가장 높은**(가장 최신) 행을 쓴다.
 // 같은 세대면 병비가 더 가까운 쪽.
-function matchComp(ids,r,gcap){
+// 걸리는 시트 행을 **전부** 돌려준다. 보통은 0개나 1개지만,
+// 시트가 한 입력에 답을 둘 적어 둔 자리가 있다(data.js 의 SHEET_COMPS 주석 참고).
+// 그때 우리가 몰래 하나를 고르지 않고 화면이 둘 다 드러내야 하므로 목록으로 준다.
+function matchComps(ids,r,gcap){
  const mine=[r.inf,r.lan,r.mar];
- const pick=ids.filter(Boolean);
- if(pick.length<2)return null;
- let best=null,bd=1e9,bg=-1;
+ if(ids.filter(Boolean).length<2)return [];
+ const hit=[];
  SHEET_COMPS.forEach(c=>{
   if(gcap!==undefined&&c.g>gcap)return;
   // 고른 리더가 전부 그 자리의 대안 안에 있어야 하고, 그 행이 요구하는 자리를 다 채워야 한다
@@ -1037,9 +1052,29 @@ function matchComp(ids,r,gcap){
   }
   const d=Math.min.apply(null,c.rs.map(v=>dist(mine,v)));
   if(d>COMP_TOL)return;
-  if(c.g>bg||(c.g===bg&&d<bd)){bg=c.g;bd=d;best=c;}
+  hit.push({c:c,d:d});
  });
- return best;
+ // 세대가 높은 쪽 → 병비가 가까운 쪽 → 시트가 META 라고 표시한 쪽.
+ // META 는 우리 판단이 아니라 시트 라벨을 그대로 읽은 것이다.
+ hit.sort((a,b)=>(b.c.g-a.c.g)||(a.d-b.d)||((b.c.meta?1:0)-(a.c.meta?1:0)));
+ // **세대·병비로 갈리는 행은 이미 갈린 것이다** — 낮은 세대 행은 답이 아니라 옛 답이다
+ // (Gen 7/8 헨드릭 건이 그거였다). 여기서 남기는 것은 그 둘로도 못 가르는 동률뿐이고,
+ // 그게 곧 "시트가 한 입력에 답을 둘 적어 둔" 자리다.
+ if(!hit.length)return [];
+ const top=hit[0];
+ return hit.filter(x=>x.c.g===top.c.g&&Math.abs(x.d-top.d)<1e-9).map(x=>x.c);
+}
+// 칸을 채울 때 쓰는 대표 행 하나. 나머지는 화면이 "시트가 답을 둘 적어 뒀다"고 알린다.
+function matchComp(ids,r,gcap){
+ const all=matchComps(ids,r,gcap);
+ return all.length?all[0]:null;
+}
+// 대표 행과 **조이너 칸이 실제로 다른** 나머지 행들. 칸이 같으면 알릴 것이 없다.
+function compRivals(all){
+ if(!all||all.length<2)return [];
+ const key=c=>c.j.map(x=>x.join("|")).join(",");
+ const k0=key(all[0]);
+ return all.slice(1).filter(c=>key(c)!==k0);
 }
 const BAND_TOL=6;   // 내 병비가 금지 비율과 이 거리 안이면 밴드
 const ROW_TOL=10;   // 상대 비율이 이 거리 밖이면 밴드 판정을 내리지 않는다
@@ -1202,8 +1237,11 @@ function calc(){
      mode==="defender"?garrisonVerdict(mine,ea):sheetVerdict(ea,mine));
  }
  // 이 편성이 시트에 있는 행인가 — 있으면 애매한 자리에서 시트 쪽으로 기운다(render.js)
- const comp=matchComp(picks.map(p=>p.hero&&p.hero.id||""),r,gcap);
- render({mode,leaders,picks,r,buck,src,cls,hits,hitMul,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap,comp});
+ const comps=matchComps(picks.map(p=>p.hero&&p.hero.id||""),r,gcap);
+ const comp=comps.length?comps[0]:null;
+ // 칸이 다른 나머지 행 — 시트가 이 입력에 답을 둘 적어 둔 경우다. 화면이 그대로 알린다.
+ const rivals=compRivals(comps);
+ render({mode,leaders,picks,r,buck,src,cls,hits,hitMul,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap,comp,rivals});
 }
 /* =============================================================================
    gear-engine.js — 홍색 장비 업그레이드 순서 계산. 순수 함수만 있다.
@@ -1473,7 +1511,7 @@ let SHEET_EDGE=1;
 const statKr=i18nFill({},function(){return{Attack:L("공격력","Attack"),Defense:L("방어력","Defense"),Lethality:L("파괴력","Lethality"),Health:L("체력","Health")};});
 
 function render(d){
- const {mode,leaders,picks,r,buck,src,cls,hits,hitMul,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap,comp}=d;
+ const {mode,leaders,picks,r,buck,src,cls,hits,hitMul,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap,comp,rivals}=d;
  let o="";
  const modeKr=mode==="rally"?L("공성(랠리)","Rally (offense)"):L("수성(개리슨)","Garrison (defense)");
  o+='<h2>'+L("① 리더 구성","① Leaders")+' <span>'+modeKr+L(" · 병비 "," · ratio ")+r.inf.toFixed(0)+"/"+r.lan.toFixed(0)+"/"+r.mar.toFixed(0)+'</span></h2>';
@@ -1685,6 +1723,14 @@ function render(d){
      comp.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+"</b> 입니다. <b>시트 행이면 그 칸을 그대로 따릅니다</b> — 칸 안에서 누구를 쓸지만 계산이 고릅니다(“제시*” 칸이면 제시·제셀·제로니모 중 하나). 이 계산기의 1번 원칙이 <b>“계산이 시트와 엇갈리면 시트를 따른다”</b> 이기 때문입니다. 그 대가는 숨기지 않습니다 — 계산만으로 고른 답이 바로 아래 <b>「🧮 계산 순위 그대로」</b> 에 그대로 있습니다. <b>시트에 없는 편성에서는 아무 일도 일어나지 않습니다</b> — 그게 보통입니다.",
      "📋 This lineup is <b>row Gen "+comp.g+" of the Ton sheet</b> (ratios "+comp.rs.map(v=>v.join("/")).join(", ")+"), whose joiners are <b>"+
      comp.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+"</b>. <b>On a row the sheet covers we fill its cells verbatim</b> — the numbers only decide who fills a cell that lists alternatives (a “Jessie*” cell takes Jessie, Jasser or Jeronimo), because this calculator’s first rule is <b>“when the numbers disagree with the sheet, follow the sheet”</b>. The cost is not hidden — what the numbers alone would pick is in <b>🧮 Raw ranking</b> just below. <b>Nothing is applied to lineups the sheet does not cover</b>, which is the usual case.")+"</p>":"")+
+  // 시트가 같은 리더·병비에 답을 둘 이상 적어 둔 자리가 있다. 우리가 몰래 하나를 고르고
+  // 나머지를 감추면 "시트를 따른다"는 말이 반쪽이 된다 — 다른 답도 그대로 보여준다.
+  (rivals&&rivals.length?'<p class="cap">'+L("⚖️ <b>시트가 이 편성에 답을 "+(rivals.length+1)+"개 적어 뒀습니다.</b> 위는 그중 하나이고, 나머지는 <b>"+
+     rivals.map(c=>c.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")).join("</b> / <b>")+
+     "</b> 입니다. 시트가 어느 쪽을 우선하라고 적어 두지 않았으므로 <b>우리도 고르지 않습니다</b> — 위 칸은 세대 → 병비 근접 → 시트가 “META” 라고 표시한 쪽 순으로 하나를 집어 채운 것뿐입니다. 공격/수비 라벨로는 갈리지 않습니다(전무는 영웅에 붙어 있고, 위젯은 SkillMod 칸에 들어가지 않아 조이너 순위를 바꾸지 않습니다).",
+     "⚖️ <b>The sheet gives "+(rivals.length+1)+" answers for this lineup.</b> The one above is one of them; the other(s) are <b>"+
+     rivals.map(c=>c.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")).join("</b> / <b>")+
+     "</b>. The sheet does not say which takes precedence, so <b>neither do we</b> — the cells above were chosen only by generation, then closest ratio, then whichever row the sheet labels “META”. The offense/defense label does not separate them: exclusive weapons belong to the heroes, and widgets never enter a SkillMod slot, so they do not change joiner ranking.")+"</p>":"")+
   '<p class="cap">'+L("넷은 ⑤ 순위 상위 4명을 그냥 자른 게 아니라, <b>포화를 보며 한 명씩</b> 골랐습니다 — 매번 “여기에 더했을 때 전투 배율이 가장 커지는 한 명”입니다. 자르기만 하면 <b>제시·제셀·제로니모처럼 같은 A칸에 들어가는 영웅이 나란히 뽑힙니다</b>(각자 ×1.250 이지만 둘째는 ×1.200, 셋째는 ×1.167 로 떨어집니다). 그래서 순위표 1~4위와 명단이 다를 수 있습니다.",
      "The four are not the top four of ranking ⑤ — each is picked in turn as <b>whoever raises the combined multiplier most</b>, given the ones already chosen. Plain truncation lines up heroes that share a slot (Jessie, Jasser and Jeronimo all fill A: ×1.250, then ×1.200, then ×1.167). So this list can differ from rows 1–4 of the table.")+"</p>"+
   (top.filter((x,i)=>top.indexOf(x)!==i).length?'<p class="cap">'+

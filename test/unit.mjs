@@ -45,7 +45,7 @@ function note(t) { console.log("   " + t); }
 
 // ── 로더 ───────────────────────────────────────────────────────────────
 const EXPORTS = "LANG,L,HN,CN,STR,HEROES,SLOTS,ORDER,byId,wpct,norm,tgtRatio,DW,dmgShare," +
-  "NA_SHARE,tgtName,tgtStat,COUNTERS,BAND_TOL,ROW_TOL,MECH,dist,sheetVerdict,garrisonVerdict,eVal,eK,eAdd,xShare,nCls,matchComp,SHEET_COMPS";
+  "NA_SHARE,tgtName,tgtStat,COUNTERS,BAND_TOL,ROW_TOL,MECH,dist,sheetVerdict,garrisonVerdict,eVal,eK,eAdd,xShare,nCls,matchComp,matchComps,compRivals,SHEET_COMPS";
 function load(lang) {
   const code = src("i18n.js") + src("data.js") + src("engine.js") +
     "\n;globalThis.__api={" + EXPORTS + "};\n";
@@ -1139,6 +1139,84 @@ section("애매하면 시트 우선");
     ok(!a.js('!!matchComp(["logan","philly","zinman"],norm(10,10,80),3)'),
        "리더가 같아도 병비가 멀면 매칭되지 않는다");
   }
+  // ②b 시트가 한 입력에 답을 둘 적어 둔 자리 — 감추지 않고 드러내는가 (2026-09-13)
+  //     발견 경위: 시트 CSV 를 다시 파싱해 SHEET_COMPS 와 대조하다 나왔다.
+  //     matchComp 이 하나만 돌려주던 시절엔 배열에서 먼저 나온 행이 조용히 이겼다.
+  {
+    const comps = JSON.parse(run(CTX_KO, "JSON.stringify(SHEET_COMPS)"));
+    ok(comps.length === 54, "SHEET_COMPS 는 시트 편성 행 54개다", String(comps.length));
+    const metas = comps.filter(c => c.meta);
+    ok(metas.length === 3, "시트 라벨이 META 인 행 3개에 meta:1 이 붙어 있다", String(metas.length));
+
+    // g12 60/20/20 은 시트에 두 줄이고, META 쪽 칸(가토)이 채워져야 한다.
+    // 2026-09-12 수집 때 이 행을 중복으로 오분류해서 통째로 빠뜨렸다.
+    {
+      const a = boot("ko").leaders("herbjorg", "lloyd", "ligeia").mine([60, 20, 20]);
+      a.el("gcap").value = "12";
+      const n = a.js('matchComps(["herbjorg","lloyd","ligeia"],norm(60,20,20),12).length');
+      ok(n === 2, "g12 60/20/20 에 시트 행이 둘 걸린다", String(n));
+      ok(a.js('matchComp(["herbjorg","lloyd","ligeia"],norm(60,20,20),12).meta===1'),
+         "동률이면 시트가 META 라고 적은 행을 쓴다");
+      const html = a.render(), after = html.slice(html.indexOf('id="rec"'));
+      const b = /<p><b>([\s\S]*?)<\/b><\/p>/.exec(after);
+      const ids = [...b[1].matchAll(/heroes\/([a-z-]+)\.webp/g)].map(m => m[1]);
+      ok(ids.includes("gatot"), "그래서 META 행의 가토가 추천에 들어간다", ids.join(","));
+      ok(/시트가 이 편성에 답을 2개 적어 뒀습니다/.test(after), "다른 답이 있다고 화면이 알린다");
+      ok(/노라/.test((/⚖️[\s\S]{0,300}/.exec(after.replace(/<[^>]+>/g, "")) || [""])[0]),
+         "알림에 나머지 답(노라 쪽)이 실제로 적힌다");
+    }
+    // g8 60/40/0 — 가토로 고르면 시트의 Defense 행과 Offense 행에 둘 다 걸린다.
+    // 공/수 라벨로는 못 가른다(전무는 영웅에 붙어 있어 같은 3인조는 같은 side 다) →
+    // 우리가 고르지 않고 드러낸다. 대안 리더로만 드러나는 자리라 53행 스윕이 못 잡았다.
+    {
+      const a = boot("ko").leaders("gatot", "sonya", "bradley").mine([60, 40, 0]);
+      a.el("gcap").value = "8";
+      const n = a.js('matchComps(["gatot","sonya","bradley"],norm(60,40,0),8).length');
+      ok(n === 2, "g8 60/40/0 가토에 시트 행이 둘 걸린다", String(n));
+      ok(/시트가 이 편성에 답을 2개 적어 뒀습니다/.test(a.render()), "그 사실을 화면이 알린다");
+      // 에디스로 고르면 Offense 행 하나만 걸리므로 알림이 없어야 한다
+      const e = boot("ko").leaders("edith", "sonya", "bradley").mine([60, 40, 0]);
+      e.el("gcap").value = "8";
+      ok(!/답을 \d+개 적어 뒀습니다/.test(e.render()), "한 행만 걸리면 알림이 안 뜬다");
+    }
+    // 칸이 똑같은 행이 둘 걸리는 경우는 알릴 것이 없다 (g1 · g11)
+    {
+      const a = boot("ko").leaders("jeronimo", "molly", "zinman").mine([50, 20, 30]);
+      a.el("gcap").value = "1";
+      ok(a.js('matchComps(["jeronimo","molly","zinman"],norm(50,20,30),1).length') === 2,
+         "g1 50/20/30 도 두 행에 걸리지만");
+      ok(!/답을 \d+개 적어 뒀습니다/.test(a.render()), "칸이 같으면 알리지 않는다");
+    }
+    // 전수 조사 — 같은 입력에 칸이 다른 행이 걸리는 자리를 기계적으로 훑는다.
+    // 이 검사가 있어야 새 세대를 추가하다 같은 충돌을 또 만들어도 바로 드러난다.
+    {
+      const found = [];
+      for (const c of comps) for (const rs of c.rs) {
+        // 리더 자리마다 **대안까지 전부** 밟는다 — 첫 후보만 넣으면 g8 가토를 놓친다
+        const alt = c.l.map(cell => cell.length ? cell : [""]);
+        for (const a0 of alt[0]) for (const a1 of alt[1]) for (const a2 of alt[2]) {
+          const q = JSON.stringify([a0, a1, a2]);
+          const hit = JSON.parse(run(CTX_KO,
+            "JSON.stringify(compRivals(matchComps(" + q + ",norm(" + rs.join(",") + ")," + c.g + ")).length)"));
+          if (hit > 0) found.push("g" + c.g + " " + rs.join("/") + " " + [a0, a1, a2].filter(Boolean).join("+"));
+        }
+      }
+      const uniq = [...new Set(found)];
+      note("시트가 답을 둘 이상 적어 둔 입력 " + uniq.length + "가지: " + uniq.join(" · "));
+      // 지금 아는 것은 g8 가토 계열과 g12 60/20/20 뿐이다. 늘어나면 알아야 한다.
+      ok(uniq.every(s => /^g8 60\/40\/0 gatot|^g12 60\/20\/20/.test(s)),
+         "칸이 갈리는 자리는 아는 둘(g8 가토 · g12 60/20/20)뿐이다", uniq.join(" · "));
+      // 그리고 그 자리마다 화면이 실제로 알리는지 확인 (조용히 하나를 고르면 안 된다)
+      for (const s of uniq) {
+        const m = /^g(\d+) (\S+) (.+)$/.exec(s), ids = m[3].split("+");
+        const a = boot("ko").leaders(ids[0] || "", ids[1] || "", ids[2] || "")
+          .mine(m[2].split("/").map(Number));
+        a.el("gcap").value = m[1];
+        ok(/답을 \d+개 적어 뒀습니다/.test(a.render()), "화면이 알린다 — " + s);
+      }
+    }
+  }
+
   // ③ 중복은 stack:1 인 영웅(노라)에게만 허용된다
   {
     // ⚠️ 명단을 기억으로 박지 않는다 — **SHEET_COMPS 에서 기계적으로 센다.**

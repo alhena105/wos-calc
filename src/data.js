@@ -366,9 +366,19 @@ const HEROES = [
 //   g  = 세대 · l = 리더 [보병[], 창병[], 궁병[]] (슬래시 대안을 배열로 다 담았다)
 //   rs = 라벨에 적힌 병비 **전부** ("60/40 or 60/30/10" 이면 둘 다)
 //   j  = 조이너 **칸 단위** [[칸1 후보], [칸2 후보], …]
+//   meta:1 = 시트 라벨이 "META - …" 로 시작하는 행 (시트가 스스로 현재 주류라고 표시한 것)
 //        시트가 "Jessie*" 라고 적은 건 **한 칸**이고 그 칸의 후보가 제시/제셀/제로니모 셀이다.
 //        평평하게 펌치면 제시와 제셀을 둘 다 넣어도 "시트대로"가 돼버린다 — 그러면 이 기능이
 //        해결하려던 문제(같은 칸을 중복으로 잡는 것)를 그대로 놓친다.
+//
+// ⚠️ **시트가 한 입력에 답을 둘 적어 둔 자리가 있다.** 리더도 병비도 같은데 조이너 칸이
+//    다른 행이 둘 있는 경우다(2026-09-13 CSV 재파싱에서 발견):
+//      · g8  60/40/0  가토·소냐·브레들리 — 시트 Defense 행과 Offense 행에 둘 다 걸린다
+//      · g12 60/20/20 헤르보르·로이드·리지아 — 둘 다 Defense 인데 답이 다르다(하나가 META)
+//    **공/수 라벨로는 못 가른다** — 전무 side 는 영웅에 붙어 있어서 같은 3인조는 같은 side 다.
+//    게다가 전무(위젯)는 SkillMod 칸에 안 들어가므로 공/수는 조이너 순위를 바꾸지 않는다.
+//    그래서 mode 를 싣지 않는다. 대신 `matchComps()` 가 걸리는 행을 **전부** 돌려주고
+//    화면이 "시트가 답을 둘 적어 뒀다"고 그대로 드러낸다. 우리가 고르지 않는다.
 //
 // 쓰는 곳은 **하나**다: 입력한 리더·병비가 이 행과 맞으면, 조이너 넷을 고를 때
 // **애매한 차이는 시트 쪽으로 기울인다**(render.js 의 SHEET_EDGE).
@@ -397,7 +407,7 @@ const SHEET_COMPS = [
  {g:6,l:[["jeronimo"],["renee"],["gwen"]],rs:[[50,20,30],[30,20,50]],j:[["jessie","jasser","jeronimo"],["seoyoon"],["mia"],["norah"]]},
  {g:6,l:[["jeronimo","hector"],["mia"],["wayne","gwen"]],rs:[[48,4,48],[40,10,50]],j:[["norah"],["norah"],["norah"],["norah","patrick"]]},
  {g:6,l:[["jeronimo"],["renee"],["greg"]],rs:[[60,40,0],[40,60,0]],j:[["mia"],["patrick"],["jessie","jasser","jeronimo"],["wuming"]]},
- {g:6,l:[["logan"],["philly"],["wayne"]],rs:[[45,5,50],[40,0,60]],j:[["norah"],["norah"],["norah"],["norah","patrick"]]},
+ {g:6,l:[["logan"],["philly"],["wayne"]],rs:[[45,5,50],[40,0,60]],j:[["norah"],["norah"],["norah"],["norah","patrick"]],meta:1},
  {g:6,l:[["hector"],["norah"],["wayne"]],rs:[[45,15,40]],j:[["mia"],["patrick"],["philly"],["lynn"]]},
  {g:6,l:[["hector"],["molly"],["wayne"]],rs:[[50,0,50]],j:[["mia"],["patrick"],["norah"],["norah"]]},
  {g:7,l:[["edith"],["gordon"],["bradley"]],rs:[[60,40,0]],j:[["renee"],["mia"],["reina"],["jessie","jasser","jeronimo"]]},
@@ -423,9 +433,12 @@ const SHEET_COMPS = [
  {g:11,l:[["eleonora"],["lloyd","fred"],["bradley"]],rs:[[60,40,0]],j:[["renee"],["mia"],["hendrik"],["reina"]]},
  {g:12,l:[["herbjorg"],["lloyd"],["bradley"]],rs:[[60,40,0]],j:[["mia"],["renee"],["patrick"],["hendrik"]]},
  {g:12,l:[["herbjorg"],["lloyd"],["ligeia"]],rs:[[60,20,20]],j:[["mia"],["patrick"],["norah"],["seoyoon"]]},
+ // 시트에 60/20/20 이 두 줄이다. 아래가 "META - Mix Defense - 60/20/20" 쪽 —
+ // 2026-09-12 수집 때 중복으로 오분류해서 빠져 있었다(2026-09-13 CSV 재파싱에서 발견).
+ {g:12,l:[["herbjorg"],["lloyd"],["ligeia"]],rs:[[60,20,20]],j:[["mia"],["gatot"],["patrick"],["seoyoon"]],meta:1},
  {g:12,l:[["herbjorg"],["molly","philly"],["ligeia"]],rs:[[50,2,48]],j:[["mia"],["patrick"],["norah"],["gatot"]]},
  {g:12,l:[["herbjorg"],["lloyd"],["ligeia"]],rs:[[50,10,40]],j:[["mia"],["patrick"],["norah"],["gatot"]]},
  {g:12,l:[["herbjorg"],["mia"],["rufus"]],rs:[[48,4,48]],j:[["patrick"],["hendrik"],["norah"],["gatot"]]},
- {g:12,l:[["herbjorg"],["karol"],["rufus"]],rs:[[50,10,40]],j:[["mia"],["patrick"],["hendrik"],["norah"]]},
+ {g:12,l:[["herbjorg"],["karol"],["rufus"]],rs:[[50,10,40]],j:[["mia"],["patrick"],["hendrik"],["norah"]],meta:1},
  {g:12,l:[["herbjorg"],["karol"],["bradley","greg"]],rs:[[60,40,0]],j:[["mia"],["renee"],["gatot"],["hendrik"]]},
 ];

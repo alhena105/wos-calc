@@ -84,11 +84,13 @@ const COMP_TOL=6;
 // 시트가 Gen 8 에 적어 둔 헨드릭 대신 Gen 7 의 패트릭이 나왔다.
 // 규칙: gcap 을 넘는 행은 아예 안 쓰고, 남은 것 중 **세대가 가장 높은**(가장 최신) 행을 쓴다.
 // 같은 세대면 병비가 더 가까운 쪽.
-function matchComp(ids,r,gcap){
+// 걸리는 시트 행을 **전부** 돌려준다. 보통은 0개나 1개지만,
+// 시트가 한 입력에 답을 둘 적어 둔 자리가 있다(data.js 의 SHEET_COMPS 주석 참고).
+// 그때 우리가 몰래 하나를 고르지 않고 화면이 둘 다 드러내야 하므로 목록으로 준다.
+function matchComps(ids,r,gcap){
  const mine=[r.inf,r.lan,r.mar];
- const pick=ids.filter(Boolean);
- if(pick.length<2)return null;
- let best=null,bd=1e9,bg=-1;
+ if(ids.filter(Boolean).length<2)return [];
+ const hit=[];
  SHEET_COMPS.forEach(c=>{
   if(gcap!==undefined&&c.g>gcap)return;
   // 고른 리더가 전부 그 자리의 대안 안에 있어야 하고, 그 행이 요구하는 자리를 다 채워야 한다
@@ -99,9 +101,29 @@ function matchComp(ids,r,gcap){
   }
   const d=Math.min.apply(null,c.rs.map(v=>dist(mine,v)));
   if(d>COMP_TOL)return;
-  if(c.g>bg||(c.g===bg&&d<bd)){bg=c.g;bd=d;best=c;}
+  hit.push({c:c,d:d});
  });
- return best;
+ // 세대가 높은 쪽 → 병비가 가까운 쪽 → 시트가 META 라고 표시한 쪽.
+ // META 는 우리 판단이 아니라 시트 라벨을 그대로 읽은 것이다.
+ hit.sort((a,b)=>(b.c.g-a.c.g)||(a.d-b.d)||((b.c.meta?1:0)-(a.c.meta?1:0)));
+ // **세대·병비로 갈리는 행은 이미 갈린 것이다** — 낮은 세대 행은 답이 아니라 옛 답이다
+ // (Gen 7/8 헨드릭 건이 그거였다). 여기서 남기는 것은 그 둘로도 못 가르는 동률뿐이고,
+ // 그게 곧 "시트가 한 입력에 답을 둘 적어 둔" 자리다.
+ if(!hit.length)return [];
+ const top=hit[0];
+ return hit.filter(x=>x.c.g===top.c.g&&Math.abs(x.d-top.d)<1e-9).map(x=>x.c);
+}
+// 칸을 채울 때 쓰는 대표 행 하나. 나머지는 화면이 "시트가 답을 둘 적어 뒀다"고 알린다.
+function matchComp(ids,r,gcap){
+ const all=matchComps(ids,r,gcap);
+ return all.length?all[0]:null;
+}
+// 대표 행과 **조이너 칸이 실제로 다른** 나머지 행들. 칸이 같으면 알릴 것이 없다.
+function compRivals(all){
+ if(!all||all.length<2)return [];
+ const key=c=>c.j.map(x=>x.join("|")).join(",");
+ const k0=key(all[0]);
+ return all.slice(1).filter(c=>key(c)!==k0);
 }
 const BAND_TOL=6;   // 내 병비가 금지 비율과 이 거리 안이면 밴드
 const ROW_TOL=10;   // 상대 비율이 이 거리 밖이면 밴드 판정을 내리지 않는다
@@ -264,6 +286,9 @@ function calc(){
      mode==="defender"?garrisonVerdict(mine,ea):sheetVerdict(ea,mine));
  }
  // 이 편성이 시트에 있는 행인가 — 있으면 애매한 자리에서 시트 쪽으로 기운다(render.js)
- const comp=matchComp(picks.map(p=>p.hero&&p.hero.id||""),r,gcap);
- render({mode,leaders,picks,r,buck,src,cls,hits,hitMul,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap,comp});
+ const comps=matchComps(picks.map(p=>p.hero&&p.hero.id||""),r,gcap);
+ const comp=comps.length?comps[0]:null;
+ // 칸이 다른 나머지 행 — 시트가 이 입력에 답을 둘 적어 둔 경우다. 화면이 그대로 알린다.
+ const rivals=compRivals(comps);
+ render({mode,leaders,picks,r,buck,src,cls,hits,hitMul,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap,comp,rivals});
 }
