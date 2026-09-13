@@ -981,22 +981,30 @@ section("애매하면 시트 우선");
      "SHEET_ROWS 52행이 전부 SHEET_COMPS 에서 찾아진다 (두 표가 어긋나지 않았다)",
      matched + "/" + SHEET_ROWS.length);
 
-  let changed = 0, loss = 0, worst = 0, first0 = 0, first1 = 0, hit0 = 0, hit1 = 0, tot = 0;
+  let changed = 0, loss = 0, worst = 0, worstStack = 0, first0 = 0, first1 = 0, hit0 = 0, hit1 = 0, tot = 0;
   for (const row of SHEET_ROWS) {
     const off = pick(row, 0), on = pick(row, 0.02);
     if (off.ids.join() !== on.ids.join()) changed++;
     const d = (off.v - on.v) / off.v * 100;
-    loss += d; if (d > worst) worst = d;
+    // 스택 칸을 강제로 따른 행은 **여유폭 밖**이 정상이다 — 그 규칙이 일부러 여유폭을 안 본다.
+    // 두 상한을 섞으면 "여유폭이 지켜지는가"를 아무도 안 지키게 된다. 그래서 갈라서 센다.
+    const stacked = on.ids.some((x, i) => on.ids.indexOf(x) !== i);
+    if (stacked) { if (d > worstStack) worstStack = d; }
+    else { loss += d; if (d > worst) worst = d; }
     if (row.top.some(x => off.ids.includes(x))) first0++;
     if (row.top.some(x => on.ids.includes(x))) first1++;
     for (const j of row.pri) { tot++; if (off.ids.includes(j)) hit0++; if (on.ids.includes(j)) hit1++; }
   }
   note("명단이 바뀐 행 " + changed + "/" + SHEET_ROWS.length +
-       " · 배율 손실 평균 " + (loss / SHEET_ROWS.length).toFixed(3) + "% · 최대 " + worst.toFixed(2) + "%");
+       " · 여유폭 규칙 손실 평균 " + (loss / SHEET_ROWS.length).toFixed(3) + "% · 최대 " + worst.toFixed(2) + "%");
+  note("스택 칸을 강제로 따른 행의 최대 손실 " + worstStack.toFixed(2) + "% (여유폭 밖이 정상)");
   note("(참고 · 검증 아님) 시트 #1 재현 " + (first0 / SHEET_ROWS.length * 100).toFixed(1) + "% → " +
        (first1 / SHEET_ROWS.length * 100).toFixed(1) + "% · 겹침 " +
        (hit0 / tot * 100).toFixed(1) + "% → " + (hit1 / tot * 100).toFixed(1) + "%");
-  ok(worst <= 2.5, "시트를 따르느라 잃는 배율이 여유폭(2%) 근처를 넘지 않는다", worst.toFixed(2) + "%");
+  ok(worst <= 2.5, "여유폭 규칙으로 잃는 배율이 2% 근처를 넘지 않는다", worst.toFixed(2) + "%");
+  // 스택 강제는 여유폭을 안 보지만 무한정은 아니다. 실측 7.97% 에서 여유를 두고 상한을 건다 —
+  // 넘어가면 SHEET_COMPS 나 노라 데이터가 바뀐 것이니 다시 봐야 한다.
+  ok(worstStack <= 9, "스택 칸을 강제로 따르는 대가가 9% 를 넘지 않는다", worstStack.toFixed(2) + "%");
   ok(changed >= 10, "시트 행에서 실제로 판단이 바뀐다", String(changed));
   ok(hit1 > hit0 && first1 >= first0, "따르게 했으니 시트와 더 가까워진다", hit1 + " vs " + hit0);
 
@@ -1033,7 +1041,32 @@ section("애매하면 시트 우선");
     }
     ok(bad.length === 0, "노라 말고는 아무도 중복으로 뽑히지 않는다", bad.slice(0, 3).join(", "));
     ok(dupRows >= 3, "노라 중복이 실제로 쓰이는 행이 있다 (예외가 죽어 있지 않다)", String(dupRows));
-    note("시트 우선 상태에서 노라를 2장 이상 뽑는 행 " + dupRows + "/" + SHEET_ROWS.length);
+    let three = 0;
+    for (const row of SHEET_ROWS) {
+      const ids = pick(row, 0.02).ids;
+      if (ids.filter(x => x === "norah").length >= 3) three++;
+    }
+    ok(three >= 3, "시트가 노라를 3칸 적은 행에서 실제로 3장을 뽑는다", String(three));
+    note("시트 우선 상태에서 노라 2장 이상 " + dupRows + "행 · 3장 이상 " + three + "행");
+  }
+  // ③b 보조 패널(#recAll)은 **시트를 전혀 안 본** 순수 계산이어야 한다.
+  // 그래야 "시트를 따르느라 얼마를 포기했는지"가 화면에 보인다. 노라 3장 행은 그 차이가 8% 다.
+  {
+    const row = {lead: ["magnus", "mia", "hendrik"], r: [48, 4, 48], gen: 9};
+    const a = boot("ko").leaders(row.lead[0], row.lead[1], row.lead[2]).mine(row.r);
+    a.el("gcap").value = String(row.gen);
+    const html = a.render();
+    const i = html.indexOf('id="recAll"');
+    ok(i > 0, "노라 3장 행에서는 보조 패널이 뜬다 (추천과 다르니까)");
+    const alt = [...html.slice(i, html.indexOf("</b>", i)).matchAll(/heroes\/([a-z-]+)\.webp/g)].map(m => m[1]);
+    ok(alt.filter(x => x === "norah").length <= 1,
+       "보조 패널은 시트를 안 보므로 노라를 3장 쌓지 않는다", alt.join(","));
+    const pureV = +(/전투 배율 ×([\d.]+)/.exec(html.slice(i)) || [0, 0])[1];
+    const recV = +(/전투 배율 ×([\d.]+)/.exec(html.slice(html.indexOf('id="rec"'))) || [0, 0])[1];
+    ok(pureV > recV, "그 행에서 순수 계산이 추천보다 높다 — 포기한 양이 화면에 보인다",
+       "순수 " + pureV + " vs 추천 " + recV);
+    note("노라 3장 행의 대가: 추천 ×" + recV + " vs 순수 계산 ×" + pureV +
+         " (" + ((1 - recV / pureV) * 100).toFixed(1) + "% 포기)");
   }
   // ④ 사용자가 잡은 자리: 로건·필리·진먼 60/40/0 Gen 3 → 시트는 미아·패트릭·제시*·서윤
   {
