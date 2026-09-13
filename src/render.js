@@ -123,8 +123,9 @@ function render(d){
   '</p><p class="cap">'+L("예외 — 상대가 같은 영웅을 4스택하면 상대 칸이 이미 합연산으로 포화라 우리 감소가 상대적으로 크게 먹힙니다. 그때는 20% 계열도 쓸 만합니다. · 근거: 볼트 「랠리 조이너 선정 규칙·개리슨 운영 (Ton)」 §5·§8 (Ton 반복 테스트)",
     "Exception — if the enemy stacks the same hero four times, their slot is already saturated by addition, so your reduction bites relatively harder; 20% skills are worth taking then. · Source: vault note “Rally joiner selection & garrison ops (Ton)”, §5 and §8.")+"</p></div>";
  // 기본은 **시트 등재 영웅만**이다(2026-09-12). 계산 순위 그대로가 아니다.
- // 근거: 시트 52행 대조(SHEET_EDGE=0)에서 등재만 쪽이 #1 재현 84.6→92.3% · 겹침 48.2→58.8% 로 올라갔고,
- // **한 행도 나빠지지 않았다.** 이론 배지 영웅(웨인·고든·플린트·그웬)이 36회 끼어들던 자리다.
+ // 근거: 시트 52행 대조(SHEET_EDGE=0)에서 등재만 쪽이 #1 재현 84.6→92.3% · 겹침 50.4→59.2% 로 올라갔고,
+ // **한 행도 나빠지지 않았다** — 이건 주장이 아니라 unit.mjs 가 지키는 검사다(#1·겹침 양쪽).
+ // 이론 배지 영웅이 41회 끼어들던 자리다(웨인21·고든11·플린트3·알론소3·아모스2·블랑쉬1).
  // 계산 순위는 아래 보조 패널(#recAll)로 계속 보여준다 — 값을 감추는 게 아니라 순서를 바꾼 것이다.
  // 리더로 쓴 영웅도 조이너로 들어올 수 있다 — 다른 연맹원이 자기 것을 데려오는 것이다.
  // 예전에는 뽑힐 수 없게 막아 뒀는데 **근거 없는 가정**이었다 — 시트는 10개 행에서
@@ -217,8 +218,8 @@ function render(d){
   ' <span class="tag t-ok">'+L("시트 등재만","sheet-listed only")+'</span></h3><p><b>'+top.map(x=>hpic(x.h,"sm")+esc(HN(x.h))).join(" · ")+
   '</b></p><p class="cap">'+L("전투 배율 ×","Combat multiplier ×")+comboAll(top).toFixed(3)+
   L(" · 리더가 쓰는 영웅도 조이너로 들어올 수 있습니다 — 다른 연맹원이 자기 것을 데려오는 것이라 막지 않습니다."," · a hero already run by a leader can still join — a different alliance member brings their own copy, so it is not blocked.")+"</p>"+
-  '<p class="cap">'+L("여기 나오는 건 <b>Ton 시트 조이너 명단에 오른 영웅만</b>입니다. 계산 순위 1~4위를 그대로 쓰지 않는 이유는 <b>투자 문턱</b> 때문입니다 — 이론 순위가 높아도 전설은 만렙 보유자가 적고, 만렙 찍은 사람은 대개 이미 그 영웅을 리더로 쓰고 있어 조이너로 못 뺍니다. 시트 52행과 대조했더니 <b>이쪽이 #1 재현 92.3% · 겹침 58.8%</b> 로, 계산 순위 그대로(84.6% · 48.2%)보다 낫고 <b>한 행도 나빠지지 않았습니다</b>.",
-     "These are only heroes on the Ton sheet’s joiner list. The raw top four is not used because of the <b>investment threshold</b>: legendaries are rarely maxed, and whoever did max one is usually already running it as a leader. Checked against all 52 sheet rows, this list reproduces the sheet’s #1 joiner <b>92.3%</b> of the time with <b>58.8%</b> overlap, against 84.6% / 48.2% for the raw ranking — and it was never worse on any row.")+"</p>"+
+  '<p class="cap">'+L("여기 나오는 건 <b>Ton 시트 조이너 명단에 오른 영웅만</b>입니다. 계산 순위 1~4위를 그대로 쓰지 않는 이유는 <b>투자 문턱</b> 때문입니다 — 이론 순위가 높아도 전설은 만렙 보유자가 적고, 만렙 찍은 사람은 대개 이미 그 영웅을 리더로 쓰고 있어 조이너로 못 뺍니다. 시트 52행과 대조했더니 <b>이쪽이 #1 재현 92.3% · 겹침 59.2%</b> 로, 계산 순위 그대로(84.6% · 50.4%)보다 낫고 <b>한 행도 나빠지지 않았습니다</b>.",
+     "These are only heroes on the Ton sheet’s joiner list. The raw top four is not used because of the <b>investment threshold</b>: legendaries are rarely maxed, and whoever did max one is usually already running it as a leader. Checked against all 52 sheet rows, this list reproduces the sheet’s #1 joiner <b>92.3%</b> of the time with <b>59.2%</b> overlap, against 84.6% / 50.4% for the raw ranking — and it was never worse on any row.")+"</p>"+
   (comp?'<p class="cap">'+L("📋 이 편성은 <b>Ton 시트 Gen "+comp.g+" 행</b>에 있습니다(병비 "+comp.rs.map(v=>v.join("/")).join(" · ")+"). 시트가 적은 조이너는 <b>"+
      comp.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+"</b> 입니다. <b>시트 행이면 그 칸을 그대로 따릅니다</b> — 칸 안에서 누구를 쓸지만 계산이 고릅니다(“제시*” 칸이면 제시·제셀·제로니모 중 하나). 이 계산기의 1번 원칙이 <b>“계산이 시트와 엇갈리면 시트를 따른다”</b> 이기 때문입니다. 그 대가는 숨기지 않습니다 — 계산만으로 고른 답이 바로 아래 <b>「🧮 계산 순위 그대로」</b> 에 그대로 있습니다. <b>시트에 없는 편성에서는 아무 일도 일어나지 않습니다</b> — 그게 보통입니다.",
      "📋 This lineup is <b>row Gen "+comp.g+" of the Ton sheet</b> (ratios "+comp.rs.map(v=>v.join("/")).join(", ")+"), whose joiners are <b>"+

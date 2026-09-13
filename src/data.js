@@ -150,8 +150,12 @@ const HEROES = [
       {n:"Crescent Uplift",slot:"A",v:.20,t:"전 부대 피해량 +20%",te:"all troops damage +20%"},
       {n:"Elemental Resonance",slot:"A",v:.25,t:"전 부대 스킬 피해 +25%",te:"all troops skill damage +25%"}],
  w:{side:"defender",stat:"Defense",name:"Steel Discipline"}},
+// ⚠️ Nightmare Trace 의 bk:"A" 는 **원문 문구 규칙의 유일한 예외**다(2026-09-13).
+// 원문이 "extra damage" 라 규칙대로면 칸이 아닌데, 시트를 정답지로 놓고 스킬 타입을
+// 전수로 쓸어 보니 이 한 건만 두 지표가 같은 방향으로 움직였다 — 자세한 근거는
+// test/fixtures.mjs 의 X_BUCKETED 주석과 CLAUDE.md 정정 이력에 있다.
 {id:"renee",s:1,kr:"레니",en:"Renee",cls:"lancer",gen:6,rar:"leg",
- exp:[{n:"Nightmare Trace",slot:"X",k:"dmg",v:1.0,tgt:"lancer",t:"창병 2턴마다 추가딜 200%",te:"lancers, every 2 turns: +200% extra damage"},
+ exp:[{n:"Nightmare Trace",slot:"X",k:"dmg",bk:"A",v:1.0,tgt:"lancer",t:"창병 2턴마다 추가딜 200%",te:"lancers, every 2 turns: +200% extra damage"},
       {n:"Dreamcatcher",slot:"X",k:"dmg",v:1.5,tgt:"lancer",t:"표식 대상 창병 피해량 +150%",te:"vs marked targets: lancer damage +150%"},
       {n:"Dreamslice",slot:"A",v:.35,t:"표식 대상 전 부대 피해량 +75%",te:"vs marked targets: all troops damage +75%"}],
  w:{side:"rally",stat:"Lethality",name:"Wistful Enchantment"}},

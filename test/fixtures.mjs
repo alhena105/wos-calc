@@ -129,7 +129,8 @@ export const SHEET_JOINERS = [
 // wosheroes 원문이 "Damage Dealt / Damage Taken" 을 올린다(내린다)고 적은 것만 담는다.
 // 이런 스킬은 일반 칸과 **같은 스탯**이라 칸을 우회하면 그것만 포화를 안 겪는다
 // (플린트가 리더 A칸 1.60 을 무시하고 1.00 에서 재어 3위로 올라오던 문제).
-// "extra damage / 추가피해" 처럼 타격에 붙는 것은 다른 기전이라 여기 없다.
+// "extra damage / 추가피해" 처럼 타격에 붙는 것은 다른 기전이라 원칙적으로 여기 없다 —
+// **예외 한 건(renee Nightmare Trace)은 맨 아래에 근거와 함께 따로 적었다.**
 //
 // 원문 확인 (2026-09-01, https://wosheroes.com/heroes/<슬러그>):
 //   flint  Pyromaniac           "increases his Infantry's Damage Dealt by 20-100%"
@@ -146,6 +147,22 @@ export const SHEET_JOINERS = [
 // 일부러 뺀 것: renee Dreamcatcher. 원문은 "increasing her Lancers' damage dealt to marked
 // targets" 로 분명 스탯이지만, **표식 유지율을 아직 환산하지 않아** v 가 원값(1.5)이다.
 // 환산 안 된 값을 칸에 넣으면 오히려 더 부풀려진다 → 환산부터 하고 붙일 것.
+//
+// ⚠️ **문구 규칙의 유일한 예외 — renee Nightmare Trace (2026-09-13).**
+// 원문은 "lancers, every 2 turns: +200% extra damage" 라 문구 규칙대로면 칸이 아니다.
+// 그런데 **시트를 정답지로 놓고**(사용자 지시: 시트가 최적값) 스킬 타입 배정을 전수로
+// 쓸어 보니, 후보 32건 중 **두 지표가 같은 방향으로 움직인 것은 이 한 건뿐**이었다:
+//   · 전체풀(#recAll) 칸 적중 113 → 119 /216. 바뀐 6행이 **6/6 같은 패턴** —
+//     플린트가 빠지고 시트가 실제로 적은 패트릭이 들어온다. 기전이 바로 bk 의 존재 이유다
+//     (Nightmare Trace 가 A칸을 우회하니 플린트를 눌러주지 못하고 있었다).
+//   · 시트풀(#rec) 칸 적중 139 → 141 /216 (g12 60/20/20 두 행에서 제시 → 패트릭).
+//   · 시트를 따르느라 포기하는 배율의 **최대값 37.6% → 20.0%** — CLAUDE.md 가
+//     "근거가 생기면 제일 먼저 손볼 자리" 라고 미리 지목해 둔 바로 그 행이다.
+//   · 악화되는 지표 없음(평균 손실 7.05% → 6.91%).
+// ⚠️ **다른 extra damage 스킬로 일반화하지 말 것.** 문구가 같은 15건은 Δ 가 정확히 0 인데,
+// 시트가 동의해서가 아니라 **v 가 작아 순위를 못 바꿔서**다(레니 1.0 vs 노라·그웬 0.2).
+// 그쪽은 여전히 자료 없음이다. 실제로 블랭킷으로 전부 칸에 넣으면 노라가 14장 → 7장으로
+// 반토막 나 시트풀이 되레 나빠진다 — 시트는 노라를 11행에 적고 3장씩 쌓는다.
 export const X_BUCKETED = [
   {id:"flint",    n:"Pyromaniac",           bk:"A"},
   {id:"ahmose",   n:"Prayer of Flame",      bk:"A"},
@@ -157,6 +174,7 @@ export const X_BUCKETED = [
   {id:"estrella", n:"Splendid Scene",       bk:"A", alsoBk:"D"},
   {id:"viveca",   n:"Children of the Mist", bk:"A", alsoBk:"D"},
   {id:"gordon",   n:"Chemical Terror",      bk:"A"},
+  {id:"renee",    n:"Nightmare Trace",      bk:"A"},   // ⚠️ 문구 규칙의 예외 — 위 주석 참고
 ];
 
 // ── 시트 세대별 행 — 조이너 순위 대조용 ──────────────────────

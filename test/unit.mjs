@@ -978,6 +978,50 @@ section("시트 행 대조 (조이너 순위)");
        (/#1 재현 [\d.]+% · 겹침 [\d.]+%/.exec(cap) || ["없음"])[0]);
   }
 
+  // 캡션은 **쌍**으로 적혀 있다 — "등재만 92.3%/59.2% vs 계산순위 84.6%/50.4%".
+  // 위 검사는 앞 쌍만 봤다. 뒤 쌍(#recAll)이 묵으면 "이쪽이 낫다"는 비교 자체가 거짓이 된다.
+  // 그리고 캡션은 "한 행도 나빠지지 않았습니다" 라고 단언한다 — 그건 측정이지 수사가 아니므로
+  // 여기서 실제로 센다. 2026-09-13 레니 bk 변경 때 이 세 가지가 한꺼번에 틀어졌다.
+  {
+    const both = row => {
+      const a = boot("ko").leaders(row.lead[0] || "", row.lead[1] || "", row.lead[2] || "").mine(row.r);
+      a.el("gcap").value = String(row.gen);
+      a.js("SHEET_EDGE=0");
+      const html = a.render();
+      const at = id => {
+        const i = html.indexOf('id="' + id + '"');
+        if (i < 0) return null;
+        const b = /<p><b>([\s\S]*?)<\/b><\/p>/.exec(html.slice(i));
+        return b ? [...b[1].matchAll(/heroes\/([a-z-]+)\.webp/g)].map(m => m[1]) : null;
+      };
+      const rec = at("rec");
+      return {rec, all: at("recAll") || rec};
+    };
+    let fa = 0, pa = 0, ta = 0, worseTop = [], worseOv = [];
+    for (const row of SHEET_ROWS) {
+      const {rec, all} = both(row);
+      if (row.top.some(x => all.includes(x))) fa++;
+      for (const j of row.pri) { ta++; if (all.includes(j)) pa++; }
+      // 등재만이 계산순위보다 나쁜 행이 하나라도 있으면 캡션의 단언이 거짓이다
+      if (!row.top.some(x => rec.includes(x)) && row.top.some(x => all.includes(x)))
+        worseTop.push("G" + row.gen + " " + row.r.join("/"));
+      const o1 = row.pri.filter(j => rec.includes(j)).length;
+      const o2 = row.pri.filter(j => all.includes(j)).length;
+      if (o1 < o2) worseOv.push("G" + row.gen + " " + row.r.join("/") + " (" + o1 + "<" + o2 + ")");
+    }
+    const fap = fa / SHEET_ROWS.length * 100, pap = pa / ta * 100;
+    note("계산 순위 그대로(#recAll) #1 재현 " + fap.toFixed(1) + "% · 겹침 " + pap.toFixed(1) + "%");
+    const r0 = SHEET_ROWS[0];
+    const cap = boot("ko").leaders(r0.lead[0], r0.lead[1], r0.lead[2]).mine(r0.r).render();
+    ok(cap.includes("(" + fap.toFixed(1) + "% · " + pap.toFixed(1) + "%)"),
+       "캡션의 '계산 순위 그대로' 쌍도 실측과 같다",
+       fap.toFixed(1) + "% / " + pap.toFixed(1) + "% · 캡션: " +
+       (/계산 순위 그대로\([\d.]+% · [\d.]+%\)/.exec(cap) || ["없음"])[0]);
+    ok(worseTop.length === 0 && worseOv.length === 0,
+       "캡션의 '한 행도 나빠지지 않았습니다' 가 실제로 참이다",
+       "#1 " + worseTop.join(", ") + " · 겹침 " + worseOv.join(", "));
+  }
+
   // ── 넷을 고르는 방법: 포화를 보며 한 명씩 (2026-09-12) ──
   // 자르기(단독 상위 4명)보다 나빠지는 행이 하나도 없어야 한다. 하나라도 있으면
   // 탐욕이 뒤로 미루는 선택 때문이므로, 그때는 방법을 다시 봐야 한다.
