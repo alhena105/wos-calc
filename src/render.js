@@ -177,23 +177,29 @@ function render(d){
  // 실측 대가: 전투 배율 평균 −0.27% · 최대 −2.09% (여유폭과 같은 크기다).
  // 시트 행의 조이너는 **칸 단위**다. 아직 안 채운 칸을 메우는 후보만 우대한다 —
  // 그래야 "제시* 칸"에 제시와 제셀을 둘 다 넣고 시트대로라고 우기는 일이 없다.
+ // stack:1 인 영웅(노라)만 두 번 이상 고를 수 있다. 근거는 data.js 주석 참고 —
+ // 시트 세대 탭이 노라만 2~3장 겹쳐 쓰고 다른 영웅은 한 번도 안 겹친다.
+ // ⚠️ "고를 수 있다"지 "쌓아라"가 아니다. 둘째 노라는 같은 A·D 칸에 합연산으로 들어가
+ // 자기끼리 포화하므로, 모델이 더 낫다고 볼 때만 뽑힌다(순수 계산에서는 사실상 안 뽑힌다).
+ const canRepeat=(out,c)=>c.h.stack||out.indexOf(c)<0;
  const pick4=list=>{
   const cells=comp?comp.j:null;
   const out=[];
   for(let k=0;k<4;k++){
    let best=null,bv=-1;
-   list.forEach(c=>{if(out.indexOf(c)>=0)return;
+   list.forEach(c=>{if(!canRepeat(out,c))return;
     const v=comboAll(out.concat([c]));
     if(v>bv+1e-9){bv=v;best=c;}});
    if(!best)break;
    if(cells&&SHEET_EDGE>0){
     // 이미 out 이 채운 칸은 뺀다 — **한 명이 한 칸만** 먹는다(먼저 비어 있는 칸부터).
+    // 노라를 두 장 골랐으면 노라 칸도 두 개가 찬다 — 시트가 세 칸을 노라로 적은 행이 그 자리다.
     const used=[];
     out.forEach(x=>{for(let i=0;i<cells.length;i++)
       if(used.indexOf(i)<0&&cells[i].indexOf(x.h.id)>=0){used.push(i);break;}});
     const opens=cells.filter((cell,i)=>used.indexOf(i)<0);
     let alt=null,av=-1;
-    list.forEach(c=>{if(out.indexOf(c)>=0)return;
+    list.forEach(c=>{if(!canRepeat(out,c))return;
      if(!opens.some(cell=>cell.indexOf(c.h.id)>=0))return;
      const v=comboAll(out.concat([c]));
      if(v>=bv*(1-SHEET_EDGE)-1e-12&&v>av){av=v;alt=c;}});
@@ -218,6 +224,9 @@ function render(d){
      comp.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+"</b>. Where our figures are <b>within 2%, the sheet wins</b> — that is the size of our own error bar (nudging the unfounded <code>DW.infantry</code> and <code>NA_SHARE</code> assumptions moves the multiplier 1–2% and changes over half the rows), so the model cannot separate them. <b>No such nudge is applied to lineups the sheet does not cover.</b>")+"</p>":"")+
   '<p class="cap">'+L("넷은 ⑤ 순위 상위 4명을 그냥 자른 게 아니라, <b>포화를 보며 한 명씩</b> 골랐습니다 — 매번 “여기에 더했을 때 전투 배율이 가장 커지는 한 명”입니다. 자르기만 하면 <b>제시·제셀·제로니모처럼 같은 A칸에 들어가는 영웅이 나란히 뽑힙니다</b>(각자 ×1.250 이지만 둘째는 ×1.200, 셋째는 ×1.167 로 떨어집니다). 그래서 순위표 1~4위와 명단이 다를 수 있습니다.",
      "The four are not the top four of ranking ⑤ — each is picked in turn as <b>whoever raises the combined multiplier most</b>, given the ones already chosen. Plain truncation lines up heroes that share a slot (Jessie, Jasser and Jeronimo all fill A: ×1.250, then ×1.200, then ×1.167). So this list can differ from rows 1–4 of the table.")+"</p>"+
+  (top.filter((x,i)=>top.indexOf(x)!==i).length?'<p class="cap">'+
+   L("같은 영웅이 두 번 나온 것은 <b>노라만 허용</b>하기 때문입니다 — 시트 세대 탭이 노라만 2~3장 겹쳐 쓰고 다른 영웅은 한 번도 겹치지 않습니다(볼트 「랠리 참여자 영웅 가이드」도 “스택 시에도 효율이 좋은 특수 케이스”라고 적었습니다). 둘째 노라도 같은 A·D 칸에 합연산으로 들어가 <b>자기끼리 포화</b>하므로, 그래도 이득일 때만 뽑힙니다.",
+     "The same hero appears twice because <b>only Norah may repeat</b> — the sheet stacks her two or three deep in ten rows and never doubles anyone else (the vault guide calls her “a special case that stays efficient when stacked”). A second Norah still adds into the same A and D slots, so it <b>saturates against itself</b> and is only taken when it still wins.")+"</p>":"")+
   '<p class="cap">'+L("위 배율은 네 명의 단독 배율을 곱한 값이 아니라 <b>같은 칸에 겹치는 분을 합쳤을 때</b>의 값입니다. 순위표의 배율을 넣는 순서대로 곱하면 더 크게 나오는데, 그건 포화를 빼먹은 숫자입니다. 그리고 <b>생존 칸도 같은 무게로 셉니다</b> — 전투비를 양쪽 식으로 펴면 <code>(내딜증 × 내감소) ÷ (상대딜증 × 상대감소)</code> 라, 내 딜 칸과 내 감소 칸이 결과에 똑같이 곱해집니다.",
      "This multiplier is not the product of the four individual figures — it is what you get after <b>adding up the parts that land in the same slot</b>. Multiplying the ranking figures together gives a larger number that ignores saturation. <b>Survival slots count the same</b>: expand the kill ratio for both sides and it reduces to <code>(my damage-up × my reduction) ÷ (theirs × theirs)</code>, so your damage slots and your reduction slots multiply the outcome equally.")+"</p>"+
   (rank.filter(x=>x.dup).length?'<p class="cap">'+L("🚫 리더 중복 금지: ","🚫 Cannot double as joiners: ")+rank.filter(x=>x.dup).map(x=>esc(HN(x.h))).join(" · ")+"</p>":"")+"</div>"+

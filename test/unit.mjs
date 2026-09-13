@@ -764,8 +764,14 @@ section("전투 배율 — bk 겹침 · pc 기대값");
   // 이 검사가 필요로 하는 건 "bk X 한 명 + 그와 같은 칸에 들어가는 조이너 + pc 한 명"뿐이다.
   ok(ids.includes("norah"), "추천에 bk X 조이너(노라)가 있다", ids.join(","));
   ok(ids.includes("mia"), "추천에 pc 조이너(미아)가 있다", ids.join(","));
-  ok(ids.some(id => id !== "norah" && E.byId[id].exp[0].slot === "A"),
-     "노라와 같은 A칸에 들어가는 조이너가 함께 있다 (겹침이 실제로 생기는 자리)", ids.join(","));
+  // A칸에 기여하는 조이너가 둘 이상이어야 겹침이 실제로 생긴다.
+  // 노라가 두 장(stack:1) 뽑혀도 둘 다 bk:"A" 라 성립한다 — 이름이 달라야 할 이유는 없다.
+  const inA = id => {
+    const e = E.byId[id].exp[0];
+    return e.slot === "A" || e.bk === "A" || (e.also && e.also.bk === "A");
+  };
+  ok(ids.filter(inA).length >= 2,
+     "A칸에 들어가는 조이너가 둘 이상이다 (겹침이 실제로 생기는 자리)", ids.join(","));
 
   const rr = E.norm(45, 5, 50);
   const mkBase = () => {
@@ -1009,7 +1015,27 @@ section("애매하면 시트 우선");
     ok(!a.js('!!matchComp(["logan","philly","zinman"],norm(10,10,80))'),
        "리더가 같아도 병비가 멀면 매칭되지 않는다");
   }
-  // ③ 사용자가 잡은 자리: 로건·필리·진먼 60/40/0 Gen 3 → 시트는 미아·패트릭·제시*·서윤
+  // ③ 중복은 stack:1 인 영웅(노라)에게만 허용된다
+  {
+    ok(E.HEROES.filter(h => h.stack).map(h => h.id).join() === "norah",
+       "stack:1 은 노라 하나뿐이다", E.HEROES.filter(h => h.stack).map(h => h.id).join());
+    let dupRows = 0;
+    const bad = [];
+    for (const row of SHEET_ROWS) for (const edge of [0, 0.02]) {
+      const ids = pick(row, edge).ids;
+      const cnt = {};
+      ids.forEach(i => { cnt[i] = (cnt[i] || 0) + 1; });
+      for (const id of Object.keys(cnt)) {
+        if (cnt[id] < 2) continue;
+        if (id !== "norah") bad.push("G" + row.gen + " " + row.r.join("/") + " " + id + "×" + cnt[id]);
+        else if (edge === 0.02) dupRows++;
+      }
+    }
+    ok(bad.length === 0, "노라 말고는 아무도 중복으로 뽑히지 않는다", bad.slice(0, 3).join(", "));
+    ok(dupRows >= 3, "노라 중복이 실제로 쓰이는 행이 있다 (예외가 죽어 있지 않다)", String(dupRows));
+    note("시트 우선 상태에서 노라를 2장 이상 뽑는 행 " + dupRows + "/" + SHEET_ROWS.length);
+  }
+  // ④ 사용자가 잡은 자리: 로건·필리·진먼 60/40/0 Gen 3 → 시트는 미아·패트릭·제시*·서윤
   {
     const row = {lead: ["logan", "philly", "zinman"], r: [60, 40, 0], gen: 3};
     const on = pick(row, 0.02);

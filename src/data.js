@@ -8,6 +8,12 @@
 //   올리는(내리는) 스킬이라는 표시다. 이런 스킬은 일반 칸과 같은 스탯이므로 칸을 우회하면 안 되고,
 //   병종 딜 지분(dmg) 또는 병력 지분(sur)으로 환산해 그 칸에 합산한다. 근거는 wosheroes 원문이고,
 //   "extra damage / 추가피해" 처럼 타격에 붙는 것은 다른 기전이라 bk 를 달지 않는다.
+// stack:1 — 이 영웅만 조이너로 **중복으로 들여보낸다**는 표시. 현재 노라 하나뿐이다.
+//   근거: 시트 세대 탭이 10개 행에서 노라를 2~3장 곹쳐 쓰고(다른 영웅은 한 번도 안 곹친다),
+//   볼트 「랠리 참여자 영웅 가이드」 257행이 "노라의 스킬이 스택 시에도 효율이 좋은 특수 케이스"라고 적었다.
+//   ⚠️ 이건 **고를 수 있게만** 해 주는 플래그지 "쌀라"는 지시가 아니다. 둘째 노라는 같은 A·D 칸에
+//   합연산으로 들어가 자기끼리 포화하므로, 우리 모델은 그게 더 나을 때만 집는다.
+//   순수 계산(SHEET_EDGE=0)에서는 둘째 노라가 사실상 안 뽑힌다 — 그게 정상이다.
 // slot:"AH" — 위 규칙의 짝이다. 원문이 "extra damage / extra attack / N% damage" 처럼
 //   **타격에 붙는** 것은 Damage Dealt 스탯이 아니므로 A칸(합연산)에 넣지 않는다.
 //   어느 칸인지는 자료가 없으니 칸을 만들지도 않는다 — 자기 계수로만 곱한다(포화 없음).
@@ -125,7 +131,7 @@ const HEROES = [
       {n:"Rampant",slot:"X",k:"dmg",v:1.07,tgt:"infantry",bk:"A",also:{slot:"X",k:"dmg",v:.535,tgt:"marksman",bk:"A"},t:"보병 피해량 +200% · 궁병 +100% (10회 동안 매 공격 85%로 감쇠 → 평균 0.535 환산)",te:"infantry damage +200%, marksmen +100% (decays over 10 procs)"},
       {n:"Blitz",slot:"AH",v:.50,p:"25%",pe:"25% chance",t:"25% 확률 200% 피해",te:"25% chance: 200% damage"}],
  w:{side:"defender",stat:"Attack",name:"Goliath"}},
-{id:"norah",s:1,kr:"노라",en:"Norah",cls:"lancer",gen:5,rar:"leg",
+{id:"norah",s:1,stack:1,kr:"노라",en:"Norah",cls:"lancer",gen:5,rar:"leg",
  exp:[{n:"Combined Arms",slot:"X",k:"dmg",v:.15,tgt:"inf+mar",bk:"A",also:{slot:"X",k:"sur",v:.15,tgt:"inf+mar",bk:"D"},t:"보병·궁병 받피 −15% & 피해량 +15%",te:"infantry & marksmen: damage taken −15% and damage +15%"},
       {n:"Sneak Strike",slot:"X",k:"dmg",v:.20,tgt:"lancer",t:"창병 20% 확률 추가피해 +100%",te:"lancers, 20% chance: +100% extra damage"},
       {n:"Momentum",slot:"A",v:.25,p:"창병 5공격마다",pe:"lancers, every 5th attack",t:"피해량 +25% & 받피 −25% (2턴)",te:"damage +25% & damage taken −25% (2 turns)",also:{slot:"D",v:.25}}],
