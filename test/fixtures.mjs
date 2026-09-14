@@ -174,6 +174,12 @@ export const X_BUCKETED = [
   {id:"estrella", n:"Splendid Scene",       bk:"A", alsoBk:"D"},
   {id:"viveca",   n:"Children of the Mist", bk:"A", alsoBk:"D"},
   {id:"gordon",   n:"Chemical Terror",      bk:"A"},
+  // 2026-09-14 wosheroes 44명 재대조에서 추가: "reducing Damage Taken by 20% for Marksmen … increasing
+  // Damage Dealt by 20% for Lancers" — 노라와 같은 꼴인데 tgt:"mar+lan" 한 항목으로 뭉쳐 있었다.
+  {id:"edith",    n:"Strategic Balance",    bk:"D", alsoBk:"A"},
+  // 2026-09-14: "reducing damage taken by Lancers and Marksmen by 30% and Infantry by 70%" — 문자 그대로 Damage Taken.
+  // 창·궁 몫(also)을 더하면서 같이 붙였다. 4회마다 공격을 쉬는 비용은 못 싣는다(data.js 주석).
+  {id:"ahmose",   n:"Viper Formation",      bk:"D", alsoBk:"D"},
 ];
 
 // ── 시트 세대별 행 — 조이너 순위 대조용 ──────────────────────

@@ -27,12 +27,13 @@ function dmgShare(t,r){
 // v 는 1병종 기준값이므로 (1−(1−pc)^n)/pc 를 곱해 되돌린다 (n=1 이면 그대로).
 // 근거: 볼트 「랠리 조이너 선정 규칙·개리슨 운영 (Ton)」 §6 — 미아 3병종 기대값 43.75%.
 function nCls(r){return (r.inf>0?1:0)+(r.lan>0?1:0)+(r.mar>0?1:0);}
+// 병종이 하나도 없으면(n=0) pc 스킬의 기대값은 0 이다 — 예전에는 원값을 그대로 돌려줬다(2026-09-14 감사).
 function eVal(e,r){const n=nCls(r);
- return e.pc&&n>0?e.v*(1-Math.pow(1-e.pc,n))/e.pc:e.v;}
+ return e.pc?(n>0?e.v*(1-Math.pow(1-e.pc,n))/e.pc:0):e.v;}
 // 같은 스킬이 k장 있을 때의 기대값. pc 는 **시행 횟수만** 늘어나므로 k 에 비례하지 않는다 —
 // 시행이 n·k 번이 될 뿐이라 곧 포화한다. 일반 스킬은 그냥 k 배다.
 function eK(e,r,k){const n=nCls(r);
- return e.pc&&n>0?e.v*(1-Math.pow(1-e.pc,n*k))/e.pc:e.v*k;}
+ return e.pc?(n>0?e.v*(1-Math.pow(1-e.pc,n*k))/e.pc:0):e.v*k;}
 // 이미 have 장 있을 때 한 장 더 넣는 값. have=0 이면 eVal 과 같다.
 // ⚠️ 미아를 리더로 쓰고 조이너로 또 넣을 때 이게 없으면 두 번째 장이 +43.75%p 로 잡힌다.
 // 실제로는 3병종 발동이 87.5% → 98.4% 로 오를 뿐이라 **+5.5%p** 다.
@@ -48,6 +49,9 @@ function nbAdd(v,have){return (1+(have+1)*v)/(1+have*v);}
 // X(병종 한정) 스킬의 환산 지분 — 딜은 딜 지분, 생존은 병력 지분
 function xShare(q,r){return q.k==="sur"?tgtRatio(q.tgt,r)/100:dmgShare(q.tgt,r);}
 const NA_SHARE=.8; // 일반공격이 총딜에서 차지하는 비중 가정
+// An(일반공격 한정) 칸에 넣을 값 — 총딜 = NA_SHARE×일반공격×(1+Σv) + (1−NA_SHARE)×스킬 이므로
+// 칸값은 정확히 1+NA_SHARE×Σv 다. 리더든 조이너든 같은 잣대로 이 칸에 합산한다(2026-09-14).
+function anVal(e,r){return e.slot==="An"?e.v*NA_SHARE:eVal(e,r);}
 const tgtName=i18nFill({},function(){return{infantry:L("보병","infantry"),lancer:L("창병","lancers"),marksman:L("궁병","marksmen"),"inf+mar":L("보병+궁병","infantry+marksmen"),"mar+lan":L("궁병+창병","marksmen+lancers")};});
 function tgtStat(t,r){const v=tgtRatio(t,r);return v<5?["dead",L("사망","dead"),v]:v<20?["weak",L("약함","weak"),v]:["ok",L("정상","ok"),v];}
 
@@ -219,7 +223,11 @@ function calc(){
      return;}
    // AH(타격 계열)는 칸이 아니다 — 합연산 대신 자기 계수로 곱해서 따로 모은다.
    if(e.slot==="AH"){const v=eVal(e,r);hits.push({hero,e,v});hitMul*=1+v;return;}
-   add(e.slot,eVal(e,r)); if(e.also)add(e.also.slot,eVal(e.also,r));
+   // An(일반공격 한정)도 칸이다 — 값을 일반공격 비중(NA_SHARE)으로 환산해 합산한다.
+   // 예전에는 리더는 원값(0.30)을 칸에 넣고 조이너는 칸 밖에서 ×(1+0.24) 로 곱했다 →
+   // 리더 레이나 행에서 조이너 레이나가 자기 포화를 안 겪어 ×1.240(정확 ×1.194)로 부풀었다(2026-09-14).
+   add(e.slot,anVal(e,r),e.slot==="An"?L(" (일반공격 비중 "+(NA_SHARE*100)+"% 환산)"," (normal-attack share "+(NA_SHARE*100)+"%)"):"");
+   if(e.also)add(e.also.slot,eVal(e.also,r));
  }));
 
  // ── 위젯 ──
@@ -241,7 +249,10 @@ function calc(){
    // 다만 그 영웅의 스킬은 이미 리더 쪽에서 칸에 들어가 있으므로 **한 장 더 얹는 값**으로 잰다.
    const have=lid.has(h.id)?1:0;
    if(e.slot==="X"){const[st,lbl,v]=tgtStat(e.tgt,r);cond=st+"|"+tgtName[e.tgt]+" "+v.toFixed(0)+"% ("+lbl+")";
-     if(st==="dead")return{h,e,mul:1,detail:[L("병종 비중 부족 → 사망","class share too low → dead")],cond,dup:lid.has(h.id)};
+     // 2026-09-14: 여기 있던 "dead 면 mul:1 로 조기 반환" 절벽을 없앴다. 리더 쪽 bk X 는 dead 여도 지분 비례값이
+     // 칸에 들어가는데 조이너만 0 으로 잘려 같은 스킬이 한쪽에서만 사라졌다(레니 창병 4.9% ×1.000 / 5.0% ×1.075).
+     // 지분 환산(xShare)이 이미 연속으로 줄이므로 절벽은 덧붙은 규칙이었고 임계값 5% 의 근거도 없다.
+     // 사망 라벨(cond)은 안내로 남고, pool 의 mul>1.001 필터가 실질적으로 0 인 것만 거른다.
      // 한 스킬이 두 병종에 걸리면 각각 지분을 곱한다 — 서로 다른 축이라 곱연산이다
      const part=x=>{const sh=xShare(x,r);
        detail.push(L(tgtName[x.tgt]+" "+(x.k==="sur"?"병력":"딜")+" 지분 "+(sh*100).toFixed(0)+"% 환산",
@@ -252,8 +263,6 @@ function calc(){
        if(have)detail.push(L("리더가 이미 들고 있음 → 자기끼리 합연산","already on the leader → adds to itself"));
        return nbAdd(x.v*sh,have);};
      mul=part(e); if(e.also&&e.also.slot==="X")mul*=part(e.also);
-   }else if(e.slot==="An"){
-     mul=1+e.v*NA_SHARE;detail.push(L("일반공격 비중 "+(NA_SHARE*100)+"% 가정","assumes normal attacks are "+(NA_SHARE*100)+"% of damage"));
    }else if(e.slot==="AH"){
      // 칸이 아니라 자기 계수다 → 리더가 A칸을 얼마나 채웠든 포화를 겪지 않는다.
      mul=nbAdd(eVal(e,r),have);
@@ -270,7 +279,10 @@ function calc(){
            "already on the leader → only "+nCls(r)+" more rolls: fires "+((1-Math.pow(1-e.pc,nCls(r)*2))*100).toFixed(1)+"%, second copy adds +"+(eAdd(e,r,1)*100).toFixed(2)+"pp")
        :L("병종 "+nCls(r)+"종 → 발동 "+((1-Math.pow(1-e.pc,nCls(r)))*100).toFixed(1)+"% · 기대값 "+(eVal(e,r)*100).toFixed(2)+"%",
            nCls(r)+" troop types → fires "+((1-Math.pow(1-e.pc,nCls(r)))*100).toFixed(1)+"% · EV "+(eVal(e,r)*100).toFixed(2)+"%"));
-     step(e.slot,eAdd(e,r,have)); if(e.also)step(e.also.slot,e.also.v);
+     if(e.slot==="An")detail.push(L("일반공격 비중 "+(NA_SHARE*100)+"% 가정 · 같은 칸 합연산","assumes normal attacks are "+(NA_SHARE*100)+"% of damage · adds in the same slot"));
+     // also 도 같은 함수(eAdd)로 — 지금은 also 에 pc 가 없어 값이 같지만, 2026-09-12 에 comboAll 이 e.v 를 써서
+     // 미아를 과소계상한 것과 같은 함정이 여기 열려 있었다(2026-09-14 감사, 예방 수정 · 값 불변).
+     step(e.slot,e.slot==="An"?anVal(e,r):eAdd(e,r,have)); if(e.also)step(e.also.slot,eAdd(e.also,r,have));
    }
    return{h,e,mul,detail,cond,dup:lid.has(h.id)};
  }).filter(Boolean);

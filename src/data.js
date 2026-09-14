@@ -88,7 +88,9 @@ const HEROES = [
  w:{side:"defender",stat:"Attack",name:"Dragonbreath"}},
 {id:"philly",s:1,kr:"필리",en:"Philly",cls:"lancer",gen:2,rar:"leg",
  exp:[{n:"Vigor Tactics",slot:"B",v:.15,t:"공격력 +15% / 방어력 +10%",te:"attack +15% / defense +10%",also:{slot:"DEF",v:.10}},
-      {n:"Dosage Boost",slot:"AH",v:.50,p:"25%",pe:"25% chance",t:"25% 확률 200% 피해",te:"25% chance: 200% damage"},
+      // 2026-09-14 정정: "25% chance of dealing 200% damage" — 그 공격이 200% 가 되는 것이라 증분은 +100% → .25×1.00 = .25.
+      // 레이나 Shadow Blade 는 "extra attack" 이라 별도 타격이므로 .50 그대로다.
+      {n:"Dosage Boost",slot:"AH",v:.25,p:"25%",pe:"25% chance",t:"25% 확률 200% 피해",te:"25% chance: 200% damage"},
       {n:"Energizing Shot",slot:"D",v:.20,p:"40%",pe:"40% chance",t:"40% 확률 받는 피해 −50%",te:"40% chance: damage taken −50%"}],
  w:{side:"defender",stat:"Health",name:"First Aid Training"}},
 {id:"alonso",kr:"알론소",en:"Alonso",cls:"marksman",gen:2,rar:"leg",
@@ -104,7 +106,9 @@ const HEROES = [
  w:{side:"defender",stat:"Defense",name:"Strong Protection"}},
 {id:"mia",s:1,kr:"미야",en:"Mia",cls:"lancer",gen:3,rar:"leg",
  exp:[{n:"Bad Luck Streak",slot:"G",v:.25,p:"50%",pe:"50% chance",pc:.5,t:"병종마다 50% 확률 적 받는 피해 +50%",te:"each troop type: 50% chance, enemy damage taken +50%"},
-      {n:"Lucky Charm",slot:"A",v:.25,p:"50%",pe:"50% chance",t:"50% 확률 피해량 +50%",te:"50% chance: damage +50%"},
+      // 2026-09-14 정정: 원문 "granting a 50% chance of boosting troops' Attack by 50%" — A(피해량)가 아니라 B(공격력).
+      // 형제 문장인 몰리 Ice Dominion · 바히티 Fluorescence 는 "damage dealt" 라 A 가 맞고, 미아만 "Attack" 이다.
+      {n:"Lucky Charm",slot:"B",v:.25,p:"50%",pe:"50% chance",t:"50% 확률 공격력 +50%",te:"50% chance: attack +50%"},
       {n:"Ritual Deciphering",slot:"D",v:.20,p:"40%",pe:"40% chance",t:"40% 확률 받는 피해 −50%",te:"40% chance: damage taken −50%"}],
  w:{side:"rally",stat:"Attack",name:"Rally of Fate"}},
 {id:"greg",kr:"그렉",en:"Greg",cls:"marksman",gen:3,rar:"leg",
@@ -114,7 +118,12 @@ const HEROES = [
  w:{side:"rally",stat:"Health",name:"Trumpet of Justice"}},
 // ── Gen 4 ──
 {id:"ahmose",kr:"아모세",en:"Ahmose",cls:"infantry",gen:4,rar:"leg",
- exp:[{n:"Viper Formation",slot:"X",k:"sur",v:.35,tgt:"infantry",t:"4공격마다 2턴 보병 받피 −70%, 창·궁 −30%",te:"every 4th attack, 2 turns: infantry damage taken −70%, lancer/marksman −30%"},
+ exp:[// 2026-09-14 정정: 창·궁 30% 몫(.30×2/4 = .15)이 빠져 있었다 — 헥터 Rampant 와 같은 "두 병종 다른 값" 구조라 also 로 단다.
+      // 보병이 4회마다 공격을 쉬는 비용은 모델에 자리가 없어 못 싣는다(예전과 같다).
+      // 원문이 문자 그대로 "reducing damage taken" 이라 bk:"D" 다(노라·에디스와 같은 규칙). 예전엔 빠져 있었다.
+      // ⚠️ "보병이 4회마다 공격을 쉰다"는 비용은 여전히 안 실린다 → 아모세는 과대평가 쪽이고, 시트 미등재라 #rec 에는 안 들지만
+      // #recAll(이론) 에는 든다(2026-09-14 실측: bk 없이 39행 · bk 넣고 16행 · also 없던 예전 2행).
+      {n:"Viper Formation",slot:"X",k:"sur",v:.35,tgt:"infantry",bk:"D",also:{slot:"X",k:"sur",v:.15,tgt:"mar+lan",bk:"D"},t:"4공격마다 2턴 보병 받피 −70%, 창·궁 −30%",te:"every 4th attack, 2 turns: infantry damage taken −70%, lancer/marksman −30%"},
       {n:"Prayer of Flame",slot:"X",k:"dmg",v:1.0,tgt:"infantry",bk:"A",t:"보병 피해량 +100%",te:"infantry damage +100%"},
       {n:"Blade of Light",slot:"X",k:"dmg",v:.60,tgt:"infantry",t:"보병 공격당 피해 +60% & 대상 받피 +25%",te:"infantry, per attack: +60% damage & target takes +25% damage"}],
  w:{side:"defender",stat:"Health",name:"Oath of Guardian"}},
@@ -132,7 +141,7 @@ const HEROES = [
 {id:"hector",kr:"헥터",en:"Hector",cls:"infantry",gen:5,rar:"leg",
  exp:[{n:"Survival Instincts",slot:"D",v:.20,p:"40%",pe:"40% chance",t:"40% 확률 받는 피해 −50%",te:"40% chance: damage taken −50%"},
       {n:"Rampant",slot:"X",k:"dmg",v:1.07,tgt:"infantry",bk:"A",also:{slot:"X",k:"dmg",v:.535,tgt:"marksman",bk:"A"},t:"보병 피해량 +200% · 궁병 +100% (10회 동안 매 공격 85%로 감쇠 → 평균 0.535 환산)",te:"infantry damage +200%, marksmen +100% (decays over 10 procs)"},
-      {n:"Blitz",slot:"AH",v:.50,p:"25%",pe:"25% chance",t:"25% 확률 200% 피해",te:"25% chance: 200% damage"}],
+      {n:"Blitz",slot:"AH",v:.25,p:"25%",pe:"25% chance",t:"25% 확률 200% 피해",te:"25% chance: 200% damage"}],   // 필리 Dosage Boost 와 같은 문장·같은 정정(2026-09-14)
  w:{side:"defender",stat:"Attack",name:"Goliath"}},
 {id:"norah",s:1,stack:1,kr:"노라",en:"Norah",cls:"lancer",gen:5,rar:"leg",
  exp:[{n:"Combined Arms",slot:"X",k:"dmg",v:.15,tgt:"inf+mar",bk:"A",also:{slot:"X",k:"sur",v:.15,tgt:"inf+mar",bk:"D"},t:"보병·궁병 받피 −15% & 피해량 +15%",te:"infantry & marksmen: damage taken −15% and damage +15%"},
@@ -157,12 +166,17 @@ const HEROES = [
  w:{side:"rally",stat:"Lethality",name:"Wistful Enchantment"}},
 {id:"wayne",kr:"웨인",en:"Wayne",cls:"marksman",gen:6,rar:"leg",
  exp:[{n:"Thunder Strike",slot:"AH",v:.25,p:"4턴마다",pe:"every 4 turns",t:"4턴마다 전 부대 추가공격 100%",te:"every 4 turns: all troops deal a 100% extra attack"},
-      {n:"Roundabout Hit",slot:"X",k:"dmg",v:.40,tgt:"marksman",t:"궁병 격턴 적 창병 +40%/궁병 +20% 추가피해",te:"marksmen, every other turn: +40% extra vs enemy lancers, +20% vs marksmen"},
+      // 2026-09-14 정정: "On every other attack" 주기형 단발 → .40÷2 = .20. 같은 문장인 블랑쉬 Crimson Sniper ·
+      // 카라 Witch's Wrath 는 이미 .20 이었고 웨인만 원값이 들어가 있었다(웨인 리더 4행 과대).
+      {n:"Roundabout Hit",slot:"X",k:"dmg",v:.20,tgt:"marksman",p:"2공격마다",pe:"every 2nd attack",t:"궁병 격턴 적 창병 +40%/궁병 +20% 추가피해",te:"marksmen, every other turn: +40% extra vs enemy lancers, +20% vs marksmen"},
       {n:"Fleet",slot:"CRIT",v:.25,t:"전 부대 치명률 +25%",te:"all troops crit rate +25%"}],
  w:{side:"defender",stat:"Lethality",name:"Offensive Defense"}},
 // ── Gen 7 ──
 {id:"edith",kr:"에디스",en:"Edith",cls:"infantry",gen:7,rar:"leg",
- exp:[{n:"Strategic Balance",slot:"X",k:"sur",v:.20,tgt:"mar+lan",t:"궁병 받피 −20% / 창병 피해량 +20%",te:"marksman damage taken −20% / lancer damage +20%"},
+ // 2026-09-14 정정: 한 스킬의 두 효과를 tgt:"mar+lan" 한 항목(k:"sur")으로 뭉쳐 창병까지 생존 효과를 받고
+ // 창병 딜↑는 통째로 빠져 있었다. 원문 "reducing Damage Taken by 20% for Marksmen … increasing Damage Dealt
+ // by 20% for Lancers" — 문자 그대로 두 스탯이라 노라 Combined Arms 와 같은 꼴(also + bk)이다.
+ exp:[{n:"Strategic Balance",slot:"X",k:"sur",v:.20,tgt:"marksman",bk:"D",also:{slot:"X",k:"dmg",v:.20,tgt:"lancer",bk:"A"},t:"궁병 받피 −20% / 창병 피해량 +20%",te:"marksman damage taken −20% / lancer damage +20%"},
       {n:"Ironclad",slot:"X",k:"sur",v:.20,tgt:"infantry",t:"보병 받는 피해 −20%",te:"infantry damage taken −20%"},
       {n:"Steel Sentinel",slot:"C",v:.25,t:"전 부대 체력 +25%",te:"all troops health +25%"}],
  w:{side:"defender",stat:"Health",name:"Fortworks"}},

@@ -45,7 +45,7 @@ function note(t) { console.log("   " + t); }
 
 // ── 로더 ───────────────────────────────────────────────────────────────
 const EXPORTS = "LANG,L,HN,CN,STR,HEROES,SLOTS,ORDER,byId,wpct,norm,tgtRatio,DW,dmgShare," +
-  "NA_SHARE,tgtName,tgtStat,COUNTERS,BAND_TOL,ROW_TOL,MECH,dist,sheetVerdict,garrisonVerdict,eVal,eK,eAdd,xShare,nCls,matchComp,matchComps,compRivals,SHEET_COMPS";
+  "NA_SHARE,anVal,tgtName,tgtStat,COUNTERS,BAND_TOL,ROW_TOL,MECH,dist,sheetVerdict,garrisonVerdict,eVal,eK,eAdd,xShare,nCls,matchComp,matchComps,compRivals,SHEET_COMPS";
 function load(lang) {
   const code = src("i18n.js") + src("data.js") + src("engine.js") +
     "\n;globalThis.__api={" + EXPORTS + "};\n";
@@ -547,7 +547,8 @@ section("조이너 추천 · T12 경고 (렌더)");
       part(e); if (e.also && e.also.slot === "X") part(e.also);
       continue;
     }
-    if (e.slot === "An") { cond *= 1 + e.v * E.NA_SHARE; continue; }
+    // An 은 칸이다 — NA_SHARE 환산값을 그 칸에 합산한다 (2026-09-14. 예전엔 계수로 곱했다)
+    if (e.slot === "An") { b.An += e.v * E.NA_SHARE; continue; }
     // AH(타격 계열)는 칸이 아니다 — 합연산에 들어가지 않고 자기 계수로 곱한다
     if (e.slot === "AH") { cond *= 1 + e.v; continue; }
     // pc(미아)는 편성 병종 수로 기대값을 다시 낸다 — 원값 0.25 를 더하면 안 된다
@@ -754,6 +755,60 @@ section("조이너 동률 타이브레이크");
 }
 
 // ── N+6b. 전투 배율 — bk(X) 겹침과 pc 기대값 회귀 ──────────────────────
+// ── N+6b. An(일반공격 한정)은 칸이다 — 리더도 조이너도 NA_SHARE 환산값을 같은 칸에 합산 ──
+// 2026-09-14 독립 공식 시뮬레이터(Kills ≈ √병력 × 공격×파괴력 ÷ 적방어×적체력 × SkillMod)와
+// 54행 전수 대조에서 잡혔다. 레이나가 리더인 4행에서만 엔진이 독립 계산보다 높았다 —
+// 리더는 An 칸에 원값 0.30 을 넣고 조이너는 칸 밖에서 ×1.24 를 곱해서, 조이너 레이나가
+// 자기 포화를 안 겪었다(×1.240 · 정확 ×1.194). 탐욕이 전수 최적을 놓친 행도 정확히 그 4행이었다.
+section("An 칸 — 리더·조이너 같은 잣대 (2026-09-14)");
+{
+  const r = E.norm(60, 40, 0);
+  const reina = E.byId.reina.exp[0];
+  ok(reina.slot === "An" && Math.abs(E.anVal(reina, r) - 0.24) < 1e-12, "레이나 S1 은 An 이고 칸값은 0.30×NA_SHARE = 0.24");
+  const rankOf = (a, id) => {
+    const html = a.render();
+    const tb = /⑤[\s\S]*?<tbody>([\s\S]*?)<\/tbody>/.exec(html)[1];
+    const tr = tb.split("<tr").find(x => new RegExp("heroes/" + id + "\.webp").test(x));
+    return tr ? +(/×([\d.]+)<div/.exec(tr) || [0, 0])[1] : null;
+  };
+  // 리더 레이나 → 조이너 레이나는 (1.24+0.24)/1.24
+  // ⑤ 는 14행뿐이라 아모세(Viper also 추가 후 ×1.24)가 리더인 편성에서는 레이나가 15위로 밀려 안 보인다 → 나탈리아로
+  const m1 = rankOf(boot("ko").leaders("natalia", "reina", "lynn").mine([60, 40, 0]).gcap(4), "reina");
+  ok(m1 !== null && Math.abs(m1 - 1.194) < 1e-3, "리더 레이나 행에서 조이너 레이나는 ×1.194 (자기 포화)", "실제 ×" + m1);
+  // 리더 없이 → ×1.240 (옛 동작을 포함한다)
+  const m0 = rankOf(boot("ko").leaders("natalia", "philly", "lynn").mine([60, 40, 0]).gcap(4), "reina");
+  ok(m0 !== null && Math.abs(m0 - 1.24) < 1e-3, "리더가 An 을 안 들면 조이너 레이나는 ×1.240 그대로", "실제 ×" + m0);
+  // 다른 영웅의 An(카라 Mech Pet)도 같은 칸 "An" 이다 — 리더 카라가 있으면 조이너 레이나는 같은 step 경로로 깎인다.
+  // (⑤ 는 14행만 그려서 gcap 17 에서는 레이나가 표 밖이라 화면으로는 못 본다 → 데이터·환산값으로 지킨다)
+  const cara = E.byId.cara.exp.find(e => e.slot === "An");
+  ok(!!cara && Math.abs(E.anVal(cara, r) - 0.24) < 1e-12, "카라 Mech Pet 도 An 칸 · 환산값 0.24 (레이나와 합연산)");
+  // 추천 패널 배율도 칸 규칙으로 — 레이나 리더 60/40 에서 #rec 의 넷을 칸에 다 넣고 다시 잰 값과 같다
+  {
+    const a = boot("ko").leaders("ahmose", "reina", "lynn").mine([60, 40, 0]).gcap(4);
+    a.js("SHEET_EDGE=0");
+    const html = a.render();
+    const st = html.indexOf('id="rec"');
+    const ids = [...html.slice(st, html.indexOf("</b>", st)).matchAll(/img\/heroes\/([a-z-]+)\.webp/g)].map(m => m[1]);
+    const shown = +(html.slice(st, st + 1400).match(/배율 ×([\d.]+)/) || [0, 0])[1];
+    const want = a.js(`(function(){
+      const r=norm(60,40,0);const lead=["ahmose","reina","lynn"].map(i=>byId[i]);
+      const buck={};ORDER.forEach(s=>{buck[s]=1;});
+      const add=(sl,v)=>{if(buck[sl]!==undefined)buck[sl]+=v;};
+      lead.forEach(h=>h.exp.forEach(e=>{if(e.slot==="ECO"||e.slot==="AH")return;
+        if(e.slot==="X"){const bk=q=>{if(q.bk)add(q.bk,q.v*xShare(q,r));};bk(e);if(e.also&&e.also.slot==="X")bk(e.also);return;}
+        add(e.slot,anVal(e,r));if(e.also)add(e.also.slot,eVal(e.also,r));}));
+      const b=Object.assign({},buck);let x=1;const seen=[];
+      ${JSON.stringify(ids)}.forEach(id=>{const e=byId[id].exp[0];const have=(id==="ahmose"||id==="reina"||id==="lynn"?1:0)+seen.filter(z=>z===id).length;seen.push(id);
+        if(e.slot==="X"){const p=w=>{const sh=xShare(w,r);if(w.bk&&b[w.bk]!==undefined)b[w.bk]+=w.v*sh;else x*=nbAdd(w.v*sh,have);};p(e);if(e.also&&e.also.slot==="X")p(e.also);return;}
+        if(e.slot==="AH"){x*=nbAdd(eVal(e,r),have);return;}
+        if(b[e.slot]!==undefined)b[e.slot]+=(e.slot==="An"?anVal(e,r):eAdd(e,r,have));if(e.also&&b[e.also.slot]!==undefined)b[e.also.slot]+=e.also.v;});
+      return ORDER.reduce((a,sl)=>a*(b[sl]/buck[sl]),1)*x;})()`);
+    ok(Math.abs(shown - +want.toFixed(3)) < 5e-4, "레이나 리더 60/40 추천 배율이 칸 검산과 같다", "화면 ×" + shown + " · 검산 ×" + want.toFixed(3));
+    ok(ids.indexOf("reina") < 0 || shown < 2.65, "옛 동작(×2.696 · 레이나 재선택 과대)이 아니다", ids.join(",") + " ×" + shown);
+    note("레이나 리더 60/40: " + ids.join(",") + " ×" + shown + " (수정 전 ×2.696)");
+  }
+}
+
 section("리더 self-pick — 무포화 스킬도 자기끼리 합연산 (2026-09-14)");
 {
   // 2026-09-14 검증에서 드러난 비대칭: 칸에 들어가는 스킬은 리더가 이미 채워 두면
@@ -778,7 +833,8 @@ section("리더 self-pick — 무포화 스킬도 자기끼리 합연산 (2026-0
   // [영웅, 계열, 리더로 쓴 편성, 안 쓴 편성, 병비, gcap]
   const CASES = [
     ["renee",  "X(bk없음)", ["jeronimo", "renee", "greg"],   ["jeronimo", "mia", "greg"],   [60, 40, 0], 6],
-    ["wayne",  "AH",        ["logan", "philly", "wayne"],    ["logan", "philly", "zinman"], [45, 5, 50], 6],
+    // 45/5/50 에서는 아모세(Viper also 추가 후)가 ⑤ 14행에서 웨인을 밀어내 안 보인다 → 20/80/0
+    ["wayne",  "AH",        ["logan", "philly", "wayne"],    ["logan", "philly", "zinman"], [20, 80, 0], 6],
     ["gordon", "X(bk없음)", ["edith", "gordon", "bradley"],  ["edith", "mia", "bradley"],   [60, 40, 0], 7],
     ["flint",  "X(bk있음)", ["flint", "philly", "zinman"],   ["logan", "philly", "zinman"], [60, 40, 0], 2],
   ];
@@ -865,7 +921,7 @@ section("전투 배율 — bk 겹침 · pc 기대값");
       }
       // An · AH 는 칸이 아니라 계수다 — 예전에 이 둘을 빼먹어서
       // 레이나(An)가 추천에 들자 검산이 혼자 달라졌다.
-      if (e.slot === "An") { x *= 1 + e.v * E.NA_SHARE; continue; }
+      if (e.slot === "An") { b.An += e.v * E.NA_SHARE; continue; }   // 칸이다 (2026-09-14)
       if (e.slot === "AH") { x *= 1 + E.eVal(e, rr); continue; }
       const v = mode === "rawPc" ? e.v : E.eVal(e, rr);
       if (b[e.slot] !== undefined) b[e.slot] += v;
@@ -898,7 +954,7 @@ section("전투 배율 — bk 겹침 · pc 기대값");
         part(e); if (e.also && e.also.slot === "X") part(e.also);
         continue;
       }
-      if (e.slot === "An") { x *= 1 + e.v * E.NA_SHARE; continue; }
+      if (e.slot === "An") { b.An += e.v * E.NA_SHARE; continue; }   // 칸이다 (2026-09-14)
       if (e.slot === "AH") { x *= 1 + E.eVal(e, rr); continue; }
       if (b[e.slot] !== undefined) b[e.slot] += E.eVal(e, rr);
       if (e.also && b[e.also.slot] !== undefined) b[e.also.slot] += e.also.v;
@@ -1087,12 +1143,12 @@ section("시트 행 대조 (조이너 순위)");
         const add=(sl,v)=>{if(buck[sl]!==undefined)buck[sl]+=v;};
         if(e.slot==="X"){const bk=q=>{if(q.bk)add(q.bk,q.v*xShare(q,r));};
           bk(e);if(e.also&&e.also.slot==="X")bk(e.also);return;}
-        add(e.slot,eVal(e,r));if(e.also)add(e.also.slot,eVal(e.also,r));}));
+        add(e.slot,anVal(e,r));if(e.also)add(e.also.slot,eVal(e.also,r));}));
       const one=id=>{const e=byId[id].exp[0];
         if(e.slot==="X"){const p=w=>{const sh=xShare(w,r);
             return w.bk&&buck[w.bk]!==undefined?(buck[w.bk]+w.v*sh)/buck[w.bk]:1+w.v*sh;};
           return p(e)*(e.also&&e.also.slot==="X"?p(e.also):1);}
-        if(e.slot==="An")return 1+e.v*NA_SHARE;
+        if(e.slot==="An")return (buck.An+e.v*NA_SHARE)/buck.An;
         if(e.slot==="AH")return 1+eVal(e,r);
         let m=1;const st=(sl,v)=>{const b=buck[sl];if(b!==undefined)m*=(b+v)/b;};
         st(e.slot,eVal(e,r)); if(e.also)st(e.also.slot,e.also.v); return m;};
@@ -1102,7 +1158,7 @@ section("시트 행 대조 (조이너 순위)");
           if(e.slot==="X"){const p=w=>{const sh=xShare(w,r);
               if(w.bk&&b[w.bk]!==undefined)put(w.bk,w.v*sh); else x*=1+w.v*sh;};
             p(e); if(e.also&&e.also.slot==="X")p(e.also); return;}
-          if(e.slot==="An"){x*=1+e.v*NA_SHARE;return;}
+          if(e.slot==="An"){put("An",e.v*NA_SHARE);return;}
           if(e.slot==="AH"){x*=1+eVal(e,r);return;}
           put(e.slot,eVal(e,r)); if(e.also)put(e.also.slot,e.also.v);});
         return ORDER.reduce((a,sl)=>a*(b[sl]/buck[sl]),1)*x;};
@@ -1530,7 +1586,9 @@ section("애매하면 시트 우선");
     const i = html.indexOf('id="recAll"');
     ok(i > 0, "노라 3장 행에서는 보조 패널이 뜬다 (추천과 다르니까)");
     const alt = [...html.slice(i, html.indexOf("</b>", i)).matchAll(/heroes\/([a-z-]+)\.webp/g)].map(m => m[1]);
-    ok(alt.filter(x => x === "norah").length <= 1,
+    // 둘째 노라는 순수 계산에서도 이득이면 뽑힌다(stack:1 · CLAUDE.md 「중복은 stack 인 영웅에게만」).
+    // 2026-09-14 미아 Lucky Charm 이 A→B 로 옮겨가 A칸이 낮아지자 이 행도 그렇게 됐다. 막는 것은 **3장**이다.
+    ok(alt.filter(x => x === "norah").length <= 2,
        "보조 패널은 시트를 안 보므로 노라를 3장 쌓지 않는다", alt.join(","));
     const pureV = +(/전투 배율 ×([\d.]+)/.exec(html.slice(i)) || [0, 0])[1];
     const recV = +(/전투 배율 ×([\d.]+)/.exec(html.slice(html.indexOf('id="rec"'))) || [0, 0])[1];
