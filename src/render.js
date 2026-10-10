@@ -11,7 +11,7 @@ let SHEET_EDGE=1;
 const statKr=i18nFill({},function(){return{Attack:L("공격력","Attack"),Defense:L("방어력","Defense"),Lethality:L("파괴력","Lethality"),Health:L("체력","Health")};});
 
 function render(d){
- const {mode,leaders,picks,r,buck,src,cls,hits,hitMul,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap,comp,rivals}=d;
+ const {mode,leaders,picks,r,buck,src,cls,hits,hitMul,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap,comp,rivals,near}=d;
  let o="";
  const modeKr=mode==="rally"?L("공성(랠리)","Rally (offense)"):L("수성(개리슨)","Garrison (defense)");
  o+='<h2>'+L("① 리더 구성","① Leaders")+' <span>'+modeKr+L(" · 병비 "," · ratio ")+r.inf.toFixed(0)+"/"+r.lan.toFixed(0)+"/"+r.mar.toFixed(0)+'</span></h2>';
@@ -257,6 +257,17 @@ function render(d){
      comp.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+"</b> 입니다. <b>시트 행이면 그 칸을 그대로 따릅니다</b> — 칸 안에서 누구를 쓸지만 계산이 고릅니다(“제시*” 칸이면 제시·제셀·제로니모 중 하나). 이 계산기의 1번 원칙이 <b>“계산이 시트와 엇갈리면 시트를 따른다”</b> 이기 때문입니다. 그 대가는 숨기지 않습니다 — 계산만으로 고른 답이 바로 아래 <b>「🧮 계산 순위 그대로」</b> 에 그대로 있습니다. <b>시트에 없는 편성에서는 아무 일도 일어나지 않습니다</b> — 그게 보통입니다.",
      "📋 This lineup is <b>row Gen "+comp.g+" of the Ton sheet</b> (ratios "+comp.rs.map(v=>v.join("/")).join(", ")+"), whose joiners are <b>"+
      comp.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+"</b>. <b>On a row the sheet covers we fill its cells verbatim</b> — the numbers only decide who fills a cell that lists alternatives (a “Jessie*” cell takes Jessie, Jasser or Jeronimo), because this calculator’s first rule is <b>“when the numbers disagree with the sheet, follow the sheet”</b>. The cost is not hidden — what the numbers alone would pick is in <b>🧮 Raw ranking</b> just below. <b>Nothing is applied to lineups the sheet does not cover</b>, which is the usual case.")+"</p>":"")+
+  // 병비가 맞는 행이 없을 때 — 리더가 같은 시트 행을 안내한다 (2026-10-10, 사용자 요청).
+  // 아모세·필리·린 60/40 에서 "시트랑 왜 달라?" 가 나왔다 — 시트는 그 셋을 50/2/48 에만 적어 뒀는데
+  // 화면이 아무 말도 안 해서 사용자가 알 길이 없었다. 판정에는 안 쓰고 안내만 한다.
+  (!comp&&near&&near.length?'<p class="cap">'+L("📍 <b>이 병비로는 시트에 없는 편성</b>이라 위 넷은 계산만으로 골랐습니다. 다만 <b>같은 리더 조합이 시트에 다른 병비로 있습니다</b> — "+
+     near.map(c=>"Gen "+c.g+" <b>"+c.rs.map(v=>v.join("/")).join(" · ")+"</b> → "+c.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+
+       (c.alt&&c.alt.length?" (대체 "+c.alt.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+")":"")).join(" / ")+
+     ". 병비를 그 값으로 두면 그 행의 칸을 그대로 따릅니다.",
+     "📍 <b>The sheet has no row for this lineup at this ratio</b>, so the four above come from the numbers alone. But <b>the same leaders do appear in the sheet at other ratios</b> — "+
+     near.map(c=>"Gen "+c.g+" <b>"+c.rs.map(v=>v.join("/")).join(" · ")+"</b> → "+c.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+
+       (c.alt&&c.alt.length?" (alternatives "+c.alt.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+")":"")).join(" / ")+
+     ". Set the ratio to one of those and that row’s cells are followed verbatim.")+"</p>":"")+
   // 시트는 조이너 넷 옆에 "Alternative #1~#3" 칸을 따로 둔다(48/54 행 · 69칸).
   // 넷을 못 구할 때 쓰라는 목록이라 **순위에도 pick4 에도 넣지 않는다** — 시트가 그 셋에
   // 순서를 매기지 않았으므로 우리도 매기지 않고 그대로 보여주기만 한다.

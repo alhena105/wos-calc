@@ -1092,18 +1092,22 @@ const COMP_TOL=6;
 // 걸리는 시트 행을 **전부** 돌려준다. 보통은 0개나 1개지만,
 // 시트가 한 입력에 답을 둘 적어 둔 자리가 있다(data.js 의 SHEET_COMPS 주석 참고).
 // 그때 우리가 몰래 하나를 고르지 않고 화면이 둘 다 드러내야 하므로 목록으로 준다.
+// 고른 리더가 전부 그 자리의 대안 안에 있어야 하고, 그 행이 요구하는 자리를 다 채워야 한다
+function leadersFit(c,ids){
+ for(let i=0;i<3;i++){
+  const want=c.l[i],got=ids[i];
+  if(want.length&&(!got||want.indexOf(got)<0))return false;
+  if(!want.length&&got)return false;
+ }
+ return true;
+}
 function matchComps(ids,r,gcap){
  const mine=[r.inf,r.lan,r.mar];
  if(ids.filter(Boolean).length<2)return [];
  const hit=[];
  SHEET_COMPS.forEach(c=>{
   if(gcap!==undefined&&c.g>gcap)return;
-  // 고른 리더가 전부 그 자리의 대안 안에 있어야 하고, 그 행이 요구하는 자리를 다 채워야 한다
-  for(let i=0;i<3;i++){
-   const want=c.l[i],got=ids[i];
-   if(want.length&&(!got||want.indexOf(got)<0))return;
-   if(!want.length&&got)return;
-  }
+  if(!leadersFit(c,ids))return;
   const d=Math.min.apply(null,c.rs.map(v=>dist(mine,v)));
   if(d>COMP_TOL)return;
   hit.push({c:c,d:d});
@@ -1117,6 +1121,14 @@ function matchComps(ids,r,gcap){
  if(!hit.length)return [];
  const top=hit[0];
  return hit.filter(x=>x.c.g===top.c.g&&Math.abs(x.d-top.d)<1e-9).map(x=>x.c);
+}
+// 병비가 맞는 행이 없을 때 — **리더만 맞는 행**을 안내용으로 돌려준다 (2026-10-10, 사용자 요청).
+// 판정·칸 채우기에는 쓰지 않는다. "같은 리더가 시트에 다른 병비로 있다"는 사실만 화면이 알린다 —
+// 아모세·필리·린 60/40 에서 시트 50/2/48 행(미아·패트릭·제시*·서윤)이 있다는 걸 사용자가 알 길이 없었다.
+// gcap 은 matchComps 와 같은 기준으로 본다(서버에 없는 세대 행을 안내하면 그 조이너도 없다).
+function nearComps(ids,gcap){
+ if(ids.filter(Boolean).length<2)return [];
+ return SHEET_COMPS.filter(c=>(gcap===undefined||c.g<=gcap)&&leadersFit(c,ids)).sort((a,b)=>b.g-a.g);
 }
 // 칸을 채울 때 쓰는 대표 행 하나. 나머지는 화면이 "시트가 답을 둘 적어 뒀다"고 알린다.
 function matchComp(ids,r,gcap){
@@ -1311,7 +1323,9 @@ function calc(){
  const comp=comps.length?comps[0]:null;
  // 칸이 다른 나머지 행 — 시트가 이 입력에 답을 둘 적어 둔 경우다. 화면이 그대로 알린다.
  const rivals=compRivals(comps);
- render({mode,leaders,picks,r,buck,src,cls,hits,hitMul,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap,comp,rivals});
+ // 병비가 맞는 행이 없을 때만 — 리더가 같은 행을 안내한다(판정에는 안 쓴다)
+ const near=comps.length?[]:nearComps(picks.map(p=>p.hero&&p.hero.id||""),gcap);
+ render({mode,leaders,picks,r,buck,src,cls,hits,hitMul,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap,comp,rivals,near});
 }
 /* =============================================================================
    gear-engine.js — 홍색 장비 업그레이드 순서 계산. 순수 함수만 있다.
@@ -1581,7 +1595,7 @@ let SHEET_EDGE=1;
 const statKr=i18nFill({},function(){return{Attack:L("공격력","Attack"),Defense:L("방어력","Defense"),Lethality:L("파괴력","Lethality"),Health:L("체력","Health")};});
 
 function render(d){
- const {mode,leaders,picks,r,buck,src,cls,hits,hitMul,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap,comp,rivals}=d;
+ const {mode,leaders,picks,r,buck,src,cls,hits,hitMul,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap,comp,rivals,near}=d;
  let o="";
  const modeKr=mode==="rally"?L("공성(랠리)","Rally (offense)"):L("수성(개리슨)","Garrison (defense)");
  o+='<h2>'+L("① 리더 구성","① Leaders")+' <span>'+modeKr+L(" · 병비 "," · ratio ")+r.inf.toFixed(0)+"/"+r.lan.toFixed(0)+"/"+r.mar.toFixed(0)+'</span></h2>';
@@ -1827,6 +1841,17 @@ function render(d){
      comp.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+"</b> 입니다. <b>시트 행이면 그 칸을 그대로 따릅니다</b> — 칸 안에서 누구를 쓸지만 계산이 고릅니다(“제시*” 칸이면 제시·제셀·제로니모 중 하나). 이 계산기의 1번 원칙이 <b>“계산이 시트와 엇갈리면 시트를 따른다”</b> 이기 때문입니다. 그 대가는 숨기지 않습니다 — 계산만으로 고른 답이 바로 아래 <b>「🧮 계산 순위 그대로」</b> 에 그대로 있습니다. <b>시트에 없는 편성에서는 아무 일도 일어나지 않습니다</b> — 그게 보통입니다.",
      "📋 This lineup is <b>row Gen "+comp.g+" of the Ton sheet</b> (ratios "+comp.rs.map(v=>v.join("/")).join(", ")+"), whose joiners are <b>"+
      comp.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+"</b>. <b>On a row the sheet covers we fill its cells verbatim</b> — the numbers only decide who fills a cell that lists alternatives (a “Jessie*” cell takes Jessie, Jasser or Jeronimo), because this calculator’s first rule is <b>“when the numbers disagree with the sheet, follow the sheet”</b>. The cost is not hidden — what the numbers alone would pick is in <b>🧮 Raw ranking</b> just below. <b>Nothing is applied to lineups the sheet does not cover</b>, which is the usual case.")+"</p>":"")+
+  // 병비가 맞는 행이 없을 때 — 리더가 같은 시트 행을 안내한다 (2026-10-10, 사용자 요청).
+  // 아모세·필리·린 60/40 에서 "시트랑 왜 달라?" 가 나왔다 — 시트는 그 셋을 50/2/48 에만 적어 뒀는데
+  // 화면이 아무 말도 안 해서 사용자가 알 길이 없었다. 판정에는 안 쓰고 안내만 한다.
+  (!comp&&near&&near.length?'<p class="cap">'+L("📍 <b>이 병비로는 시트에 없는 편성</b>이라 위 넷은 계산만으로 골랐습니다. 다만 <b>같은 리더 조합이 시트에 다른 병비로 있습니다</b> — "+
+     near.map(c=>"Gen "+c.g+" <b>"+c.rs.map(v=>v.join("/")).join(" · ")+"</b> → "+c.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+
+       (c.alt&&c.alt.length?" (대체 "+c.alt.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+")":"")).join(" / ")+
+     ". 병비를 그 값으로 두면 그 행의 칸을 그대로 따릅니다.",
+     "📍 <b>The sheet has no row for this lineup at this ratio</b>, so the four above come from the numbers alone. But <b>the same leaders do appear in the sheet at other ratios</b> — "+
+     near.map(c=>"Gen "+c.g+" <b>"+c.rs.map(v=>v.join("/")).join(" · ")+"</b> → "+c.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+
+       (c.alt&&c.alt.length?" (alternatives "+c.alt.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+")":"")).join(" / ")+
+     ". Set the ratio to one of those and that row’s cells are followed verbatim.")+"</p>":"")+
   // 시트는 조이너 넷 옆에 "Alternative #1~#3" 칸을 따로 둔다(48/54 행 · 69칸).
   // 넷을 못 구할 때 쓰라는 목록이라 **순위에도 pick4 에도 넣지 않는다** — 시트가 그 셋에
   // 순서를 매기지 않았으므로 우리도 매기지 않고 그대로 보여주기만 한다.

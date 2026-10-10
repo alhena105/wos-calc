@@ -106,18 +106,22 @@ const COMP_TOL=6;
 // 걸리는 시트 행을 **전부** 돌려준다. 보통은 0개나 1개지만,
 // 시트가 한 입력에 답을 둘 적어 둔 자리가 있다(data.js 의 SHEET_COMPS 주석 참고).
 // 그때 우리가 몰래 하나를 고르지 않고 화면이 둘 다 드러내야 하므로 목록으로 준다.
+// 고른 리더가 전부 그 자리의 대안 안에 있어야 하고, 그 행이 요구하는 자리를 다 채워야 한다
+function leadersFit(c,ids){
+ for(let i=0;i<3;i++){
+  const want=c.l[i],got=ids[i];
+  if(want.length&&(!got||want.indexOf(got)<0))return false;
+  if(!want.length&&got)return false;
+ }
+ return true;
+}
 function matchComps(ids,r,gcap){
  const mine=[r.inf,r.lan,r.mar];
  if(ids.filter(Boolean).length<2)return [];
  const hit=[];
  SHEET_COMPS.forEach(c=>{
   if(gcap!==undefined&&c.g>gcap)return;
-  // 고른 리더가 전부 그 자리의 대안 안에 있어야 하고, 그 행이 요구하는 자리를 다 채워야 한다
-  for(let i=0;i<3;i++){
-   const want=c.l[i],got=ids[i];
-   if(want.length&&(!got||want.indexOf(got)<0))return;
-   if(!want.length&&got)return;
-  }
+  if(!leadersFit(c,ids))return;
   const d=Math.min.apply(null,c.rs.map(v=>dist(mine,v)));
   if(d>COMP_TOL)return;
   hit.push({c:c,d:d});
@@ -131,6 +135,14 @@ function matchComps(ids,r,gcap){
  if(!hit.length)return [];
  const top=hit[0];
  return hit.filter(x=>x.c.g===top.c.g&&Math.abs(x.d-top.d)<1e-9).map(x=>x.c);
+}
+// 병비가 맞는 행이 없을 때 — **리더만 맞는 행**을 안내용으로 돌려준다 (2026-10-10, 사용자 요청).
+// 판정·칸 채우기에는 쓰지 않는다. "같은 리더가 시트에 다른 병비로 있다"는 사실만 화면이 알린다 —
+// 아모세·필리·린 60/40 에서 시트 50/2/48 행(미아·패트릭·제시*·서윤)이 있다는 걸 사용자가 알 길이 없었다.
+// gcap 은 matchComps 와 같은 기준으로 본다(서버에 없는 세대 행을 안내하면 그 조이너도 없다).
+function nearComps(ids,gcap){
+ if(ids.filter(Boolean).length<2)return [];
+ return SHEET_COMPS.filter(c=>(gcap===undefined||c.g<=gcap)&&leadersFit(c,ids)).sort((a,b)=>b.g-a.g);
 }
 // 칸을 채울 때 쓰는 대표 행 하나. 나머지는 화면이 "시트가 답을 둘 적어 뒀다"고 알린다.
 function matchComp(ids,r,gcap){
@@ -325,5 +337,7 @@ function calc(){
  const comp=comps.length?comps[0]:null;
  // 칸이 다른 나머지 행 — 시트가 이 입력에 답을 둘 적어 둔 경우다. 화면이 그대로 알린다.
  const rivals=compRivals(comps);
- render({mode,leaders,picks,r,buck,src,cls,hits,hitMul,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap,comp,rivals});
+ // 병비가 맞는 행이 없을 때만 — 리더가 같은 행을 안내한다(판정에는 안 쓴다)
+ const near=comps.length?[]:nearComps(picks.map(p=>p.hero&&p.hero.id||""),gcap);
+ render({mode,leaders,picks,r,buck,src,cls,hits,hitMul,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap,comp,rivals,near});
 }

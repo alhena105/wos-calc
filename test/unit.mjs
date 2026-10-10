@@ -45,7 +45,7 @@ function note(t) { console.log("   " + t); }
 
 // ── 로더 ───────────────────────────────────────────────────────────────
 const EXPORTS = "LANG,L,HN,CN,STR,HEROES,SLOTS,ORDER,byId,wpct,norm,tgtRatio,DW,dmgShare," +
-  "NA_SHARE,twoStat,anVal,tgtName,tgtStat,COUNTERS,BAND_TOL,ROW_TOL,MECH,dist,sheetVerdict,garrisonVerdict,eVal,eK,eAdd,xShare,nCls,matchComp,matchComps,compRivals,SHEET_COMPS";
+  "NA_SHARE,twoStat,anVal,tgtName,tgtStat,COUNTERS,BAND_TOL,ROW_TOL,MECH,dist,sheetVerdict,garrisonVerdict,eVal,eK,eAdd,xShare,nCls,matchComp,matchComps,compRivals,nearComps,SHEET_COMPS";
 function load(lang) {
   const code = src("i18n.js") + src("data.js") + src("engine.js") +
     "\n;globalThis.__api={" + EXPORTS + "};\n";
@@ -1494,6 +1494,42 @@ section("애매하면 시트 우선");
       const e = boot("ko").leaders("edith", "sonya", "bradley").mine([60, 40, 0]);
       e.el("gcap").value = "8";
       ok(!/답을 \d+개 적어 뒀습니다/.test(e.render()), "한 행만 걸리면 알림이 안 뜬다");
+    }
+    // 병비가 맞는 행이 없으면 **리더가 같은 행**을 안내한다 (2026-10-10, 사용자 요청).
+    // 아모세·필리·린 60/40 — 시트는 그 셋을 50/2/48 에만 적어 뒀는데 화면이 침묵해서 "왜 시트랑 달라?" 가 나왔다.
+    {
+      const a = boot("ko").leaders("ahmose", "philly", "lynn").mine([60, 40, 0]);
+      a.el("gcap").value = "4";
+      const html = a.render();
+      ok(a.js('matchComps(["ahmose","philly","lynn"],norm(60,40,0),4).length') === 0, "아모세·필리·린 60/40 은 시트 행이 없다");
+      const near = JSON.parse(a.js('JSON.stringify(nearComps(["ahmose","philly","lynn"],4).map(c=>c.rs))'));
+      ok(near.length === 1 && near[0][0].join("/") === "50/2/48", "리더가 같은 행은 Gen 4 50/2/48 하나다", JSON.stringify(near));
+      const hint = /📍[\s\S]*?<\/p>/.exec(html);
+      ok(!!hint && /50\/2\/48/.test(hint[0]) && /미야 · 패트릭 · 제시\/제셀\/제로니모 · 서윤/.test(hint[0]) && /대체 진먼/.test(hint[0]),
+         "📍 안내가 그 행의 병비·조이너·대체 칸을 적는다", hint ? hint[0].replace(/<[^>]+>/g, "").slice(0, 160) : "없음");
+      // 안내는 판정이 아니다 — #rec 은 여전히 순수 계산이어야 한다(시트 칸 미아·패트릭·제시·서윤을 베끼지 않는다)
+      const st = html.indexOf('id="rec"');
+      const ids = [...html.slice(st, html.indexOf("</b>", st)).matchAll(/heroes\/([a-z-]+)\.webp/g)].map(m => m[1]);
+      ok(ids.join() !== "mia,patrick,jessie,seoyoon", "안내만 하고 칸을 베끼지는 않는다", ids.join(","));
+      ok(!/📋 이 편성은/.test(html), "시트 행 문단(📋)은 안 뜬다");
+      // 병비를 그 값으로 두면 안내 대신 시트 행이 잡힌다
+      const b = boot("ko").leaders("ahmose", "philly", "lynn").mine([50, 2, 48]);
+      b.el("gcap").value = "4";
+      const hb = b.render();
+      ok(!/📍/.test(hb) && /📋 이 편성은/.test(hb), "50/2/48 로 두면 안내가 사라지고 시트 행이 잡힌다");
+      // 세대 상한을 넘는 행은 안내하지 않는다 (matchComps 와 같은 기준)
+      const c = boot("ko").leaders("ahmose", "philly", "lynn").mine([60, 40, 0]);
+      c.el("gcap").value = "3";
+      ok(!/📍/.test(c.render()), "gcap 3 이면 Gen 4 행을 안내하지 않는다");
+      // 시트에 아예 없는 리더 조합에는 안내할 것이 없다
+      const d = boot("ko").leaders("flint", "philly", "lynn").mine([60, 40, 0]);
+      d.el("gcap").value = "12";
+      ok(!/📍/.test(d.render()), "시트에 없는 리더 조합이면 안내가 없다");
+      // 영어 화면에도 한글이 남지 않는다
+      const e2 = boot("en").leaders("ahmose", "philly", "lynn").mine([60, 40, 0]);
+      e2.el("gcap").value = "4";
+      const he = /📍[\s\S]*?<\/p>/.exec(e2.render());
+      ok(!!he && !/[가-힣]/.test(he[0]) && /50\/2\/48/.test(he[0]), "영어 안내에 한글이 없다");
     }
     // 칸이 똑같은 행이 둘 걸리는 경우는 알릴 것이 없다 (g1 · g11)
     {
