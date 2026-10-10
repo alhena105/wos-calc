@@ -29,7 +29,7 @@ const out = {};
 // ① 기본 가정 — 시트 등재 풀 / 전체 풀
 const base = makeSim(E);
 out.baseS = measure(base, "S"); out.baseAll = measure(base, "All");
-console.log("기본(DW.inf=.3, NA=.8) 시트풀: #1", out.baseS.top.toFixed(1), "겹침", out.baseS.pri.toFixed(1), "| 전체풀: #1", out.baseAll.top.toFixed(1), "겹침", out.baseAll.pri.toFixed(1));
+console.log("기본(DW.inf=" + E.DW.infantry + ", NA=" + E.NA_SHARE + ") 시트풀: #1", out.baseS.top.toFixed(1), "겹침", out.baseS.pri.toFixed(1), "| 전체풀: #1", out.baseAll.top.toFixed(1), "겹침", out.baseAll.pri.toFixed(1));
 console.log("세대별(시트풀):", JSON.stringify(out.baseS.byGen));
 // ② 민감도 — DW.infantry
 out.sweepDW = [];

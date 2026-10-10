@@ -301,8 +301,8 @@ var STR={
  lbEnD:["들어오는 랠리 병비 (선택)","Incoming rally ratio (optional)"],
  phInf:["보","inf"], phLan:["창","lan"], phMar:["궁","mar"],
  lbGcap:["서버 최대 세대 (조이너 풀 제한)","Server's highest generation (limits the joiner pool)"],
- assump:['<b>계산 가정</b> — 원정스킬은 전부 Lv.5(4성 이상)로 간주 · 확률·주기 스킬은 <b>기대값</b>으로 환산 · 병종 전용 딜 스킬은 보병 가중치 0.3을 적용한 <b>딜 지분</b>으로 환산(보병은 탱커라 병력 비중 대비 딜이 적음) · 일반공격 한정 스킬은 총딜의 80%를 일반공격으로 가정 · "확률로 N% <b>피해량</b>" 계열은 "피해량 증가"와 같은 칸으로 묶고, 원문이 "<b>추가피해·추가공격·N% 피해</b>"인 것은 칸이 아니라 따로 곱합니다(어느 칸인지 자료 없음).<br>전무 레벨 0 = 미보유 · 숫자 옆 칸이 전무 레벨입니다. 병비 합이 100이 아니면 자동으로 정규화합니다.',
-   '<b>Assumptions</b> — every expedition skill is treated as Lv.5 (4★ or above) · chance-based and periodic skills are converted to <b>expected value</b> · class-locked damage skills are converted to a <b>damage share</b> with infantry weighted 0.3 (infantry tanks, so it contributes less damage than its headcount) · normal-attack-only skills assume 80% of total damage is normal attacks · "N% <b>damage dealt</b> on a chance" is grouped into the same slot as "damage bonus", while wording such as "<b>extra damage, extra attack or N% damage</b>" multiplies on its own instead of entering a slot (no source says which slot it would occupy).<br>Exclusive-gear level 0 = not owned; the box beside each hero is its level. If the ratio does not add to 100 it is normalised automatically.'],
+ assump:['<b>계산 가정</b> — 원정스킬은 전부 Lv.5(4성 이상)로 간주 · 확률·주기 스킬은 <b>기대값</b>으로 환산 · 병종 전용 딜 스킬은 보병 가중치 0.3을 적용한 <b>딜 지분</b>으로 환산(보병은 탱커라 병력 비중 대비 딜이 적음) · 일반공격 한정 스킬은 총딜의 60%를 일반공격으로 가정 · 두 칸 스킬(공격+방어 등)은 곱이 아니라 <b>합</b>으로 환산 · "확률로 N% <b>피해량</b>" 계열은 "피해량 증가"와 같은 칸으로 묶고, 원문이 "<b>추가피해·추가공격·N% 피해</b>"인 것은 칸이 아니라 따로 곱합니다(어느 칸인지 자료 없음).<br>전무 레벨 0 = 미보유 · 숫자 옆 칸이 전무 레벨입니다. 병비 합이 100이 아니면 자동으로 정규화합니다.',
+   '<b>Assumptions</b> — every expedition skill is treated as Lv.5 (4★ or above) · chance-based and periodic skills are converted to <b>expected value</b> · class-locked damage skills are converted to a <b>damage share</b> with infantry weighted 0.3 (infantry tanks, so it contributes less damage than its headcount) · normal-attack-only skills assume 60% of total damage is normal attacks · two-stat skills (attack + defense etc.) are valued as a <b>sum</b>, not a product · "N% <b>damage dealt</b> on a chance" is grouped into the same slot as "damage bonus", while wording such as "<b>extra damage, extra attack or N% damage</b>" multiplies on its own instead of entering a slot (no source says which slot it would occupy).<br>Exclusive-gear level 0 = not owned; the box beside each hero is its level. If the ratio does not add to 100 it is normalised automatically.'],
  srcData:['데이터 출처: <a href="https://wosheroes.com/">wosheroes</a> · <a href="https://www.whiteoutsurvival-community.com/">whiteoutsurvival-community</a> · <a href="https://www.whiteoutsurvival.wiki/">whiteoutsurvival.wiki</a> (2026-08-15 수집 · Gen14~17 2026-08-22 보강) · 영웅 초상: <a href="https://www.whiteoutsurvival.wiki/">whiteoutsurvival.wiki</a> (© Century Games)',
    'Data: <a href="https://wosheroes.com/">wosheroes</a> · <a href="https://www.whiteoutsurvival-community.com/">whiteoutsurvival-community</a> · <a href="https://www.whiteoutsurvival.wiki/">whiteoutsurvival.wiki</a> (collected 2026-08-15; Gen 14-17 added 2026-08-22) · Hero portraits: <a href="https://www.whiteoutsurvival.wiki/">whiteoutsurvival.wiki</a> (© Century Games)'],
  srcModel:['계산 모델: <a href="https://blog.astris.kr/posts/f7a87706-3c2f-40c0-b282-d77a311ab4e3">랠리 편성 × 조이너 스킬 × 데미지 공식 통합 해설</a> · 확률/주기 스킬은 기대값으로 환산한 근사치입니다.',
@@ -1034,7 +1034,16 @@ function eAdd(e,r,have){return eK(e,r,have+1)-eK(e,r,have);}
 function nbAdd(v,have){return (1+(have+1)*v)/(1+have*v);}
 // X(병종 한정) 스킬의 환산 지분 — 딜은 딜 지분, 생존은 병력 지분
 function xShare(q,r){return q.k==="sur"?tgtRatio(q.tgt,r)/100:dmgShare(q.tgt,r);}
-const NA_SHARE=.8; // 일반공격이 총딜에서 차지하는 비중 가정
+const NA_SHARE=.6; // 일반공격이 총딜에서 차지하는 비중 가정
+// ⚠️ 0.8 → 0.6 (2026-10-10). 근거는 기전이 아니라 **시트 재현**이다 — 사용자가 목표를 "최대한 시트의 조합과
+// 대체가 나오게" 로 정했고, 52행 격자(0.5~0.8)에서 0.5~0.7 이 평탄 구간이라 가운데를 골랐다. 0.8 에서는 레이나가
+// ×1.240 으로 25% 에픽(×1.250)에 붙어 23행에 끼어들었다. 시트 G7 주석 "Little skills damage, Reina is okay".
+// 측정표는 CLAUDE.md 「2026-10-10 시트 재현 목표」 절에 있다. 느낌으로 다시 만지지 말 것 — 격자부터 다시 돌린다.
+// 두 칸 스킬(필리 공15/방10 · 진먼 방10/체10 · Gen 9+ 의 공15/방10 여섯)은 **합으로 잰다** (2026-10-10).
+// 다른 칸은 곱이라 (1+a)(1+b) = 1+a+b+ab 가 되는데, 그 교차항 ab(필리 1.5%p)가 정확히 25% 에픽을 제치는 폭이었다.
+// 칸에는 그대로 넣고(같은 칸 포화는 살린다) 이 계수로 교차항만 걷어낸다. 역시 근거는 시트 재현이다 —
+// 볼트 공식도 시트 Rally Joiners 탭 산수도 다른 스탯은 곱한다. 시트가 둘에 "25%/20%" 라벨을 안 붙이는 게 유일한 간접 신호.
+function twoStat(a,b){return (1+a+b)/((1+a)*(1+b));}
 // An(일반공격 한정) 칸에 넣을 값 — 총딜 = NA_SHARE×일반공격×(1+Σv) + (1−NA_SHARE)×스킬 이므로
 // 칸값은 정확히 1+NA_SHARE×Σv 다. 리더든 조이너든 같은 잣대로 이 칸에 합산한다(2026-09-14).
 function anVal(e,r){return e.slot==="An"?e.v*NA_SHARE:eVal(e,r);}
@@ -1268,7 +1277,11 @@ function calc(){
      if(e.slot==="An")detail.push(L("일반공격 비중 "+(NA_SHARE*100)+"% 가정 · 같은 칸 합연산","assumes normal attacks are "+(NA_SHARE*100)+"% of damage · adds in the same slot"));
      // also 도 같은 함수(eAdd)로 — 지금은 also 에 pc 가 없어 값이 같지만, 2026-09-12 에 comboAll 이 e.v 를 써서
      // 미아를 과소계상한 것과 같은 함정이 여기 열려 있었다(2026-09-14 감사, 예방 수정 · 값 불변).
-     step(e.slot,e.slot==="An"?anVal(e,r):eAdd(e,r,have)); if(e.also)step(e.also.slot,eAdd(e.also,r,have));
+     const a1=e.slot==="An"?anVal(e,r):eAdd(e,r,have); step(e.slot,a1);
+     if(e.also){const b1=eAdd(e.also,r,have); step(e.also.slot,b1);
+       // 두 칸 스킬은 합으로 — 교차항 ab 를 걷어낸다 (2026-10-10, 시트 재현 목표)
+       if(buck[e.slot]!==undefined&&buck[e.also.slot]!==undefined){const c=twoStat(a1,b1);mul*=c;
+         detail.push(L("두 칸 스킬 → 합으로 잽니다 (교차항 제거 ×"+c.toFixed(3)+")","two-stat skill → measured as a sum (cross term removed ×"+c.toFixed(3)+")"));}}
    }
    return{h,e,mul,detail,cond,dup:lid.has(h.id)};
  }).filter(Boolean);
@@ -1722,7 +1735,10 @@ function render(d){
    if(q.e.slot==="AH"){x*=nbAdd(eVal(q.e,r),have);return;}
    // ⚠️ e.v 가 아니라 eAdd 다 — 미아처럼 pc 가 붙은 스킬은 편성 병종 수로 기대값을 내고,
    // **이미 몇 장 있는지**(리더 보유분 + 앞서 고른 조이너)에 따라 두 장째부터 값이 확 준다.
-   put(q.e.slot,q.e.slot==="An"?anVal(q.e,r):eAdd(q.e,r,have));if(q.e.also)put(q.e.also.slot,eAdd(q.e.also,r,have));});
+   const a1=q.e.slot==="An"?anVal(q.e,r):eAdd(q.e,r,have); put(q.e.slot,a1);
+   if(q.e.also){const b1=eAdd(q.e.also,r,have); put(q.e.also.slot,b1);
+     // 두 칸 스킬은 합으로 — ⑤ 단독 배율(engine.js)과 같은 교차항 제거 (2026-10-10)
+     if(b[q.e.slot]!==undefined&&b[q.e.also.slot]!==undefined)x*=twoStat(a1,b1);}});
   return ORDER.reduce((a,sl)=>a*(b[sl]/buck[sl]),1)*x;};
 
  // ── 넷을 고르는 방법: 단독 배율 상위 4명이 아니라 **포화를 보며 한 명씩** 고른다 (2026-09-12)
@@ -1805,8 +1821,8 @@ function render(d){
   '</b></p><p class="cap">'+L("전투 배율 ×","Combat multiplier ×")+comboAll(top).toFixed(3)+
   L(" · 리더가 쓰는 영웅도 조이너로 들어올 수 있습니다 — 다른 연맹원이 자기 것을 데려오는 것이라 막지 않습니다."," · a hero already run by a leader can still join — a different alliance member brings their own copy, so it is not blocked.")+"</p>"+
   stackNote(top)+
-  '<p class="cap">'+L("여기 나오는 건 <b>Ton 시트 조이너 명단에 오른 영웅만</b>입니다. 계산 순위 1~4위를 그대로 쓰지 않는 이유는 <b>투자 문턱</b> 때문입니다 — 이론 순위가 높아도 전설은 만렙 보유자가 적고, 만렙 찍은 사람은 대개 이미 그 영웅을 리더로 쓰고 있어 조이너로 못 뺍니다. 시트 52행과 대조했더니 <b>이쪽이 #1 재현 94.2% · 겹침 59.2%</b> 로, 계산 순위 그대로(88.5% · 46.9%)보다 낫고 <b>한 행도 나빠지지 않았습니다</b>.",
-     "These are only heroes on the Ton sheet’s joiner list. The raw top four is not used because of the <b>investment threshold</b>: legendaries are rarely maxed, and whoever did max one is usually already running it as a leader. Checked against all 52 sheet rows, this list reproduces the sheet’s #1 joiner <b>94.2%</b> of the time with <b>59.2%</b> overlap, against 88.5% / 46.9% for the raw ranking — and it was never worse on any row.")+"</p>"+
+  '<p class="cap">'+L("여기 나오는 건 <b>Ton 시트 조이너 명단에 오른 영웅만</b>입니다. 계산 순위 1~4위를 그대로 쓰지 않는 이유는 <b>투자 문턱</b> 때문입니다 — 이론 순위가 높아도 전설은 만렙 보유자가 적고, 만렙 찍은 사람은 대개 이미 그 영웅을 리더로 쓰고 있어 조이너로 못 뺍니다. 시트 52행과 대조했더니 <b>이쪽이 #1 재현 94.2% · 겹침 61.4%</b> 로, 계산 순위 그대로(92.3% · 47.8%)보다 낫고 <b>한 행도 나빠지지 않았습니다</b>.",
+     "These are only heroes on the Ton sheet’s joiner list. The raw top four is not used because of the <b>investment threshold</b>: legendaries are rarely maxed, and whoever did max one is usually already running it as a leader. Checked against all 52 sheet rows, this list reproduces the sheet’s #1 joiner <b>94.2%</b> of the time with <b>61.4%</b> overlap, against 92.3% / 47.8% for the raw ranking — and it was never worse on any row.")+"</p>"+
   (comp?'<p class="cap">'+L("📋 이 편성은 <b>Ton 시트 Gen "+comp.g+" 행</b>에 있습니다(병비 "+comp.rs.map(v=>v.join("/")).join(" · ")+"). 시트가 적은 조이너는 <b>"+
      comp.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+"</b> 입니다. <b>시트 행이면 그 칸을 그대로 따릅니다</b> — 칸 안에서 누구를 쓸지만 계산이 고릅니다(“제시*” 칸이면 제시·제셀·제로니모 중 하나). 이 계산기의 1번 원칙이 <b>“계산이 시트와 엇갈리면 시트를 따른다”</b> 이기 때문입니다. 그 대가는 숨기지 않습니다 — 계산만으로 고른 답이 바로 아래 <b>「🧮 계산 순위 그대로」</b> 에 그대로 있습니다. <b>시트에 없는 편성에서는 아무 일도 일어나지 않습니다</b> — 그게 보통입니다.",
      "📋 This lineup is <b>row Gen "+comp.g+" of the Ton sheet</b> (ratios "+comp.rs.map(v=>v.join("/")).join(", ")+"), whose joiners are <b>"+

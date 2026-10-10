@@ -45,7 +45,7 @@ function note(t) { console.log("   " + t); }
 
 // ── 로더 ───────────────────────────────────────────────────────────────
 const EXPORTS = "LANG,L,HN,CN,STR,HEROES,SLOTS,ORDER,byId,wpct,norm,tgtRatio,DW,dmgShare," +
-  "NA_SHARE,anVal,tgtName,tgtStat,COUNTERS,BAND_TOL,ROW_TOL,MECH,dist,sheetVerdict,garrisonVerdict,eVal,eK,eAdd,xShare,nCls,matchComp,matchComps,compRivals,SHEET_COMPS";
+  "NA_SHARE,twoStat,anVal,tgtName,tgtStat,COUNTERS,BAND_TOL,ROW_TOL,MECH,dist,sheetVerdict,garrisonVerdict,eVal,eK,eAdd,xShare,nCls,matchComp,matchComps,compRivals,SHEET_COMPS";
 function load(lang) {
   const code = src("i18n.js") + src("data.js") + src("engine.js") +
     "\n;globalThis.__api={" + EXPORTS + "};\n";
@@ -217,7 +217,8 @@ ok(Math.abs(E.norm(48, 4, 48).inf - 48) < 1e-9, "병비 정규화 (합 100이면
 ok(Math.abs(E.norm(60, 60, 0).inf - 50) < 1e-9, "병비 정규화 (합 120 → 50/50/0)");
 ok(E.tgtStat("marksman", E.norm(60, 40, 0))[0] === "dead", "궁병 0% → 사망 판정");
 ok(E.tgtStat("marksman", E.norm(50, 20, 30))[0] === "ok", "궁병 30% → 정상 판정");
-ok(E.DW.infantry === 0.3 && E.NA_SHARE === 0.8, "딜 지분 가정 고정");
+ok(E.DW.infantry === 0.3 && E.NA_SHARE === 0.6, "딜 지분 가정 고정 (NA_SHARE 0.6 — 2026-10-10 시트 재현 격자)");
+ok(Math.abs(E.twoStat(.15, .10) - 1.25 / 1.265) < 1e-12 && E.twoStat(0, .2) === 1, "두 칸 스킬 교차항 제거 계수 (필리 1.265 → 1.250 · 한 칸이면 1)");
 ok(Math.abs(E.dmgShare("infantry", E.norm(50, 20, 30)) - (50 * 0.3) / (50 * 0.3 + 20 + 30)) < 1e-9,
    "보병 딜 지분에 가중치 0.3 적용");
 
@@ -554,6 +555,8 @@ section("조이너 추천 · T12 경고 (렌더)");
     // pc(미아)는 편성 병종 수로 기대값을 다시 낸다 — 원값 0.25 를 더하면 안 된다
     if (b[e.slot] !== undefined) b[e.slot] += E.eVal(e, rr);
     if (e.also && b[e.also.slot] !== undefined) b[e.also.slot] += e.also.v;
+    // 두 칸 스킬은 합으로 — 교차항 제거 (2026-10-10)
+    if (e.also && b[e.slot] !== undefined && b[e.also.slot] !== undefined) cond *= E.twoStat(E.eVal(e, rr), e.also.v);
   }
   const want = E.ORDER.reduce((x, sl) => x * (b[sl] / base[sl]), 1) * cond;
   const dmgOnly = E.ORDER.filter(sl => E.SLOTS[sl].k === "dmg")
@@ -764,24 +767,24 @@ section("An 칸 — 리더·조이너 같은 잣대 (2026-09-14)");
 {
   const r = E.norm(60, 40, 0);
   const reina = E.byId.reina.exp[0];
-  ok(reina.slot === "An" && Math.abs(E.anVal(reina, r) - 0.24) < 1e-12, "레이나 S1 은 An 이고 칸값은 0.30×NA_SHARE = 0.24");
+  ok(reina.slot === "An" && Math.abs(E.anVal(reina, r) - 0.18) < 1e-12, "레이나 S1 은 An 이고 칸값은 0.30×NA_SHARE = 0.18");
+  // ⑤ 표는 14행뿐이라 NA_SHARE 0.6 에서는 레이나(×1.153)가 표 밖으로 밀린다 → render 에 넘어가는 rank 를 직접 읽는다
   const rankOf = (a, id) => {
-    const html = a.render();
-    const tb = /⑤[\s\S]*?<tbody>([\s\S]*?)<\/tbody>/.exec(html)[1];
-    const tr = tb.split("<tr").find(x => new RegExp("heroes/" + id + "\.webp").test(x));
-    return tr ? +(/×([\d.]+)<div/.exec(tr) || [0, 0])[1] : null;
+    a.js("const __r=render; render=function(d){globalThis.__d=d;return __r(d);}");
+    a.render();
+    return +a.js("(function(){const x=__d.rank.find(z=>z.h.id==='" + id + "');return x?x.mul.toFixed(3):'null';})()") || null;
   };
-  // 리더 레이나 → 조이너 레이나는 (1.24+0.24)/1.24
+  // 리더 레이나 → 조이너 레이나는 (1.18+0.18)/1.18 = ×1.153
   // ⑤ 는 14행뿐이라 아모세(Viper also 추가 후 ×1.24)가 리더인 편성에서는 레이나가 15위로 밀려 안 보인다 → 나탈리아로
   const m1 = rankOf(boot("ko").leaders("natalia", "reina", "lynn").mine([60, 40, 0]).gcap(4), "reina");
-  ok(m1 !== null && Math.abs(m1 - 1.194) < 1e-3, "리더 레이나 행에서 조이너 레이나는 ×1.194 (자기 포화)", "실제 ×" + m1);
-  // 리더 없이 → ×1.240 (옛 동작을 포함한다)
+  ok(m1 !== null && Math.abs(m1 - 1.153) < 1e-3, "리더 레이나 행에서 조이너 레이나는 ×1.153 (자기 포화)", "실제 ×" + m1);
+  // 리더 없이 → ×1.180 (옛 동작을 포함한다)
   const m0 = rankOf(boot("ko").leaders("natalia", "philly", "lynn").mine([60, 40, 0]).gcap(4), "reina");
-  ok(m0 !== null && Math.abs(m0 - 1.24) < 1e-3, "리더가 An 을 안 들면 조이너 레이나는 ×1.240 그대로", "실제 ×" + m0);
+  ok(m0 !== null && Math.abs(m0 - 1.18) < 1e-3, "리더가 An 을 안 들면 조이너 레이나는 ×1.180 그대로", "실제 ×" + m0);
   // 다른 영웅의 An(카라 Mech Pet)도 같은 칸 "An" 이다 — 리더 카라가 있으면 조이너 레이나는 같은 step 경로로 깎인다.
   // (⑤ 는 14행만 그려서 gcap 17 에서는 레이나가 표 밖이라 화면으로는 못 본다 → 데이터·환산값으로 지킨다)
   const cara = E.byId.cara.exp.find(e => e.slot === "An");
-  ok(!!cara && Math.abs(E.anVal(cara, r) - 0.24) < 1e-12, "카라 Mech Pet 도 An 칸 · 환산값 0.24 (레이나와 합연산)");
+  ok(!!cara && Math.abs(E.anVal(cara, r) - 0.18) < 1e-12, "카라 Mech Pet 도 An 칸 · 환산값 0.18 (레이나와 합연산)");
   // 추천 패널 배율도 칸 규칙으로 — 레이나 리더 60/40 에서 #rec 의 넷을 칸에 다 넣고 다시 잰 값과 같다
   {
     const a = boot("ko").leaders("ahmose", "reina", "lynn").mine([60, 40, 0]).gcap(4);
@@ -801,7 +804,8 @@ section("An 칸 — 리더·조이너 같은 잣대 (2026-09-14)");
       ${JSON.stringify(ids)}.forEach(id=>{const e=byId[id].exp[0];const have=(id==="ahmose"||id==="reina"||id==="lynn"?1:0)+seen.filter(z=>z===id).length;seen.push(id);
         if(e.slot==="X"){const p=w=>{const sh=xShare(w,r);if(w.bk&&b[w.bk]!==undefined)b[w.bk]+=w.v*sh;else x*=nbAdd(w.v*sh,have);};p(e);if(e.also&&e.also.slot==="X")p(e.also);return;}
         if(e.slot==="AH"){x*=nbAdd(eVal(e,r),have);return;}
-        if(b[e.slot]!==undefined)b[e.slot]+=(e.slot==="An"?anVal(e,r):eAdd(e,r,have));if(e.also&&b[e.also.slot]!==undefined)b[e.also.slot]+=e.also.v;});
+        const a1=e.slot==="An"?anVal(e,r):eAdd(e,r,have);if(b[e.slot]!==undefined)b[e.slot]+=a1;
+        if(e.also&&b[e.slot]!==undefined&&b[e.also.slot]!==undefined){const b1=eAdd(e.also,r,have);b[e.also.slot]+=b1;x*=twoStat(a1,b1);}});
       return ORDER.reduce((a,sl)=>a*(b[sl]/buck[sl]),1)*x;})()`);
     ok(Math.abs(shown - +want.toFixed(3)) < 5e-4, "레이나 리더 60/40 추천 배율이 칸 검산과 같다", "화면 ×" + shown + " · 검산 ×" + want.toFixed(3));
     ok(ids.indexOf("reina") < 0 || shown < 2.65, "옛 동작(×2.696 · 레이나 재선택 과대)이 아니다", ids.join(",") + " ×" + shown);
@@ -926,6 +930,7 @@ section("전투 배율 — bk 겹침 · pc 기대값");
       const v = mode === "rawPc" ? e.v : E.eVal(e, rr);
       if (b[e.slot] !== undefined) b[e.slot] += v;
       if (e.also && b[e.also.slot] !== undefined) b[e.also.slot] += e.also.v;
+      if (e.also && b[e.slot] !== undefined && b[e.also.slot] !== undefined) x *= E.twoStat(v, e.also.v);   // 두 칸 스킬은 합으로 (2026-10-10)
     }
     return E.ORDER.reduce((acc, sl) => acc * (b[sl] / base[sl]), 1) * x;
   };
@@ -958,6 +963,7 @@ section("전투 배율 — bk 겹침 · pc 기대값");
       if (e.slot === "AH") { x *= 1 + E.eVal(e, rr); continue; }
       if (b[e.slot] !== undefined) b[e.slot] += E.eVal(e, rr);
       if (e.also && b[e.also.slot] !== undefined) b[e.also.slot] += e.also.v;
+      if (e.also && b[e.slot] !== undefined && b[e.also.slot] !== undefined) x *= E.twoStat(E.eVal(e, rr), e.also.v);   // 두 칸 스킬은 합으로 (2026-10-10)
     }
     return E.ORDER.reduce((acc, sl) => acc * (b[sl] / base[sl]), 1) * x;
   })();
@@ -1151,7 +1157,8 @@ section("시트 행 대조 (조이너 순위)");
         if(e.slot==="An")return (buck.An+e.v*NA_SHARE)/buck.An;
         if(e.slot==="AH")return 1+eVal(e,r);
         let m=1;const st=(sl,v)=>{const b=buck[sl];if(b!==undefined)m*=(b+v)/b;};
-        st(e.slot,eVal(e,r)); if(e.also)st(e.also.slot,e.also.v); return m;};
+        st(e.slot,eVal(e,r)); if(e.also){st(e.also.slot,e.also.v);
+          if(buck[e.slot]!==undefined&&buck[e.also.slot]!==undefined)m*=twoStat(eVal(e,r),e.also.v);} return m;};
       const combo=ids=>{const b=Object.assign({},buck);let x=1;
         const put=(sl,v)=>{if(b[sl]!==undefined)b[sl]+=v;};
         ids.forEach(id=>{const e=byId[id].exp[0];
@@ -1160,7 +1167,8 @@ section("시트 행 대조 (조이너 순위)");
             p(e); if(e.also&&e.also.slot==="X")p(e.also); return;}
           if(e.slot==="An"){put("An",e.v*NA_SHARE);return;}
           if(e.slot==="AH"){x*=1+eVal(e,r);return;}
-          put(e.slot,eVal(e,r)); if(e.also)put(e.also.slot,e.also.v);});
+          put(e.slot,eVal(e,r)); if(e.also){put(e.also.slot,e.also.v);
+            if(b[e.slot]!==undefined&&b[e.also.slot]!==undefined)x*=twoStat(eVal(e,r),e.also.v);}});
         return ORDER.reduce((a,sl)=>a*(b[sl]/buck[sl]),1)*x;};
       const gcap=+document.getElementById("gcap").value||99;
       const pool=HEROES.filter(h=>h.gen<=gcap&&h.s&&!lid.has(h.id)&&h.exp[0]&&h.exp[0].slot!=="ECO")
@@ -1274,7 +1282,8 @@ section("애매하면 시트 우선");
   // 실측에서 여유를 두고 잡았다 — 올라가면 하한선도 같이 올린다.
   // ⚠️ 0.60 은 너무 느슨했다 — 회귀 6종을 심어 보니 1종만 걸렸다(2026-09-14 검증).
   // 0.63 이면 「탐욕 대신 상위4 자르기」·「투자 문턱 뒤집기」까지 잡히고 여유가 4칸 남는다.
-  ok(cellHit0 / cellTot >= 0.63, "시트 등재 풀 안의 순수 계산이 시트 칸의 63% 이상에 떨어진다",
+  // 2026-10-10 두 칸 합산 + NA_SHARE 0.6 으로 65.9 → 70.7% 가 되어 0.68 로 올렸다(여유 5칸).
+  ok(cellHit0 / cellTot >= 0.68, "시트 등재 풀 안의 순수 계산이 시트 칸의 68% 이상에 떨어진다",
      (cellHit0 / cellTot * 100).toFixed(1) + "%");
   // ⚠️ 위 지표는 `#rec` 을 읽으므로 **bk·AH 계열 회귀를 구조적으로 못 잡는다** — 플린트 같은
   // 시트 미등재 영웅이 밀려들어도 `poolS` 밖이라 안 보이기 때문이다. 그래서 전체 풀도 같이 잰다.

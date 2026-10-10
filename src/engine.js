@@ -48,7 +48,16 @@ function eAdd(e,r,have){return eK(e,r,have+1)-eK(e,r,have);}
 function nbAdd(v,have){return (1+(have+1)*v)/(1+have*v);}
 // X(병종 한정) 스킬의 환산 지분 — 딜은 딜 지분, 생존은 병력 지분
 function xShare(q,r){return q.k==="sur"?tgtRatio(q.tgt,r)/100:dmgShare(q.tgt,r);}
-const NA_SHARE=.8; // 일반공격이 총딜에서 차지하는 비중 가정
+const NA_SHARE=.6; // 일반공격이 총딜에서 차지하는 비중 가정
+// ⚠️ 0.8 → 0.6 (2026-10-10). 근거는 기전이 아니라 **시트 재현**이다 — 사용자가 목표를 "최대한 시트의 조합과
+// 대체가 나오게" 로 정했고, 52행 격자(0.5~0.8)에서 0.5~0.7 이 평탄 구간이라 가운데를 골랐다. 0.8 에서는 레이나가
+// ×1.240 으로 25% 에픽(×1.250)에 붙어 23행에 끼어들었다. 시트 G7 주석 "Little skills damage, Reina is okay".
+// 측정표는 CLAUDE.md 「2026-10-10 시트 재현 목표」 절에 있다. 느낌으로 다시 만지지 말 것 — 격자부터 다시 돌린다.
+// 두 칸 스킬(필리 공15/방10 · 진먼 방10/체10 · Gen 9+ 의 공15/방10 여섯)은 **합으로 잰다** (2026-10-10).
+// 다른 칸은 곱이라 (1+a)(1+b) = 1+a+b+ab 가 되는데, 그 교차항 ab(필리 1.5%p)가 정확히 25% 에픽을 제치는 폭이었다.
+// 칸에는 그대로 넣고(같은 칸 포화는 살린다) 이 계수로 교차항만 걷어낸다. 역시 근거는 시트 재현이다 —
+// 볼트 공식도 시트 Rally Joiners 탭 산수도 다른 스탯은 곱한다. 시트가 둘에 "25%/20%" 라벨을 안 붙이는 게 유일한 간접 신호.
+function twoStat(a,b){return (1+a+b)/((1+a)*(1+b));}
 // An(일반공격 한정) 칸에 넣을 값 — 총딜 = NA_SHARE×일반공격×(1+Σv) + (1−NA_SHARE)×스킬 이므로
 // 칸값은 정확히 1+NA_SHARE×Σv 다. 리더든 조이너든 같은 잣대로 이 칸에 합산한다(2026-09-14).
 function anVal(e,r){return e.slot==="An"?e.v*NA_SHARE:eVal(e,r);}
@@ -282,7 +291,11 @@ function calc(){
      if(e.slot==="An")detail.push(L("일반공격 비중 "+(NA_SHARE*100)+"% 가정 · 같은 칸 합연산","assumes normal attacks are "+(NA_SHARE*100)+"% of damage · adds in the same slot"));
      // also 도 같은 함수(eAdd)로 — 지금은 also 에 pc 가 없어 값이 같지만, 2026-09-12 에 comboAll 이 e.v 를 써서
      // 미아를 과소계상한 것과 같은 함정이 여기 열려 있었다(2026-09-14 감사, 예방 수정 · 값 불변).
-     step(e.slot,e.slot==="An"?anVal(e,r):eAdd(e,r,have)); if(e.also)step(e.also.slot,eAdd(e.also,r,have));
+     const a1=e.slot==="An"?anVal(e,r):eAdd(e,r,have); step(e.slot,a1);
+     if(e.also){const b1=eAdd(e.also,r,have); step(e.also.slot,b1);
+       // 두 칸 스킬은 합으로 — 교차항 ab 를 걷어낸다 (2026-10-10, 시트 재현 목표)
+       if(buck[e.slot]!==undefined&&buck[e.also.slot]!==undefined){const c=twoStat(a1,b1);mul*=c;
+         detail.push(L("두 칸 스킬 → 합으로 잽니다 (교차항 제거 ×"+c.toFixed(3)+")","two-stat skill → measured as a sum (cross term removed ×"+c.toFixed(3)+")"));}}
    }
    return{h,e,mul,detail,cond,dup:lid.has(h.id)};
  }).filter(Boolean);

@@ -20,8 +20,9 @@ export function makeSim(E, opt = {}) {
     return p / tot;
   };
   // 세트(스킬 목록)를 칸별로 모은다. 반환: {bucket -> Σv}, pc 그룹은 복사본 수로 한 번에.
+  // 두 칸 스킬(공격+방어 등)은 합으로 — 각 칸에는 넣되 교차항 (1+a)(1+b)-(1+a+b)=ab 를 cross 로 걷어낸다 (2026-10-10, 시트 재현 목표)
   function collect(skills, r) {
-    const add = {}, self = {}, pcg = {};
+    const add = {}, self = {}, pcg = {}; let cross = 1;
     const put = (k, v) => { add[k] = (add[k] || 0) + v; };
     for (const {h, e} of skills) {
       if (e.slot === "ECO") continue;
@@ -36,13 +37,13 @@ export function makeSim(E, opt = {}) {
       }
       if (e.slot === "AH") { const k = "self:" + h.id + "/" + e.n; self[k] = (self[k] || 0) + e.v; continue; }
       if (e.slot === "An") { const k = "self:" + h.id + "/" + e.n; self[k] = (self[k] || 0) + e.v * NA_SHARE; continue; }
-      put(e.slot, e.v); if (e.also) put(e.also.slot, e.also.v);
+      put(e.slot, e.v); if (e.also) { put(e.also.slot, e.also.v); cross *= (1 + e.v + e.also.v) / ((1 + e.v) * (1 + e.also.v)); }
     }
     const n = cls(r);
     for (const k in pcg) { const {e, n: copies} = pcg[k]; const v = n > 0 ? e.v * (1 - Math.pow(1 - e.pc, n * copies)) / e.pc : 0; put(e.slot, v); if (e.also) put(e.also.slot, e.also.v * copies); }
-    return {add, self};
+    return {add, self, cross};
   }
-  const prod = ({add, self}) => Object.values(add).reduce((a, v) => a * (1 + v), 1) * Object.values(self).reduce((a, v) => a * (1 + v), 1);
+  const prod = ({add, self, cross}) => Object.values(add).reduce((a, v) => a * (1 + v), 1) * Object.values(self).reduce((a, v) => a * (1 + v), 1) * (cross ?? 1);
   // 리더 스킬 목록 + 조이너 S1 목록
   const leaderSkills = lead => lead.filter(Boolean).flatMap(id => byId[id].exp.map(e => ({h: byId[id], e})));
   const joinerSkills = js => js.map(id => ({h: byId[id], e: byId[id].exp[0]}));
