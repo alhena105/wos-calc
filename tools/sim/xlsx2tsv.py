@@ -9,9 +9,7 @@ for ws in wb.worksheets:
     rows = []
     for r in ws.iter_rows(values_only=True):
         if all(v is None for v in r): continue
-        rows.append(["" if v is None else str(v).replace("
-", " / ") for v in r])
+        rows.append(["" if v is None else str(v).replace("\n", " / ") for v in r])
     with open(os.path.join(out, name + ".tsv"), "w", encoding="utf-8") as f:
-        for r in rows: f.write("	".join(r).rstrip("	") + "
-")
+        for r in rows: f.write("\t".join(r).rstrip("\t") + "\n")
     print(name, len(rows))
