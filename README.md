@@ -32,7 +32,7 @@ Korean and English are both supported. Use the toggle at the top right; the page
 - 원정스킬은 전부 Lv.5(4성 이상)로 간주
 - 확률·주기 스킬은 기대값으로 환산
 - 병종 전용 딜 스킬은 보병 가중치 0.3을 적용한 딜 지분으로 환산
-- 일반공격 한정 스킬은 총딜의 80%를 일반공격으로 가정
+- 일반공격 한정 스킬은 총딜의 50%를 일반공격으로 가정
 - "확률로 N% 피해" 계열은 "피해량 증가"와 같은 칸으로 묶음 (effect_op 미확정)
 
 계산 모델의 근거는 [랠리 편성 × 조이너 스킬 × 데미지 공식 통합 해설](https://blog.astris.kr/posts/f7a87706-3c2f-40c0-b282-d77a311ab4e3)에 있습니다.

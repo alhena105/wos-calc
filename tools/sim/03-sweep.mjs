@@ -40,7 +40,7 @@ for (let dw = 0.1; dw <= 1.001; dw += 0.1) {
 }
 // ③ 민감도 — NA_SHARE
 out.sweepNA = [];
-for (let na = 0.5; na <= 1.001; na += 0.1) {
+for (let na = 0.0; na <= 1.001; na += 0.1) {   // 2026-10-17: 0.5 부터 쓸어서 아래쪽 평탄 구간을 못 봤다
   const m = measure(makeSim(E, {NA_SHARE: na}), "S");
   out.sweepNA.push({na: +na.toFixed(2), top: m.top, pri: m.pri, all: m.all});
   console.log("NA_SHARE", na.toFixed(1), "#1", m.top.toFixed(1), "겹침", m.pri.toFixed(1));

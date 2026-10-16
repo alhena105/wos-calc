@@ -301,8 +301,8 @@ var STR={
  lbEnD:["들어오는 랠리 병비 (선택)","Incoming rally ratio (optional)"],
  phInf:["보","inf"], phLan:["창","lan"], phMar:["궁","mar"],
  lbGcap:["서버 최대 세대 (조이너 풀 제한)","Server's highest generation (limits the joiner pool)"],
- assump:['<b>계산 가정</b> — 원정스킬은 전부 Lv.5(4성 이상)로 간주 · 확률·주기 스킬은 <b>기대값</b>으로 환산 · 병종 전용 딜 스킬은 보병 가중치 0.3을 적용한 <b>딜 지분</b>으로 환산(보병은 탱커라 병력 비중 대비 딜이 적음) · 일반공격 한정 스킬은 총딜의 60%를 일반공격으로 가정 · 두 칸 스킬(공격+방어 등)은 곱이 아니라 <b>합</b>으로 환산 · "확률로 N% <b>피해량</b>" 계열은 "피해량 증가"와 같은 칸으로 묶고, 원문이 "<b>추가피해·추가공격·N% 피해</b>"인 것은 칸이 아니라 따로 곱합니다(어느 칸인지 자료 없음).<br>전무 레벨 0 = 미보유 · 숫자 옆 칸이 전무 레벨입니다. 병비 합이 100이 아니면 자동으로 정규화합니다.',
-   '<b>Assumptions</b> — every expedition skill is treated as Lv.5 (4★ or above) · chance-based and periodic skills are converted to <b>expected value</b> · class-locked damage skills are converted to a <b>damage share</b> with infantry weighted 0.3 (infantry tanks, so it contributes less damage than its headcount) · normal-attack-only skills assume 60% of total damage is normal attacks · two-stat skills (attack + defense etc.) are valued as a <b>sum</b>, not a product · "N% <b>damage dealt</b> on a chance" is grouped into the same slot as "damage bonus", while wording such as "<b>extra damage, extra attack or N% damage</b>" multiplies on its own instead of entering a slot (no source says which slot it would occupy).<br>Exclusive-gear level 0 = not owned; the box beside each hero is its level. If the ratio does not add to 100 it is normalised automatically.'],
+ assump:['<b>계산 가정</b> — 원정스킬은 전부 Lv.5(4성 이상)로 간주 · 확률·주기 스킬은 <b>기대값</b>으로 환산 · 병종 전용 딜 스킬은 보병 가중치 0.3을 적용한 <b>딜 지분</b>으로 환산(보병은 탱커라 병력 비중 대비 딜이 적음) · 일반공격 한정 스킬은 총딜의 50%를 일반공격으로 가정 · 두 칸 스킬(공격+방어 등)은 곱이 아니라 <b>합</b>으로 환산 · "확률로 N% <b>피해량</b>" 계열은 "피해량 증가"와 같은 칸으로 묶고, 원문이 "<b>추가피해·추가공격·N% 피해</b>"인 것은 칸이 아니라 따로 곱합니다(어느 칸인지 자료 없음).<br>전무 레벨 0 = 미보유 · 숫자 옆 칸이 전무 레벨입니다. 병비 합이 100이 아니면 자동으로 정규화합니다.',
+   '<b>Assumptions</b> — every expedition skill is treated as Lv.5 (4★ or above) · chance-based and periodic skills are converted to <b>expected value</b> · class-locked damage skills are converted to a <b>damage share</b> with infantry weighted 0.3 (infantry tanks, so it contributes less damage than its headcount) · normal-attack-only skills assume 50% of total damage is normal attacks · two-stat skills (attack + defense etc.) are valued as a <b>sum</b>, not a product · "N% <b>damage dealt</b> on a chance" is grouped into the same slot as "damage bonus", while wording such as "<b>extra damage, extra attack or N% damage</b>" multiplies on its own instead of entering a slot (no source says which slot it would occupy).<br>Exclusive-gear level 0 = not owned; the box beside each hero is its level. If the ratio does not add to 100 it is normalised automatically.'],
  srcData:['데이터 출처: <a href="https://wosheroes.com/">wosheroes</a> · <a href="https://www.whiteoutsurvival-community.com/">whiteoutsurvival-community</a> · <a href="https://www.whiteoutsurvival.wiki/">whiteoutsurvival.wiki</a> (2026-08-15 수집 · Gen14~17 2026-08-22 보강) · 영웅 초상: <a href="https://www.whiteoutsurvival.wiki/">whiteoutsurvival.wiki</a> (© Century Games)',
    'Data: <a href="https://wosheroes.com/">wosheroes</a> · <a href="https://www.whiteoutsurvival-community.com/">whiteoutsurvival-community</a> · <a href="https://www.whiteoutsurvival.wiki/">whiteoutsurvival.wiki</a> (collected 2026-08-15; Gen 14-17 added 2026-08-22) · Hero portraits: <a href="https://www.whiteoutsurvival.wiki/">whiteoutsurvival.wiki</a> (© Century Games)'],
  srcModel:['계산 모델: <a href="https://blog.astris.kr/posts/f7a87706-3c2f-40c0-b282-d77a311ab4e3">랠리 편성 × 조이너 스킬 × 데미지 공식 통합 해설</a> · 확률/주기 스킬은 기대값으로 환산한 근사치입니다.',
@@ -1040,7 +1040,11 @@ function eAdd(e,r,have){return eK(e,r,have+1)-eK(e,r,have);}
 function nbAdd(v,have){return (1+(have+1)*v)/(1+have*v);}
 // X(병종 한정) 스킬의 환산 지분 — 딜은 딜 지분, 생존은 병력 지분
 function xShare(q,r){return q.k==="sur"?tgtRatio(q.tgt,r)/100:dmgShare(q.tgt,r);}
-const NA_SHARE=.6; // 일반공격이 총딜에서 차지하는 비중 가정
+const NA_SHARE=.5; // 일반공격이 총딜에서 차지하는 비중 가정
+// ⚠️ 0.6 → 0.5 (2026-10-17). 엔진으로 0.00~0.70 을 쓸어 보니 **0.00~0.65 는 52행 추천이 한 명도 안 바뀐다.**
+// 결과에 닿는 경로는 레이나(1+0.30×NA) 하나뿐이고, NA > 2/3 이면 레이나가 ×1.200(20% 계열 · 칸이 찬 25% 계열)을
+// 넘어 9행에 끼어든다. 시트가 주는 건 그 **상한 2/3 하나**다. 0.6 은 그 경계에서 0.067 이라 0.5 로 여유를 뒀다
+// (하한 0 은 시트 근거가 아니라 측정 범위 끝이라 구간 가운데 0.33 을 고르지 않았다).
 // ⚠️ 0.8 → 0.6 (2026-10-10). 근거는 기전이 아니라 **시트 재현**이다 — 사용자가 목표를 "최대한 시트의 조합과
 // 대체가 나오게" 로 정했고, 52행 격자(0.5~0.8)에서 0.5~0.7 이 평탄 구간이라 가운데를 골랐다. 0.8 에서는 레이나가
 // ×1.240 으로 25% 에픽(×1.250)에 붙어 23행에 끼어들었다. 시트 G7 주석 "Little skills damage, Reina is okay".
