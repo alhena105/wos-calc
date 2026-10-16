@@ -144,6 +144,22 @@ function nearComps(ids,gcap){
  if(ids.filter(Boolean).length<2)return [];
  return SHEET_COMPS.filter(c=>(gcap===undefined||c.g<=gcap)&&leadersFit(c,ids)).sort((a,b)=>b.g-a.g);
 }
+// 동률 타이브레이크용 — gcap 근처(USE_WIN 세대 안) 시트 행에서 이 영웅이 조이너 칸에 오른 행 수 (2026-10-17).
+// 시트 등재(s) 플래그만으로는 등재 영웅끼리의 동률(제시·헨드릭·패트릭 ×1.250)을 못 가른다.
+// ⚠️ skip(이 입력에 걸리는 시트 행)은 **반드시 뺀다.** 안 빼면 시트 행을 시트 답으로 맞히는 순환이 된다 —
+// 그래서 SHEET_EDGE=0 대조가 따로 손 안 대도 leave-one-out 이다.
+// 창 폭은 쓸어서 골랐다: 0 62.3% · 1~2 62.7%(평탄) · 3~4 61.4% · 6 60.5% (52행 겹침). 전체 빈도는 저세대
+// 행을 휩쓴 제시가 이겨 효과가 없다. 값을 바꾸지 않는다 — 같은 배율 안에서만 순서를 정한다.
+const USE_WIN=2;
+function sheetUse(gcap,skip){
+ const n={};
+ SHEET_COMPS.forEach(c=>{
+  if(c.g>gcap||c.g<gcap-USE_WIN||skip.indexOf(c)>=0)return;
+  const seen=new Set();c.j.forEach(s=>s.forEach(id=>seen.add(id)));
+  seen.forEach(id=>{n[id]=(n[id]||0)+1;});
+ });
+ return n;
+}
 // 칸을 채울 때 쓰는 대표 행 하나. 나머지는 화면이 "시트가 답을 둘 적어 뒀다"고 알린다.
 function matchComp(ids,r,gcap){
  const all=matchComps(ids,r,gcap);
@@ -313,13 +329,18 @@ function calc(){
  }).filter(Boolean);
  // 동률 타이브레이크 — 값이 같으면 모델은 더 못 가른다. 그래서 **투자 문턱**으로 가른다:
  // 실제로 조이너로 들어오는 건 이론 순위가 아니라 "Lv.5 로 올라와 있는 영웅"이기 때문이다.
- //   ① 시트 등재(s) → ② 에픽(만렙이 싸다) → ③ 낮은 세대(보유율이 높다) → ④ 데이터 순서
+ //   ① 시트 등재(s) → ② 근처 세대 시트 사용 빈도(sheetUse) → ③ 에픽(만렙이 싸다) → ④ 낮은 세대(보유율이 높다) → ⑤ 데이터 순서
  // 값 자체는 건드리지 않는다. 순위를 바꾸는 게 아니라 **같은 값 안에서만** 순서를 정한다.
  // 예전에는 데이터 순서에 맡겨서 그웬(이론·G5)이 헨드릭(시트·G8)을 앞섰다.
  // 부동소수 끝자리로 동률이 깨지지 않게 6자리에서 반올림해 비교한다.
- // sort 는 ES2019 부터 안정 정렬이라 ④ 는 따로 안 적어도 지켜진다.
+ // sort 는 ES2019 부터 안정 정렬이라 ⑤ 는 따로 안 적어도 지켜진다.
+ // 이 편성이 시트에 있는 행인가 — 있으면 애매한 자리에서 시트 쪽으로 기운다(render.js).
+ // ② 의 빈도에서 이 행들을 빼야 하므로 정렬보다 먼저 구한다.
+ const comps=matchComps(picks.map(p=>p.hero&&p.hero.id||""),r,gcap);
+ const use=sheetUse(gcap,comps);
  const tkey=x=>Math.round(x.mul*1e6);
  rank.sort((a,b)=>(tkey(b)-tkey(a))||((b.h.s?1:0)-(a.h.s?1:0))||
+   ((use[b.h.id]||0)-(use[a.h.id]||0))||
    ((b.h.rar==="epic")-(a.h.rar==="epic"))||(a.h.gen-b.h.gen));
 
  // ── 카운터 ──
@@ -332,8 +353,6 @@ function calc(){
    ctr=Object.assign({mode,en:ea},
      mode==="defender"?garrisonVerdict(mine,ea):sheetVerdict(ea,mine));
  }
- // 이 편성이 시트에 있는 행인가 — 있으면 애매한 자리에서 시트 쪽으로 기운다(render.js)
- const comps=matchComps(picks.map(p=>p.hero&&p.hero.id||""),r,gcap);
  const comp=comps.length?comps[0]:null;
  // 칸이 다른 나머지 행 — 시트가 이 입력에 답을 둘 적어 둔 경우다. 화면이 그대로 알린다.
  const rivals=compRivals(comps);

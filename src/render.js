@@ -110,8 +110,8 @@ function render(d){
    (x.cond?'<div class="note">'+x.cond.split("|")[1]+"</div>":"")+'</td><td class="note">'+x.detail.map(esc).join("<br>")+
    '</td><td class="big">×'+x.mul.toFixed(3)+'<div class="note">'+(x.e.slot==="X"?L("조건부","conditional"):dmg?L("딜","damage"):L("생존","survival"))+"</div></td></tr>";});
  o+="</tbody></table></div>";
- o+='<p class="cap">'+L("배율이 같으면 <b>투자 문턱</b>으로 가릅니다 — <b>시트 등재 → 에픽 → 낮은 세대</b> 순. 계산이 더 못 가르는 자리라, 실제로 Lv.5 까지 올라와 있을 가능성이 높은 쪽을 앞세웁니다. 값을 바꾸는 게 아니라 같은 값 안에서만 순서를 정합니다.",
-   "Equal multipliers are broken by the <b>investment threshold</b> — <b>sheet-listed first, then epics, then lower generations</b>. The model cannot separate them, so the tie goes to whoever is more likely to actually be maxed. This only orders within a tie; it never changes a value.")+"</p>";
+ o+='<p class="cap">'+L("배율이 같으면 <b>투자 문턱</b>으로 가릅니다 — <b>시트 등재 → 근처 세대(±2) 시트 행에서 자주 쓰인 영웅 → 에픽 → 낮은 세대</b> 순. 계산이 더 못 가르는 자리라, 실제로 Lv.5 까지 올라와 있을 가능성이 높은 쪽을 앞세웁니다. 빈도를 셀 때 지금 이 편성에 걸리는 시트 행은 뺍니다. 값을 바꾸는 게 아니라 같은 값 안에서만 순서를 정합니다.",
+   "Equal multipliers are broken by the <b>investment threshold</b> — <b>sheet-listed first, then heroes the sheet uses most in nearby generations (±2), then epics, then lower generations</b>. The model cannot separate them, so the tie goes to whoever is more likely to actually be maxed. The count leaves out any sheet row that matches this very lineup. This only orders within a tie; it never changes a value.")+"</p>";
  // 감소 계열이 왜 25% 증가에 지는지 — 근거는 볼트 「랠리 조이너 선정 규칙·개리슨 운영 (Ton)」 §5·§8.
  // 위 배율은 이미 그 나눗셈으로 계산돼 있다(감소 칸도 같은 buck 에 합산되므로 20% 는 ×1.200 이 된다).
  // 화면에 적어 두는 이유는 "×1.200 과 ×1.250 은 5%p 차이" 로 읽히기 때문이다.
@@ -181,7 +181,7 @@ function render(d){
  // 나온다"고 경고했는데, 그건 중복을 허용했을 때 이야기다. 후보를 서로 다른 영웅으로 제한하면
  // 시트 지침 5번("4명을 섞는 게 낫다")과 어긋나지 않는다.
  //
- // 동률이면 pool 순서가 이긴다 — pool 은 이미 투자 문턱(시트 등재 → 에픽 → 낮은 세대)으로
+ // 동률이면 pool 순서가 이긴다 — pool 은 이미 투자 문턱(시트 등재 → 근처 세대 시트 빈도 → 에픽 → 낮은 세대)으로
  // 정렬돼 있으므로 그 정책이 그대로 지켜진다.
  // 시트 행과 맞으면 그 행의 조이너를 그대로 쓴다 — 이 프로젝트 1번 원칙을 그대로 옮긴 것이다.
  // 예전에는 "애매한 2% 안에서만" 였는데, 그러면 제시군 14칸·가토 5칸 같은 자리를 못 따라가고
@@ -251,8 +251,8 @@ function render(d){
   '</b></p><p class="cap">'+L("전투 배율 ×","Combat multiplier ×")+comboAll(top).toFixed(3)+
   L(" · 리더가 쓰는 영웅도 조이너로 들어올 수 있습니다 — 다른 연맹원이 자기 것을 데려오는 것이라 막지 않습니다."," · a hero already run by a leader can still join — a different alliance member brings their own copy, so it is not blocked.")+"</p>"+
   stackNote(top)+
-  '<p class="cap">'+L("여기 나오는 건 <b>Ton 시트 조이너 명단에 오른 영웅만</b>입니다. 계산 순위 1~4위를 그대로 쓰지 않는 이유는 <b>투자 문턱</b> 때문입니다 — 이론 순위가 높아도 전설은 만렙 보유자가 적고, 만렙 찍은 사람은 대개 이미 그 영웅을 리더로 쓰고 있어 조이너로 못 뺍니다. 시트 52행과 대조했더니 <b>이쪽이 #1 재현 94.2% · 겹침 61.4%</b> 로, 계산 순위 그대로(92.3% · 47.8%)보다 낫고 <b>한 행도 나빠지지 않았습니다</b>.",
-     "These are only heroes on the Ton sheet’s joiner list. The raw top four is not used because of the <b>investment threshold</b>: legendaries are rarely maxed, and whoever did max one is usually already running it as a leader. Checked against all 52 sheet rows, this list reproduces the sheet’s #1 joiner <b>94.2%</b> of the time with <b>61.4%</b> overlap, against 92.3% / 47.8% for the raw ranking — and it was never worse on any row.")+"</p>"+
+  '<p class="cap">'+L("여기 나오는 건 <b>Ton 시트 조이너 명단에 오른 영웅만</b>입니다. 계산 순위 1~4위를 그대로 쓰지 않는 이유는 <b>투자 문턱</b> 때문입니다 — 이론 순위가 높아도 전설은 만렙 보유자가 적고, 만렙 찍은 사람은 대개 이미 그 영웅을 리더로 쓰고 있어 조이너로 못 뺍니다. 시트 52행과 대조했더니 <b>이쪽이 #1 재현 98.1% · 겹침 62.7%</b> 로, 계산 순위 그대로(96.2% · 49.1%)보다 낫고 <b>한 행도 나빠지지 않았습니다</b>.",
+     "These are only heroes on the Ton sheet’s joiner list. The raw top four is not used because of the <b>investment threshold</b>: legendaries are rarely maxed, and whoever did max one is usually already running it as a leader. Checked against all 52 sheet rows, this list reproduces the sheet’s #1 joiner <b>98.1%</b> of the time with <b>62.7%</b> overlap, against 96.2% / 49.1% for the raw ranking — and it was never worse on any row.")+"</p>"+
   (comp?'<p class="cap">'+L("📋 이 편성은 <b>Ton 시트 Gen "+comp.g+" 행</b>에 있습니다(병비 "+comp.rs.map(v=>v.join("/")).join(" · ")+"). 시트가 적은 조이너는 <b>"+
      comp.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+"</b> 입니다. <b>시트 행이면 그 칸을 그대로 따릅니다</b> — 칸 안에서 누구를 쓸지만 계산이 고릅니다(“제시*” 칸이면 제시·제셀·제로니모 중 하나). 이 계산기의 1번 원칙이 <b>“계산이 시트와 엇갈리면 시트를 따른다”</b> 이기 때문입니다. 그 대가는 숨기지 않습니다 — 계산만으로 고른 답이 바로 아래 <b>「🧮 계산 순위 그대로」</b> 에 그대로 있습니다. <b>시트에 없는 편성에서는 아무 일도 일어나지 않습니다</b> — 그게 보통입니다.",
      "📋 This lineup is <b>row Gen "+comp.g+" of the Ton sheet</b> (ratios "+comp.rs.map(v=>v.join("/")).join(", ")+"), whose joiners are <b>"+

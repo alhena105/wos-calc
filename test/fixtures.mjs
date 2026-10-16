@@ -180,6 +180,10 @@ export const X_BUCKETED = [
   // 2026-09-14: "reducing damage taken by Lancers and Marksmen by 30% and Infantry by 70%" — 문자 그대로 Damage Taken.
   // 창·궁 몫(also)을 더하면서 같이 붙였다. 4회마다 공격을 쉬는 비용은 못 싣는다(data.js 주석).
   {id:"ahmose",   n:"Viper Formation",      bk:"D", alsoBk:"D"},
+  // 2026-10-17: "increases Infantry Defense by 30%" — 병종 한정이지만 방어력 스탯이다. 실험 분류표(집결원 스킬
+  // 분류)도 둘을 DEFENSE UP 에 필리·진먼·그레고리와 같이 넣었다. 가토 원문은 "Infantry Defense" 그대로다.
+  {id:"gatot",    n:"Golden Guard",         bk:"DEF"},
+  {id:"gisela",   n:"Alloyed Defense",      bk:"DEF"},
 ];
 
 // ── 시트 세대별 행 — 조이너 순위 대조용 ──────────────────────

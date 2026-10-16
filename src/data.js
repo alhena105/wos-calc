@@ -22,6 +22,12 @@
 //   어느 칸인지는 자료가 없으니 칸을 만들지도 않는다 — 자기 계수로만 곱한다(포화 없음).
 //   X 스킬에서 extra damage 계열에 bk 를 달지 않는 것과 **같은 규칙**이고, 예전에는
 //   이 둘이 어긋나 있었다(X 는 칸을 피하는데 일반 칸은 A 에 합산). 2026-09-12 정정.
+// 제시·제셀·제로니모(S1)·린(S1) 은 slot:"E"(파괴력) 다 — wosheroes 원문은 "damage dealt" 지만
+//   실험으로 나눈 집결원 스킬 분류표(2026-10-17 사용자 제공)가 넷을 블랑쉬·알론소와 같은 LETHALITY UP 에,
+//   소냐·도미닉을 따로 DAMAGE DEALT UP 에 둔다. 시트 Rally Joiners 범례 "Blanchette type of skills
+//   (lethality) is also additive" 와도 맞는다. 제로니모 S3 Expert Swordsmanship 은 표에 없어 A 그대로다.
+//   같은 표가 가토·기젤라(병종 한정 방어력)를 DEFENSE UP 에 넣어 bk:"DEF" 를 붙였다(bk 규칙 그대로).
+//   표의 룸 보겐(적 파괴력↓)·그레고리 방어 10%* 는 원문과 달라 따르지 않았다.
 // slot 코드: A=피해량↑ AH=타격 추가피해(칸 아님) An=일반공격피해↑ B=공격력↑ C=체력↑ D=받는피해↓ DEF=방어력↑
 //            E=파괴력↑ F=적방어↓ G=적받는피해↑ H=적공격↓ I=적파괴력↓ J=적피해량↓
 //            DODGE=회피 CRIT=치명률 X=병종한정/주기형 ECO=비전투
@@ -33,10 +39,10 @@
 const HEROES = [
 // ── Epic (원정스킬 2개, 전용무기 없음) ──
 {id:"jessie",s:1,kr:"제시",en:"Jessie",cls:"lancer",gen:0,rar:"epic",
- exp:[{n:"Stand of Arms",slot:"A",v:.25,t:"전 부대 피해량 +25%",te:"all troops damage +25%"},
+ exp:[{n:"Stand of Arms",slot:"E",v:.25,t:"전 부대 피해량 +25% (실험 분류: 파괴력 칸)",te:"all troops damage +25% (tested: lethality slot)"},
       {n:"Bulwarks",slot:"D",v:.20,t:"전 부대 받는 피해 −20%",te:"all troops damage taken −20%"}],w:null},
 {id:"jasser",s:1,kr:"제셀",en:"Jasser",cls:"marksman",gen:0,rar:"epic",
- exp:[{n:"Tactical Genius",slot:"A",v:.25,t:"전 부대 피해량 +25%",te:"all troops damage +25%"},
+ exp:[{n:"Tactical Genius",slot:"E",v:.25,t:"전 부대 피해량 +25% (실험 분류: 파괴력 칸)",te:"all troops damage +25% (tested: lethality slot)"},
       {n:"Enlightened Warfare",slot:"ECO",v:0,t:"연구 속도 +15%",te:"research speed +15%"}],w:null},
 {id:"seoyoon",s:1,kr:"서윤",en:"Seo-yoon",cls:"marksman",gen:0,rar:"epic",
  exp:[{n:"Rallying Beat",slot:"B",v:.25,t:"전 부대 공격력 +25%",te:"all troops attack +25%"},
@@ -61,7 +67,7 @@ const HEROES = [
       {n:"Total Control",slot:"ECO",v:0,t:"훈련 속도 +20%",te:"training speed +20%"}],w:null},
 // ── Gen 1 ──
 {id:"jeronimo",s:1,kr:"제로니모",en:"Jeronimo",cls:"infantry",gen:1,rar:"leg",
- exp:[{n:"Battle Manifesto",slot:"A",v:.25,t:"전 부대 피해량 +25%",te:"all troops damage +25%"},
+ exp:[{n:"Battle Manifesto",slot:"E",v:.25,t:"전 부대 피해량 +25% (실험 분류: 파괴력 칸)",te:"all troops damage +25% (tested: lethality slot)"},
       {n:"Swordmentor",slot:"B",v:.25,t:"전 부대 공격력 +25%",te:"all troops attack +25%"},
       {n:"Expert Swordsmanship",slot:"A",v:.15,p:"4턴중 2턴",pe:"2 turns out of 4",t:"4턴마다 2턴 피해량 +30% (시간평균 15%)",te:"2 turns out of every 4: damage +30% (time-averaged 15%)"}],
  w:{side:"rally",stat:"Attack",name:"Discernment"}},
@@ -133,7 +139,7 @@ const HEROES = [
       {n:"Shadow Blade",slot:"X",k:"dmg",v:.50,tgt:"lancer",t:"창병 25% 확률 200% 추가공격",te:"lancers, 25% chance: a 200% extra attack"}],
  w:{side:"rally",stat:"Lethality",name:"Fiery Invasion"}},
 {id:"lynn",s:1,kr:"린",en:"Lynn",cls:"marksman",gen:4,rar:"leg",
- exp:[{n:"Song of Lion",slot:"A",v:.20,p:"40%",pe:"40% chance",t:"40% 확률 피해량 +50%",te:"40% chance: damage +50%"},
+ exp:[{n:"Song of Lion",slot:"E",v:.20,p:"40%",pe:"40% chance",t:"40% 확률 피해량 +50% (실험 분류: 파괴력 칸)",te:"40% chance: damage +50% (tested: lethality slot)"},
       {n:"Melancholic Ballad",slot:"J",v:.20,t:"적 전 부대 피해량 −20%",te:"all enemy troops damage −20%"},
       {n:"Oonai Cadenza",slot:"X",k:"dmg",v:.05,tgt:"marksman",t:"궁병 3공격마다 공격력 +5% 누적",te:"marksmen, every 3rd attack: attack +5%, stacking"}],
  w:{side:"defender",stat:"Lethality",name:"Iranon's Determination"}},
@@ -192,7 +198,7 @@ const HEROES = [
  w:{side:"defender",stat:"Attack",name:"Siege Insight"}},
 // ── Gen 8 ──
 {id:"gatot",s:1,kr:"가토",en:"Gatot",cls:"infantry",gen:8,rar:"leg",
- exp:[{n:"Golden Guard",slot:"X",k:"sur",v:.30,tgt:"infantry",t:"보병 방어력 +30%",te:"infantry defense +30%"},
+ exp:[{n:"Golden Guard",slot:"X",bk:"DEF",k:"sur",v:.30,tgt:"infantry",t:"보병 방어력 +30%",te:"infantry defense +30%"},
       {n:"King's Bestowal",slot:"X",k:"sur",v:.30,tgt:"infantry",t:"보병 공격 시 보호막(공격력 30%)",te:"infantry attacks grant a shield (30% of attack)"},
       {n:"Royal Legion",slot:"H",v:.25,t:"적 전 부대 공격력 −25%",te:"all enemy troops attack −25%"}],
  w:{side:"defender",stat:"Defense",name:"Indestructible City"}},
@@ -284,7 +290,7 @@ const HEROES = [
        t:"4턴마다 2턴 적 보병 받는 피해 +30% · 적 궁병 피해량 −30%",te:"every 4 turns for 2 turns: enemy infantry take +30% damage, enemy marksmen deal −30%"}],
  w:{side:"defender",stat:"Health",name:"Fruit of Life"}},
 {id:"gisela",kr:"기젤라",en:"Gisela",cls:"infantry",gen:13,rar:"leg",
- exp:[{n:"Alloyed Defense",slot:"X",k:"sur",v:.30,tgt:"infantry",
+ exp:[{n:"Alloyed Defense",slot:"X",bk:"DEF",k:"sur",v:.30,tgt:"infantry",
        t:"보병 방어력 +30%",te:"infantry defense +30%"},
       {n:"Scavengeworks",slot:"DEF",v:.20,p:"40%",pe:"40% chance",
        t:"보병 40% 확률로 전 부대 방어력 +50% 1턴",te:"infantry: 40% chance to give all troops +50% defense for 1 turn"},
