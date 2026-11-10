@@ -1366,10 +1366,10 @@ section("애매하면 시트 우선");
     const line = a.paras().filter(x => x.includes("↘"))[0] || "";
     ok(line.includes("노라"), "겹쳐 넣은 영웅의 장당 값 문단이 뜬다", line.slice(0, 80));
     const mg = [...line.matchAll(/×([\d.]+)/g)].map(m => +m[1]);
-    // 2026-11-10: 시트는 노라 3장이지만 겹치는 칸은 따져 본다 — 2장째 ×1.228 은 필리 ×1.232 에 밀리고 마지막 칸에서 노라가 다시 이긴다.
+    // 2026-11-10: 시트는 노라 3장이지만 겹치는 칸은 따져 본다 — (2026-11-11: 셋째 장부터만 따진다) 3장째 ×1.205 가 필리 ×1.232 에 밀린다.
     ok(mg.length === 2, "노라는 2장만 남는다 — 값이 둘 찍힌다", mg.join(","));
     const sw = /id="swaps">([\s\S]*?)<\/p>/.exec(html);
-    ok(!!sw && /노라<\/b> ×1\.228 → <b>필리<\/b> ×1\.232/.test(sw[1]), "바꾼 칸과 두 값이 화면에 찍힌다 (노라 ×1.228 → 필리 ×1.232)", sw ? sw[1].replace(/<[^>]+>/g, "").slice(0, 120) : "없음");
+    ok(!!sw && /노라<\/b> ×1.205 → <b>필리<\/b> ×1\.232/.test(sw[1]), "바꾼 칸과 두 값이 화면에 찍힌다 (노라 ×1.205 → 필리 ×1.232)", sw ? sw[1].replace(/<[^>]+>/g, "").slice(0, 120) : "없음");
     ok(mg.every((v, i) => i === 0 || v < mg[i - 1]),
        "장마다 값이 줄어든다 (포화가 실제로 반영돼 있다)", mg.join(" → "));
     // 핵심 교차검증 — 첫 장의 값은 ⑤ 순위표의 그 영웅 배율과 같아야 한다.
@@ -1762,9 +1762,12 @@ section("버킷 이론 (2026-11-10)");
       const i = h.indexOf('id="rec"'), j = h.indexOf("전투 배율", i);
       return {ids: [...h.slice(i, j).matchAll(/heroes\/([a-z-]+)\.webp/g)].map(m => m[1]), v: +/×([\d.]+)/.exec(h.slice(j))[1],
               sw: (/id="swaps">([\s\S]*?)<\/p>/.exec(h) || [0, ""])[1].replace(/<[^>]+>/g, "")}; };
-    // 같은 버킷의 다른 영웅 — 진먼(방어+체력)은 필리(방어)·패트릭(체력)과 겹친다 → 제시와 비교해 밀린다
+    // 2026-11-11: 버킷이 일부만 겹치는 영웅은 따지지 않는다 — 진먼(방어+체력)은 필리·패트릭과 한쪽씩만 겹친다 → 시트 칸 그대로
     const z = rec(["jeronimo", "reina", "greg"], [50, 20, 30], 4);
-    ok(/진먼 ×1\.16\d → 제시 ×1\.200/.test(z.sw) && !z.ids.includes("zinman"), "같은 버킷의 다른 영웅 칸도 따진다 (진먼 → 제시)", z.ids.join(",") + " · " + z.sw.slice(0, 90));
+    ok(z.ids.includes("zinman") && !z.sw, "버킷이 일부만 겹치는 칸은 시트 그대로 (진먼 유지)", z.ids.join(",") + " · " + z.sw.slice(0, 90));
+    // 가이드 §7 예시 — Gen 4 제로니모·미아·알론소 48/4/48 = 패트릭·필리·진먼·레이나
+    const z7 = rec(["jeronimo", "mia", "alonso"], [48, 4, 48], 4);
+    ok(z7.ids.slice().sort().join() === "patrick,philly,reina,zinman", "가이드 §7 예시가 시트 답과 같다", z7.ids.join(","));
     // 겹치지 않으면 시트 그대로 — 바꾼 표시도 없다
     const k = rec(["logan", "philly", "zinman"], [60, 40, 0], 3);
     ok(k.ids.join() === "mia,patrick,jessie,seoyoon" && !k.sw, "겹치지 않는 행은 시트 칸 그대로 (미아·패트릭·제시·서윤)", k.ids.join(","));

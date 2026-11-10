@@ -182,7 +182,7 @@ function joinerRules(ids,r,combo,b0,skHeavy,gcap,recIds){
  if(!skHeavy&&b0.An<=1+1e-9&&avail("reina"))
   out.push({level:"info",code:"REINA",text:L("일반공격 버킷이 비어 있습니다 — 상대 스킬 데미지가 적으면 레이나를 고려하세요(시트 Gen 7 · 11).","The normal-attack bucket is empty — if their skill damage is low, consider Reina (sheet, Gen 7 and 11).")});
  if(r.inf+r.mar>=88&&avail("norah"))
-  out.push({level:"info",code:"NORAH_STACK",text:L("보병+궁병 위주 편성입니다 — 시트는 여기서 노라를 3~4장까지 적습니다. 추천은 장마다 겹침을 따져 이득일 때만 넣습니다.","Infantry + marksman heavy — the sheet lists up to 3-4 Norah here. The recommendation adds each copy only while it still wins after overlap.")});
+  out.push({level:"info",code:"NORAH_STACK",text:L("보병+궁병 위주 편성입니다 — 시트는 여기서 노라를 3~4장까지 적습니다. 추천은 둘째 장까지 시트대로 두고 셋째 장부터 이득일 때만 넣습니다.","Infantry + marksman heavy — the sheet lists up to 3-4 Norah here. The recommendation follows the sheet up to two copies and adds a third only while it still wins.")});
  if((combo&&combo.flags.indexOf("CHANCE")>=0)||recIds.some(id=>{const h=HEROES.filter(x=>x.id===id)[0];return !!h&&chanceP(h.exp[0])>0;}))
   out.push({level:"info",code:"CHANCE",text:L("추천·조합에 확률형(미아류 포함)이 있습니다 — 열세일 때 한 방을 노리는 용도입니다(시트 원칙 3).","The recommendation or combo includes a chance-based skill (Mia types included) — that is for gambling when you are the weaker side (sheet principle 3).")});
  out.push({level:"info",code:"LV5",text:L("조이너는 1번 영웅 S1 이 Lv.5 여야 채택됩니다. 미달이면 그 사람이 통째로 건너뛰어집니다.","A joiner only counts if their first hero's S1 is Lv.5 — otherwise that player is skipped entirely.")});

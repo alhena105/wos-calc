@@ -201,7 +201,13 @@ function render(d){
  // 시트 쪽이 같거나 높으면 시트대로, 낮으면 바꾸고 out.swaps 에 적어 화면에 이유를 띄운다. 여유폭은 두지 않는다(근거 없는 숫자가 된다).
  // 리더가 채운 버킷과의 겹침은 여기서 안 본다 — 그것까지 보면 시트 우선이 통째로 순수 계산이 된다.
  const bks=c=>c.at.map(a=>a.t==="free"?"x:"+a.key:a.sl).filter(Boolean);
- const overlaps=(out,c)=>{const mine=bks(c);return out.some(o=>o.h.id===c.h.id||bks(o).some(b=>mine.indexOf(b)>=0));};
+ // 2026-11-11 정정: "버킷이 하나라도 겹치면" 은 너무 넓었다 — 진먼(방어+체력)이 필리의 방어·패트릭의 체력과 한쪽씩만 겹치는데도
+ // 걸려서 시트 칸 4행이 뒤집혔고, 바꿔 넣은 쪽이 둘째 패트릭(시트에 없던 중복)인 행도 있었다. 사용자가 말한 건 "같은 스킬" 이다
+ // → 같은 영웅이거나 **S1 버킷 구성이 완전히 같은** 영웅만 겹친다고 본다.
+ const bkey=c=>bks(c).slice().sort().join("|");
+ // 그리고 **셋째 장부터**만 따진다(같은 날 사용자 결정) — 시트가 흔히 적는 노라 2장·패트릭 2장은 그대로 두고, 문제였던 3장 연속만 겨냥한다.
+ // 여유폭 숫자 없이 가이드 60행 완전 일치가 45 → 52행이 된다. 둘째 장이 계산상 낮은 자리(G6 헥터 행 ×2.383 → ×2.262)는 📐 패널이 보여 준다.
+ const overlaps=(out,c)=>{const mine=bkey(c);return out.filter(o=>o.h.id===c.h.id||(mine&&bkey(o)===mine)).length>=2;};
  const fillCells=(list,cells,out)=>{
   const late=[];out.swaps=[];
   cells.forEach(cell=>{
@@ -266,8 +272,8 @@ function render(d){
      " — copies land in the same slot additively, so <b>each one adds less</b>. Rounded to three decimals.")+"</p>":"";};
  // 시트 칸을 바꾼 자리 — 무엇을 왜 바꿨는지 숫자로 적는다(몰래 바꾸지 않는다).
  const swapNote=list=>(list.swaps&&list.swaps.length)?'<p class="cap" id="swaps">'+
-  L("🔀 <b>시트 칸을 바꾼 자리</b> — 앞서 넣은 조이너와 같은 영웅·같은 버킷이라 겹치는 칸은 그 장의 실제 값을 따져 봅니다: ",
-    "🔀 <b>Sheet cells that were swapped</b> — a cell that repeats a hero or bucket already picked is checked at its actual value: ")+
+  L("🔀 <b>시트 칸을 바꾼 자리</b> — 같은 영웅(또는 같은 스킬의 영웅)이 <b>셋째 장</b>이 되는 칸부터는 그 장의 실제 값을 따져 봅니다(둘째 장까지는 시트대로): ",
+    "🔀 <b>Sheet cells that were swapped</b> — from the <b>third copy</b> of the same hero (or a hero with the same skill), a cell is checked at its actual value (up to two copies follow the sheet): ")+
   list.swaps.map(w=>L("시트 <b>"+esc(HN(w.from.h))+"</b> ×"+w.fv.toFixed(3)+" → <b>"+esc(HN(w.to.h))+"</b> ×"+w.tv.toFixed(3),
     "sheet <b>"+esc(HN(w.from.h))+"</b> ×"+w.fv.toFixed(3)+" → <b>"+esc(HN(w.to.h))+"</b> ×"+w.tv.toFixed(3))).join(" · ")+
   L(". 시트 쪽이 같거나 높으면 시트대로 둡니다. 시트 원래 칸은 아래 📋 문단에 그대로 있습니다.",
@@ -307,9 +313,9 @@ function render(d){
   '<p class="cap">'+L("여기 나오는 건 <b>Ton 시트 조이너 명단에 오른 영웅만</b>입니다. 계산 순위 1~4위를 그대로 쓰지 않는 이유는 <b>투자 문턱</b> 때문입니다 — 이론 순위가 높아도 전설은 만렙 보유자가 적고, 만렙 찍은 사람은 대개 이미 그 영웅을 리더로 쓰고 있어 조이너로 못 뺍니다. 시트 58행과 대조했더니 <b>이쪽이 #1 재현 81.0% · 겹침 61.8%</b> 로, 계산 순위 그대로(79.3% · 56.6%)보다 낫고 <b>한 행도 나빠지지 않았습니다</b>. (#1 을 놓친 행은 대부분 시트 #1 이 레니인 행입니다 — 레니 S1 은 버킷이 미확정이라 점수에 넣지 않습니다. 그 행을 빼면 97.9% 입니다.)",
      "These are only heroes on the Ton sheet’s joiner list. The raw top four is not used because of the <b>investment threshold</b>: legendaries are rarely maxed, and whoever did max one is usually already running it as a leader. Checked against all 58 sheet rows, this list reproduces the sheet’s #1 joiner <b>81.0%</b> of the time with <b>61.8%</b> overlap, against 79.3% / 56.6% for the raw ranking — and it was never worse on any row. (Most #1 misses are rows whose sheet #1 is Renee — her S1 bucket is unconfirmed, so she is not scored. Without those rows it is 97.9%.)")+"</p>"+
   (comp?'<p class="cap">'+L("📋 이 편성은 <b>Ton 시트 Gen "+comp.g+" 행</b>에 있습니다(병비 "+comp.rs.map(v=>v.join("/")).join(" · ")+"). 시트가 적은 조이너는 <b>"+
-     comp.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+"</b> 입니다. <b>시트 행이면 그 칸을 우선 따릅니다</b> — 칸 안에서 누구를 쓸지는 계산이 고릅니다(“제시*” 칸이면 제시·제셀·제로니모 중 하나). 이 계산기의 1번 원칙이 <b>“계산이 시트와 엇갈리면 시트를 따른다”</b> 이기 때문입니다. 다만 <b>앞서 채운 조이너와 같은 영웅이거나 같은 버킷인 칸</b>은 그대로 베끼지 않고 시트 등재 영웅 중 최선과 비교해, 시트 쪽이 낮을 때만 바꿉니다(바꾼 자리는 위 🔀 에 적습니다). 그 대가는 숨기지 않습니다 — 계산만으로 고른 답이 바로 아래 <b>「🧮 계산 순위 그대로」</b> 에 그대로 있습니다. <b>시트에 없는 편성에서는 아무 일도 일어나지 않습니다</b> — 그게 보통입니다.",
+     comp.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+"</b> 입니다. <b>시트 행이면 그 칸을 우선 따릅니다</b> — 칸 안에서 누구를 쓸지는 계산이 고릅니다(“제시*” 칸이면 제시·제셀·제로니모 중 하나). 이 계산기의 1번 원칙이 <b>“계산이 시트와 엇갈리면 시트를 따른다”</b> 이기 때문입니다. 다만 <b>같은 영웅(또는 같은 스킬의 영웅)이 셋째 장이 되는 칸부터</b>는 그대로 베끼지 않고 시트 등재 영웅 중 최선과 비교해, 시트 쪽이 낮을 때만 바꿉니다(바꾼 자리는 위 🔀 에 적습니다). 그 대가는 숨기지 않습니다 — 계산만으로 고른 답이 바로 아래 <b>「🧮 계산 순위 그대로」</b> 에 그대로 있습니다. <b>시트에 없는 편성에서는 아무 일도 일어나지 않습니다</b> — 그게 보통입니다.",
      "📋 This lineup is <b>row Gen "+comp.g+" of the Ton sheet</b> (ratios "+comp.rs.map(v=>v.join("/")).join(", ")+"), whose joiners are <b>"+
-     comp.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+"</b>. <b>On a row the sheet covers we follow its cells first</b> — the numbers decide who fills a cell that lists alternatives (a “Jessie*” cell takes Jessie, Jasser or Jeronimo), because this calculator’s first rule is <b>“when the numbers disagree with the sheet, follow the sheet”</b>. The exception: <b>a cell whose hero repeats an already-picked joiner or shares a bucket with one</b> is compared against the best sheet-listed alternative and replaced only when the sheet’s hero scores lower (swaps are listed under 🔀 above). The cost is not hidden — what the numbers alone would pick is in <b>🧮 Raw ranking</b> just below. <b>Nothing is applied to lineups the sheet does not cover</b>, which is the usual case.")+"</p>":"")+
+     comp.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+"</b>. <b>On a row the sheet covers we follow its cells first</b> — the numbers decide who fills a cell that lists alternatives (a “Jessie*” cell takes Jessie, Jasser or Jeronimo), because this calculator’s first rule is <b>“when the numbers disagree with the sheet, follow the sheet”</b>. The exception: <b>a cell that would be the third copy of the same hero (or of a hero with the same skill)</b> is compared against the best sheet-listed alternative and replaced only when the sheet’s hero scores lower (swaps are listed under 🔀 above). The cost is not hidden — what the numbers alone would pick is in <b>🧮 Raw ranking</b> just below. <b>Nothing is applied to lineups the sheet does not cover</b>, which is the usual case.")+"</p>":"")+
   // 병비가 맞는 행이 없을 때 — 리더가 같은 시트 행을 안내한다 (2026-10-10, 사용자 요청).
   // 아모세·필리·린 60/40 에서 "시트랑 왜 달라?" 가 나왔다 — 시트는 그 셋을 50/2/48 에만 적어 뒀는데
   // 화면이 아무 말도 안 해서 사용자가 알 길이 없었다. 판정에는 안 쓰고 안내만 한다.
