@@ -15,7 +15,8 @@ const RJ = [
 ];
 const r3 = E.norm(50, 20, 30);
 for (const p of RJ) {
-  const skills = [{h: {id: "L"}, e: {slot: "A", v: p.lead[0] - 1}}, {h: {id: "L"}, e: {slot: "B", v: p.lead[1] - 1}}];
+  // 리더 기준값의 첫째는 제시 버킷이다 — 2026-10-17 부터 제시군이 E(파괴력) 칸이라 E 로 넣는다(예전 "A" 가 묵어 8/16 이 나왔다).
+  const skills = [{h: {id: "L"}, e: {slot: "E", v: p.lead[0] - 1}}, {h: {id: "L"}, e: {slot: "B", v: p.lead[1] - 1}}];
   for (let i = 0; i < p.jA; i++) skills.push({h: byId.jessie, e: byId.jessie.exp[0]});
   for (let i = 0; i < p.jB; i++) skills.push({h: byId.seoyoon, e: byId.seoyoon.exp[0]});
   const got = sim.prod(sim.collect(skills, r3));

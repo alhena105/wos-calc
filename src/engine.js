@@ -1,16 +1,25 @@
 const SLOTS=i18nFill({},function(){return{
  A:{n:L("피해량 증가","Damage bonus"),k:"dmg"},An:{n:L("일반공격 피해","Normal-attack damage"),k:"dmg"},B:{n:L("공격력 증가","Attack bonus"),k:"dmg"},
- AH:{n:L("타격 추가피해","Extra hit damage"),k:"dmg"},
  E:{n:L("파괴력 증가","Lethality bonus"),k:"dmg"},F:{n:L("적 방어력 감소","Enemy defense down"),k:"dmg"},G:{n:L("적 받는 피해 증가","Enemy damage taken up"),k:"dmg"},
- CRIT:{n:L("치명률","Crit rate"),k:"dmg"},
  C:{n:L("체력 증가","Health bonus"),k:"sur"},D:{n:L("받는 피해 감소","Damage taken down"),k:"sur"},DEF:{n:L("방어력 증가","Defense bonus"),k:"sur"},
  H:{n:L("적 공격력 감소","Enemy attack down"),k:"sur"},I:{n:L("적 파괴력 감소","Enemy lethality down"),k:"sur"},J:{n:L("적 피해량 감소","Enemy damage down"),k:"sur"},
- DODGE:{n:L("회피","Dodge"),k:"sur"}};});
-// AH 는 일부러 ORDER 에 없다 — 칸이 아니기 때문이다. 원문이 "extra damage / extra attack /
-// N% damage" 인 스킬은 Damage Dealt 스탯이 아니라 타격에 붙는 다른 기전이고, 어느 칸인지
-// 자료가 없다. 그래서 합연산 칸을 만들지 않고 자기 계수로만 곱한다(포화를 겪지 않는다).
-// X 스킬에서 extra damage 계열에 bk 를 달지 않는 것과 같은 규칙이다.
-const ORDER=["A","An","B","E","F","G","CRIT","C","D","DEF","H","I","J","DODGE"];
+ DODGE:{n:L("회피","Dodge"),k:"sur"},
+ SKILL:{n:L("스킬 데미지","Skill damage"),k:"x"},SKILLUP:{n:L("스킬 데미지↑","Skill damage up"),k:"x"},
+ VSTROOP:{n:L("특정 병종 상대 피해↑","Damage vs a troop type"),k:"x"},TARGET:{n:L("표식 대상 피해↑","Damage vs marked targets"),k:"x"},
+ EXTRA:{n:L("추가 피해","Extra damage"),k:"x"},SHIELD:{n:L("보호막","Shield"),k:"x"}};});
+// ── 버킷 (2026-11-10 · Ton 영상 "One thing that you DON'T understand about rallies and joiners") ──
+// 같은 버킷은 더하고 다른 버킷은 곱한다. 버킷 값 = 1 + Σ%. 점수 = Π(공격 버킷) × Π(방어 버킷)^W_DEF.
+// 방어 버킷도 1+Σ 그대로다 — 감소 20% 는 ×0.8 이 아니라 ÷1.2(상대 쪽에서 본 같은 구조)라서다.
+// ⚠️ 예전 AH(추가피해 — 칸 없이 따로 곱함)·CRIT 는 없앴다. 스킬 데미지(SKILL)와 리더 전용 버킷(EXCL)은
+// **수치 모델이 없어서** 배율에 넣지 않고 진단 칩으로만 띄운다(data.js 머리 주석 참고).
+const ATK_B=["A","An","B","E","F","G"],DEF_B=["C","D","DEF","H","I","J","DODGE"];
+const ORDER=ATK_B.concat(DEF_B);
+const BUCKET=Object.fromEntries(ORDER.map(s=>[s,1]));
+const EXCL=["SKILL","SKILLUP","VSTROOP","TARGET","EXTRA","SHIELD"];
+const W_DEF=1;              // 방어 버킷의 무게(지수). 1 = 공격 버킷과 같다 — 전투비 R 에 똑같이 곱해지기 때문이다
+let CHANCE_NO_STACK=true;   // 같은 버킷 확률형은 효과가 겹치지 않고 발동 확률만 오른다(Ton). false = 예전 기대값 단순합
+const MIA_TYPE_MIN=0;       // 미아·플로라 병종 판정 — 비중이 이 값(%)보다 큰 병종만 센다
+const GWEN_EFF=.5;          // 그웬 S1 "일부 공격에만" 감쇄. ⚠️ 0.5 는 근거 없는 값이다(사용자 결정 2026-11-10)
 const byId=Object.fromEntries(HEROES.map(h=>[h.id,h]));
 const wpct=l=>l<2?0:5+(Math.floor(l/2)-1)*2.5;
 const norm=(a,b,c)=>{const s=a+b+c;return s<=0?{inf:0,lan:0,mar:0}:{inf:a*100/s,lan:b*100/s,mar:c*100/s};};
@@ -26,7 +35,7 @@ function dmgShare(t,r){
 // pc 스킬 — 확률이 병종마다 독립으로 굴러간다. 편성에 든 병종 수만큼 시행이 늘어난다.
 // v 는 1병종 기준값이므로 (1−(1−pc)^n)/pc 를 곱해 되돌린다 (n=1 이면 그대로).
 // 근거: 볼트 「랠리 조이너 선정 규칙·개리슨 운영 (Ton)」 §6 — 미아 3병종 기대값 43.75%.
-function nCls(r){return (r.inf>0?1:0)+(r.lan>0?1:0)+(r.mar>0?1:0);}
+function nCls(r){return (r.inf>MIA_TYPE_MIN?1:0)+(r.lan>MIA_TYPE_MIN?1:0)+(r.mar>MIA_TYPE_MIN?1:0);}
 // 병종이 하나도 없으면(n=0) pc 스킬의 기대값은 0 이다 — 예전에는 원값을 그대로 돌려줬다(2026-09-14 감사).
 function eVal(e,r){const n=nCls(r);
  return e.pc?(n>0?e.v*(1-Math.pow(1-e.pc,n))/e.pc:0):e.v;}
@@ -61,10 +70,123 @@ const NA_SHARE=.5; // 일반공격이 총딜에서 차지하는 비중 가정
 // 다른 칸은 곱이라 (1+a)(1+b) = 1+a+b+ab 가 되는데, 그 교차항 ab(필리 1.5%p)가 정확히 25% 에픽을 제치는 폭이었다.
 // 칸에는 그대로 넣고(같은 칸 포화는 살린다) 이 계수로 교차항만 걷어낸다. 역시 근거는 시트 재현이다 —
 // 볼트 공식도 시트 Rally Joiners 탭 산수도 다른 스탯은 곱한다. 시트가 둘에 "25%/20%" 라벨을 안 붙이는 게 유일한 간접 신호.
-function twoStat(a,b){return (1+a+b)/((1+a)*(1+b));}
+// ⚠️ 2026-11-10 폐지 — 다른 버킷은 **곱한다**. 버킷 이론(가이드 §4 "혼합형은 두 버킷이 서로 곱해진다" · 지시서 §3.1 점수식)과
+// 반대였고, 노라(bk X 두 칸)는 원래 곱하고 있어 잣대가 둘이었다. 시트 겹침을 올리려던 보정이라 지시서 §10 에도 걸린다(사용자 결정).
+// 함수는 1 을 돌려주는 껍데기로 남긴다 — unit.mjs 의 독립 검산 복제본들이 이 이름을 부른다. 예전 식: (1+a+b)/((1+a)(1+b)).
+function twoStat(a,b){return 1;}
 // An(일반공격 한정) 칸에 넣을 값 — 총딜 = NA_SHARE×일반공격×(1+Σv) + (1−NA_SHARE)×스킬 이므로
 // 칸값은 정확히 1+NA_SHARE×Σv 다. 리더든 조이너든 같은 잣대로 이 칸에 합산한다(2026-09-14).
 function anVal(e,r){return e.slot==="An"?e.v*NA_SHARE:eVal(e,r);}
+
+// ── 버킷 엔진 코어 (2026-11-10) ─────────────────────────────────────
+// 리더 9스킬과 조이너 S1 을 똑같이 "원자(atom)" 목록으로 바꾸고, 점수는 scoreAtoms 하나가 낸다.
+// ⑤ 단일 배율 · 추천 4명 · Top 5 조합이 전부 이 함수를 쓰므로 셋이 서로 다른 산수를 할 수 없다.
+//   det  — 버킷에 그대로 더하는 값(확정 · 주기형 시간평균 · 병종 지분 환산된 bk X · An 환산)
+//   ch   — 확률형. p(발동 확률) · m(발동 시 효과) · n(판정 횟수 — 미아·플로라는 편성 병종 수)
+//   free — 버킷 없는 병종 한정 X(bk 없음). 같은 스킬끼리는 같은 자리라 1+k·v (nbAdd 와 같은 규칙)
+//   two  — 두 칸 스킬의 교차항 제거 계수(twoStat)
+// 확률형 판정: p 가 "N%" 인 일반 스킬과 pc 스킬만. "4턴중 2턴" 같은 주기형은 시간평균(det)이다.
+function chanceP(e){if(e.pc)return e.pc;const m=/^(\d+(?:\.\d+)?)%$/.exec(e.p||"");return m?+m[1]/100:0;}
+function sv(e){return e.partial?e.v*GWEN_EFF:e.v;}
+// 같은 효과 = 같은 자리. 영웅이 달라도 S1 효과가 완전히 같으면 같은 키다 — 조합 탐색의 동치류도 이 키로 묶는다.
+function sig(e){return JSON.stringify([e.slot,e.v,e.p||"",e.pc||0,e.k||"",e.tgt||"",e.bk||"",e.partial||0,e.also||null]);}
+function atoms(e,r){
+ const out=[],key=sig(e);
+ const one=(q,k2)=>{
+  if(q.slot==="ECO"||EXCL.indexOf(q.slot)>=0||q.v==null)return null;
+  if(q.slot==="X"){const v=q.v*xShare(q,r);
+   out.push(q.bk&&BUCKET[q.bk]?{t:"det",sl:q.bk,v:v,x:1}:{t:"free",key:k2,v:v});return null;}
+  if(!BUCKET[q.slot])return null;
+  if(q.slot==="An"){const v=q.v*NA_SHARE;out.push({t:"det",sl:"An",v:v,an:1});return v;}
+  const p=chanceP(q);
+  if(p>0){out.push({t:"ch",sl:q.slot,p:p,m:sv(q)/p,n:q.pc?nCls(r):1,pc:q.pc?1:0,key:k2});return null;}
+  const v=sv(q);out.push({t:"det",sl:q.slot,v:v});return v;};
+ const a=one(e,key);
+ if(e.also)one(e.also,key+"+");
+ return out;}
+// 확률형 묶음의 기대 기여.
+// CHANCE_NO_STACK=false 는 **예전 산수 그대로**다 — pc 스킬(미아·플로라)만 같은 키끼리 판정 횟수를 합치고(eK),
+//   나머지 확률형은 장수만큼 기대값을 단순히 더한다(알론소 2장 = 0.40).
+// CHANCE_NO_STACK: 같은 버킷의 확률형은 **가장 큰 발동 효과 하나만** 적용된다고 본다(Ton "데미지가 아니라 확률만 오른다").
+//   효과 내림차순으로 Σ m_k · (1−(1−p_k)^n_k) · Π_{j<k}(1−p_j)^n_j — 독립 판정.
+//   알론소 1/2/3명 → 0.20 / 0.32 / 0.392 · 미아 1장 3병종 0.4375 · 2장 0.4921875.
+function chanceEV(items){
+ if(!items||!items.length)return 0;
+ const g={};items.forEach(a=>{const x=g[a.key]||(g[a.key]={p:a.p,m:a.m,n:0,k:0,pc:a.pc});x.n+=a.n;x.k++;});
+ const ls=Object.keys(g).map(k=>g[k]);
+ if(!CHANCE_NO_STACK)return ls.reduce((s,x)=>s+(x.pc?x.m*(1-Math.pow(1-x.p,x.n)):x.k*x.p*x.m),0);
+ ls.sort((a,b)=>b.m-a.m);
+ let miss=1,ev=0;ls.forEach(x=>{const f=Math.pow(1-x.p,x.n);ev+=x.m*(1-f)*miss;miss*=f;});
+ return ev;}
+function scoreAtoms(list){
+ const det={},ch={},fr={};let s=1;
+ list.forEach(a=>{if(a.t==="det")det[a.sl]=(det[a.sl]||0)+a.v;
+  else if(a.t==="ch")(ch[a.sl]||(ch[a.sl]=[])).push(a);
+  else if(a.t==="free"){const x=fr[a.key]||(fr[a.key]={v:a.v,n:0});x.n++;}
+  else if(a.t==="two")s*=a.f;});
+ const b={};
+ ORDER.forEach(sl=>{const v=1+(det[sl]||0)+chanceEV(ch[sl]);b[sl]=v;s*=DEF_B.indexOf(sl)>=0?Math.pow(v,W_DEF):v;});
+ Object.keys(fr).forEach(k=>{s*=1+fr[k].n*fr[k].v;});
+ return {s:s,b:b};}
+// ── 4명 조합 전수 탐색 (§3.5) ──
+// 후보는 단일 배율이 1 을 넘는 영웅(gen ≤ gcap · S1 이 ECO/SKILL 계열이 아님). S1 효과가 완전히 같은 영웅은 한 동치류로 묶고
+// (제시=제셀=제로니모=블랑쉬=헤르보르=행크 …), 4명 **중복 허용(multiset)** 을 전부 잰다 — 같은 동치류를 여럿 고르면
+// 같은 버킷에 합연산으로 들어가므로 손해가 저절로 반영된다. cands 는 calc 의 rank(투자 문턱 순으로 정렬됨)다 →
+// 동치류 안의 첫 영웅이 대표명이다. 동치류가 maxC 를 넘으면 단일 배율 상위 maxC 개로 가지친다.
+function bestJoiners(base,cands,opt){
+ opt=opt||{};const K=opt.top||5,maxC=opt.maxC||30;
+ const s0=scoreAtoms(base).s,cl=[],by={};
+ cands.forEach(x=>{if(!(x.mul>1.001))return;const k=sig(x.e);
+  if(!by[k]){by[k]={key:k,at:x.at,mem:[],mul:x.mul};cl.push(by[k]);}by[k].mem.push(x);});
+ const C=cl.length>maxC?cl.slice().sort((a,b)=>b.mul-a.mul).slice(0,maxC):cl;
+ const n=C.length,best=[];
+ const consider=(ix)=>{
+  const sc=scoreAtoms(base.concat(C[ix[0]].at,C[ix[1]].at,C[ix[2]].at,C[ix[3]].at));
+  const rel=sc.s/s0;
+  if(best.length>=K&&rel<=best[best.length-1].rel+1e-12)return;
+  best.push({ix:ix.slice(),rel:rel,b:sc.b});
+  best.sort((a,b)=>(b.rel-a.rel>1e-12?1:a.rel-b.rel>1e-12?-1:0)||(()=>{for(let i=0;i<4;i++)if(a.ix[i]!==b.ix[i])return a.ix[i]-b.ix[i];return 0;})());
+  if(best.length>K)best.pop();};
+ for(let i=0;i<n;i++)for(let j=i;j<n;j++)for(let k=j;k<n;k++)for(let l=k;l<n;l++)consider([i,j,k,l]);
+ return best.map(x=>({cls:x.ix.map(i=>C[i]),rel:x.rel,b:x.b,
+   flags:x.ix.some(i=>C[i].at.some(a=>a.t==="ch"))?["CHANCE"]:[]}));}
+// 시트 행과 조합의 겹침 — 동치류 기준. 시트 칸 하나가 조합의 한 자리를 먹는다(최대 매칭, 4! 순열 전수).
+function sheetOverlap(comp,combo){
+ const cells=comp.j,slots=combo.cls;let best=0;
+ const perm=(arr,k)=>{if(k===arr.length){let c=0;
+   cells.forEach((cell,i)=>{const s=slots[arr[i]];if(s&&s.mem.some(x=>cell.indexOf(x.h.id)>=0))c++;});
+   if(c>best)best=c;return;}
+  for(let i=k;i<arr.length;i++){[arr[k],arr[i]]=[arr[i],arr[k]];perm(arr,k+1);[arr[k],arr[i]]=[arr[i],arr[k]];}};
+ perm(slots.map((_,i)=>i),0);
+ return {match:comp,overlap:best,of:cells.length};}
+// ── 규칙 레이어 (§4) — 수치 모델이 없는 판단. **점수를 건드리지 않는다.** 칩으로만 띄운다.
+// gcap — 그 서버에 아직 없는 영웅을 권하는 칩은 내지 않는다. recIds — 화면의 기본 추천(#rec) 4명. 중복 칩은 Top 1 조합뿐 아니라
+// 이것도 본다(Top 1 은 정의상 겹침을 피하므로 그것만 보면 DUP 칩이 사실상 안 뜬다 — 2026-11-10 리뷰).
+function joinerRules(ids,r,combo,b0,skHeavy,gcap,recIds){
+ const has=id=>ids.indexOf(id)>=0,out=[];recIds=recIds||[];
+ const avail=id=>{const h=HEROES.filter(x=>x.id===id)[0];return !!h&&(gcap==null||h.gen<=gcap);};
+ const inC=f=>(!!combo&&combo.cls.some(c=>c.mem.some(x=>f(x.h.id))))||recIds.some(f);
+ const miaLike=id=>id==="mia"||id==="flora";
+ if((has("mia")||has("flora"))&&inC(miaLike)){
+  const n=nCls(r),k0=ids.filter(miaLike).length,p1=1-Math.pow(.5,n*k0),p2=1-Math.pow(.5,n*(k0+1));
+  out.push({level:"warn",code:"MIA_DUP",text:L("리더에 미아·플로라가 있는데 추천·조합에 또 미아류가 있습니다 — 같은 적 받피↑ 버킷이라 <b>확률만 오릅니다</b>: 발동 "+(p1*100).toFixed(1)+"% → "+(p2*100).toFixed(1)+"% (기대값 +"+((p2-p1)*50).toFixed(2)+"%p).",
+   "A Mia-type joiner is in the recommendation or combo while the leaders already run Mia/Flora — same enemy-damage-taken bucket, so <b>only the trigger chance rises</b>: "+(p1*100).toFixed(1)+"% → "+(p2*100).toFixed(1)+"% (EV +"+((p2-p1)*50).toFixed(2)+"pp).")});}
+ if((has("ligeia")||has("estrella"))&&inC(id=>id==="hendrik"||id==="ligeia"||id==="estrella"))
+  out.push({level:"info",code:"HENDRIK_DUP",text:L("리더에 리지아·에스텔라가 있고 추천·조합에 헨드릭류가 있습니다 — 같은 적 방어↓ 버킷입니다.","The leaders run Ligeia/Estrella and the recommendation or combo has a Hendrik-type joiner — same enemy-defense-down bucket.")});
+ if((has("eleonora")||has("greg"))&&inC(id=>id==="patrick"))
+  out.push({level:"info",code:"PATRICK_DUP",text:L("리더에 엘레오노라·그렉(체력↑)이 있는데 패트릭이 들어 있습니다 — 체력 버킷이 겹칩니다(Ton 시트 Gen 11 · 13 비고).","Eleonora/Greg (health up) lead and Patrick is in — the health bucket overlaps (Ton sheet notes, Gen 11 and 13).")});
+ if(r.lan>=20&&!has("renee")&&avail("renee")&&recIds.indexOf("renee")<0)
+  out.push({level:"info",code:"RENEE",text:L("창병이 있는 편성입니다 — 시트의 60/40 행은 대부분 레니를 넣습니다. 버킷이 미확정이라 점수에는 넣지 않았습니다.","This formation has lancers — most 60/40 rows on the sheet include Renee. Her bucket is unconfirmed, so she is not scored.")});
+ if(skHeavy&&avail("wuming"))
+  out.push({level:"info",code:"WUMING",text:L("상대 스킬 데미지가 많으면 무명이 대안입니다(보병 스킬 받피 −30%) — 버킷 미확정이라 점수 외.","Against heavy skill damage Wu Ming is the alternative (infantry skill damage taken −30%) — unconfirmed bucket, not scored.")});
+ if(!skHeavy&&b0.An<=1+1e-9&&avail("reina"))
+  out.push({level:"info",code:"REINA",text:L("일반공격 버킷이 비어 있습니다 — 상대 스킬 데미지가 적으면 레이나를 고려하세요(시트 Gen 7 · 11).","The normal-attack bucket is empty — if their skill damage is low, consider Reina (sheet, Gen 7 and 11).")});
+ if(r.inf+r.mar>=88&&avail("norah"))
+  out.push({level:"info",code:"NORAH_STACK",text:L("보병+궁병 위주 편성입니다 — 시트는 여기서 노라 3~4스택을 허용합니다.","Infantry + marksman heavy — the sheet allows stacking 3-4 Norah here.")});
+ if((combo&&combo.flags.indexOf("CHANCE")>=0)||recIds.some(id=>{const h=HEROES.filter(x=>x.id===id)[0];return !!h&&chanceP(h.exp[0])>0;}))
+  out.push({level:"info",code:"CHANCE",text:L("추천·조합에 확률형(미아류 포함)이 있습니다 — 열세일 때 한 방을 노리는 용도입니다(시트 원칙 3).","The recommendation or combo includes a chance-based skill (Mia types included) — that is for gambling when you are the weaker side (sheet principle 3).")});
+ out.push({level:"info",code:"LV5",text:L("조이너는 1번 영웅 S1 이 Lv.5 여야 채택됩니다. 미달이면 그 사람이 통째로 건너뛰어집니다.","A joiner only counts if their first hero's S1 is Lv.5 — otherwise that player is skipped entirely.")});
+ return out;}
 const tgtName=i18nFill({},function(){return{infantry:L("보병","infantry"),lancer:L("창병","lancers"),marksman:L("궁병","marksmen"),"inf+mar":L("보병+궁병","infantry+marksmen"),"mar+lan":L("궁병+창병","marksmen+lancers")};});
 function tgtStat(t,r){const v=tgtRatio(t,r);return v<5?["dead",L("사망","dead"),v]:v<20?["weak",L("약함","weak"),v]:["ok",L("정상","ok"),v];}
 
@@ -244,32 +366,27 @@ function calc(){
  const out=document.getElementById("out");
  if(leaders.length===0){out.innerHTML='<div class="callout co-tip"><p>'+S("needLeader")+'</p></div>';return;}
 
- // ── 칸 집계 ──
- const buck={},src={},cls=[],hits=[];
- let hitMul=1;
- ORDER.forEach(s=>{buck[s]=1;src[s]=[];});
+ // ── 버킷 집계 (리더 9스킬) ──
+ // 점수는 scoreAtoms 가 낸다. 여기서는 화면용 출처(src) · 병종 전용 판정(cls) · 배율 제외 칩(leaderOnly) · 수치 미확인(unknown)을 모은다.
+ const base=[],src={},cls=[],leaderOnly=[],unknown=[];
+ ORDER.forEach(s=>{src[s]=[];});
  leaders.forEach(({hero})=>hero.exp.forEach(e=>{
    if(e.slot==="ECO")return;
-   const add=(sl,val,note)=>{if(buck[sl]===undefined)return;buck[sl]+=val;
-     src[sl].push(HN(hero)+" "+e.n+" +"+(val*100).toFixed(0)+"%"+(note||""));};
-   // X 는 병종 전용 판정(cls)으로 빠진다.
-   // 한 스킬이 두 병종에 다르게 걸리면(예: 보병 받피↓ + 창병 딜↑) also 로 둘 다 단다.
-   // 다만 bk 가 붙은 것은 원문이 "Damage Dealt / Damage Taken" 스탯이라 일반 칸과 같은 스탯이다 →
-   // 병종 지분으로 환산해 그 칸에도 합산한다. 칸을 우회하면 그 스킬만 포화를 안 겪는다.
-   if(e.slot==="X"){const[st,lbl,v]=tgtStat(e.tgt,r);cls.push({hero,e,st,lbl,v});
-     if(e.also&&e.also.slot==="X"){const[st2,lbl2,v2]=tgtStat(e.also.tgt,r);
-       cls.push({hero,e:Object.assign({},e,e.also),st:st2,lbl:lbl2,v:v2});}
-     const bk=q=>{if(q.bk)add(q.bk,q.v*xShare(q,r),L(" (병종 지분 환산)"," (class share)"));};
-     bk(e); if(e.also&&e.also.slot==="X")bk(e.also);
-     return;}
-   // AH(타격 계열)는 칸이 아니다 — 합연산 대신 자기 계수로 곱해서 따로 모은다.
-   if(e.slot==="AH"){const v=eVal(e,r);hits.push({hero,e,v});hitMul*=1+v;return;}
-   // An(일반공격 한정)도 칸이다 — 값을 일반공격 비중(NA_SHARE)으로 환산해 합산한다.
-   // 예전에는 리더는 원값(0.30)을 칸에 넣고 조이너는 칸 밖에서 ×(1+0.24) 로 곱했다 →
-   // 리더 레이나 행에서 조이너 레이나가 자기 포화를 안 겪어 ×1.240(정확 ×1.194)로 부풀었다(2026-09-14).
-   add(e.slot,anVal(e,r),e.slot==="An"?L(" (일반공격 비중 "+(NA_SHARE*100)+"% 환산)"," (normal-attack share "+(NA_SHARE*100)+"%)"):"");
-   if(e.also)add(e.also.slot,eVal(e.also,r));
+   [e].concat(e.also?[e.also]:[]).forEach(q=>{
+    if(EXCL.indexOf(q.slot)>=0)leaderOnly.push({hero,skill:e.n,slot:q.slot});
+    else if(q.v==null)unknown.push({hero,skill:e.n,slot:q.slot,reason:"v:null"});
+    else if(q.unsure)unknown.push({hero,skill:e.n,slot:q.slot==="X"?(q.bk||"X"):q.slot,reason:"unsure"});
+    // X 는 병종 전용 판정(cls)으로도 빠진다 — 한 스킬이 두 병종에 다르게 걸리면 also 로 둘 다 단다.
+    if(q.slot==="X"){const[st,lbl,v]=tgtStat(q.tgt,r);cls.push({hero,e:q===e?e:Object.assign({},e,q),st,lbl,v});}});
+   const at=atoms(e,r);
+   at.forEach(a=>{
+    if(a.t==="det")src[a.sl].push(HN(hero)+" "+e.n+" +"+(a.v*100).toFixed(0)+"%"+
+      (a.x?L(" (병종 지분 환산)"," (class share)"):a.an?L(" (일반공격 비중 "+(NA_SHARE*100)+"% 환산)"," (normal-attack share "+(NA_SHARE*100)+"%)"):""));
+    else if(a.t==="ch")src[a.sl].push(HN(hero)+" "+e.n+" "+(a.p*100).toFixed(0)+"%×"+(a.m*100).toFixed(0)+"%"+
+      (a.n>1?L(" (병종 "+a.n+"회 판정)"," ("+a.n+" rolls, one per troop type)"):"")+L(" — 확률형"," — chance"));});
+   base.push.apply(base,at);
  }));
+ const s0=scoreAtoms(base),buck=s0.b;
 
  // ── 위젯 ──
  const wg=picks.filter(p=>p.hero&&p.hero.w).map(p=>({
@@ -284,52 +401,33 @@ function calc(){
  const gcap=+document.getElementById("gcap").value||99;
  const rank=HEROES.filter(h=>h.gen<=gcap).map(h=>{
    const e=h.exp[0];if(!e||e.slot==="ECO")return null;
-   let mul=1,detail=[],cond=null;
+   const at=atoms(e,r),s1=scoreAtoms(base.concat(at)),mul=s1.s/s0.s;
+   const detail=[];let cond=null;
    // 리더로 쓴 영웅도 조이너로 들어올 수 있다 — 다른 연맹원이 자기 것을 데려오는 것이다.
-   // 시트도 10개 행에서 리더 영웅을 조이너 칸에 적는다(제로니모 7행 · 노라 1행 등).
-   // 다만 그 영웅의 스킬은 이미 리더 쪽에서 칸에 들어가 있으므로 **한 장 더 얹는 값**으로 잰다.
-   const have=lid.has(h.id)?1:0;
+   // 그 스킬은 이미 리더 쪽 원자로 들어가 있으므로 같은 버킷(또는 같은 자리)에 **한 장 더 얹는 값**으로 저절로 잰다.
    if(e.slot==="X"){const[st,lbl,v]=tgtStat(e.tgt,r);cond=st+"|"+tgtName[e.tgt]+" "+v.toFixed(0)+"% ("+lbl+")";
-     // 2026-09-14: 여기 있던 "dead 면 mul:1 로 조기 반환" 절벽을 없앴다. 리더 쪽 bk X 는 dead 여도 지분 비례값이
-     // 칸에 들어가는데 조이너만 0 으로 잘려 같은 스킬이 한쪽에서만 사라졌다(레니 창병 4.9% ×1.000 / 5.0% ×1.075).
-     // 지분 환산(xShare)이 이미 연속으로 줄이므로 절벽은 덧붙은 규칙이었고 임계값 5% 의 근거도 없다.
-     // 사망 라벨(cond)은 안내로 남고, pool 의 mul>1.001 필터가 실질적으로 0 인 것만 거른다.
-     // 한 스킬이 두 병종에 걸리면 각각 지분을 곱한다 — 서로 다른 축이라 곱연산이다
-     const part=x=>{const sh=xShare(x,r);
+     // 2026-09-14: 조이너 쪽 사망 절벽은 없앴다 — 지분 환산(xShare)이 이미 연속으로 줄인다. 라벨(cond)만 안내로 남는다.
+     [e].concat(e.also&&e.also.slot==="X"?[e.also]:[]).forEach(x=>{const sh=xShare(x,r);
        detail.push(L(tgtName[x.tgt]+" "+(x.k==="sur"?"병력":"딜")+" 지분 "+(sh*100).toFixed(0)+"% 환산",
-                     tgtName[x.tgt]+" "+(x.k==="sur"?"headcount":"damage")+" share "+(sh*100).toFixed(0)+"%"));
-       // bk 가 있으면 같은 스탯이라 칸에서 잰다 — 안 그러면 이 스킬만 1.00 에서 출발해 부풀려진다
-       if(x.bk&&buck[x.bk]!==undefined){const b=buck[x.bk],m=(b+x.v*sh)/b;
-         detail.push(x.bk+" "+b.toFixed(2)+"→"+(b+x.v*sh).toFixed(2)+" ×"+m.toFixed(3));return m;}
-       if(have)detail.push(L("리더가 이미 들고 있음 → 자기끼리 합연산","already on the leader → adds to itself"));
-       return nbAdd(x.v*sh,have);};
-     mul=part(e); if(e.also&&e.also.slot==="X")mul*=part(e.also);
-   }else if(e.slot==="AH"){
-     // 칸이 아니라 자기 계수다 → 리더가 A칸을 얼마나 채웠든 포화를 겪지 않는다.
-     mul=nbAdd(eVal(e,r),have);
-     detail.push(have
-       ?L("타격 계열 — 칸은 아니지만 리더가 이미 들고 있어 자기끼리 합연산합니다",
-          "hit-type — not a slot, but the leader already has it, so it adds to itself")
-       :L("타격 계열 — 칸이 아니라 자기 계수로 곱합니다 (다른 칸과는 포화하지 않습니다)",
-          "hit-type — multiplies on its own, not through a slot (does not saturate against other slots)"));
-   }else{
-     const step=(sl,val)=>{const b=buck[sl];if(b===undefined)return;const m=(b+val)/b;mul*=m;
-       detail.push(sl+" "+b.toFixed(2)+"→"+(b+val).toFixed(2)+" ×"+m.toFixed(3));};
-     if(e.pc)detail.push(have
-       ?L("리더가 이미 들고 있음 → 시행만 "+nCls(r)+"회 늘어 발동 "+((1-Math.pow(1-e.pc,nCls(r)*2))*100).toFixed(1)+"% · 두 장째 값 +"+(eAdd(e,r,1)*100).toFixed(2)+"%p",
-           "already on the leader → only "+nCls(r)+" more rolls: fires "+((1-Math.pow(1-e.pc,nCls(r)*2))*100).toFixed(1)+"%, second copy adds +"+(eAdd(e,r,1)*100).toFixed(2)+"pp")
-       :L("병종 "+nCls(r)+"종 → 발동 "+((1-Math.pow(1-e.pc,nCls(r)))*100).toFixed(1)+"% · 기대값 "+(eVal(e,r)*100).toFixed(2)+"%",
-           nCls(r)+" troop types → fires "+((1-Math.pow(1-e.pc,nCls(r)))*100).toFixed(1)+"% · EV "+(eVal(e,r)*100).toFixed(2)+"%"));
-     if(e.slot==="An")detail.push(L("일반공격 비중 "+(NA_SHARE*100)+"% 가정 · 같은 칸 합연산","assumes normal attacks are "+(NA_SHARE*100)+"% of damage · adds in the same slot"));
-     // also 도 같은 함수(eAdd)로 — 지금은 also 에 pc 가 없어 값이 같지만, 2026-09-12 에 comboAll 이 e.v 를 써서
-     // 미아를 과소계상한 것과 같은 함정이 여기 열려 있었다(2026-09-14 감사, 예방 수정 · 값 불변).
-     const a1=e.slot==="An"?anVal(e,r):eAdd(e,r,have); step(e.slot,a1);
-     if(e.also){const b1=eAdd(e.also,r,have); step(e.also.slot,b1);
-       // 두 칸 스킬은 합으로 — 교차항 ab 를 걷어낸다 (2026-10-10, 시트 재현 목표)
-       if(buck[e.slot]!==undefined&&buck[e.also.slot]!==undefined){const c=twoStat(a1,b1);mul*=c;
-         detail.push(L("두 칸 스킬 → 합으로 잽니다 (교차항 제거 ×"+c.toFixed(3)+")","two-stat skill → measured as a sum (cross term removed ×"+c.toFixed(3)+")"));}}
-   }
-   return{h,e,mul,detail,cond,dup:lid.has(h.id)};
+                     tgtName[x.tgt]+" "+(x.k==="sur"?"headcount":"damage")+" share "+(sh*100).toFixed(0)+"%"));});}
+   if(EXCL.indexOf(e.slot)>=0)detail.push(L("배율 제외 — "+SLOTS[e.slot].n+" (수치 모델 없음)","not scored — "+SLOTS[e.slot].n+" (no numeric model)"));
+   else if(e.v==null)detail.push(L("수치 미확인 — 배율 제외 (버킷 미확정)","value unconfirmed — not scored (bucket unknown)"));
+   if(e.pc){const n=nCls(r),k0=base.filter(a=>a.t==="ch"&&a.sl===e.slot&&a.n===n&&a.p===e.pc).length;
+     detail.push(k0
+       ?L("리더가 이미 같은 판정을 들고 있음 → 시행만 "+n+"회 늘어 발동 "+((1-Math.pow(1-e.pc,n*(k0+1)))*100).toFixed(1)+"%",
+          "the leaders already roll this → only "+n+" more rolls: fires "+((1-Math.pow(1-e.pc,n*(k0+1)))*100).toFixed(1)+"%")
+       :L("병종 "+n+"종 → 발동 "+((1-Math.pow(1-e.pc,n))*100).toFixed(1)+"% · 기대값 "+(eVal(e,r)*100).toFixed(2)+"%",
+          n+" troop types → fires "+((1-Math.pow(1-e.pc,n))*100).toFixed(1)+"% · EV "+(eVal(e,r)*100).toFixed(2)+"%"));}
+   else if(CHANCE_NO_STACK&&at.some(a=>a.t==="ch")&&base.some(a=>a.t==="ch"&&a.sl===e.slot))
+     detail.push(L("같은 버킷 확률형 — 효과는 겹치지 않고 발동 확률만 오릅니다","same-bucket chance skill — the effect does not stack, only the trigger chance rises"));
+   if(e.slot==="An")detail.push(L("일반공격 비중 "+(NA_SHARE*100)+"% 가정 · 같은 칸 합연산","assumes normal attacks are "+(NA_SHARE*100)+"% of damage · adds in the same slot"));
+   ORDER.forEach(sl=>{const a=s0.b[sl],b=s1.b[sl];
+     if(Math.abs(b-a)>1e-12)detail.push(sl+" "+a.toFixed(2)+"→"+b.toFixed(2)+" ×"+(b/a).toFixed(3));});
+   at.forEach(a=>{if(a.t==="free"&&base.some(z=>z.t==="free"&&z.key===a.key))
+     detail.push(L("리더가 이미 들고 있음 → 자기끼리 합연산","already on the leader → adds to itself"));});
+   const tw=at.filter(a=>a.t==="two")[0];
+   if(tw&&Math.abs(tw.f-1)>1e-9)detail.push(L("두 칸 스킬 → 합으로 잽니다 (교차항 제거 ×"+tw.f.toFixed(3)+")","two-stat skill → measured as a sum (cross term removed ×"+tw.f.toFixed(3)+")"));
+   return{h,e,mul,detail,cond,dup:lid.has(h.id),at};
  }).filter(Boolean);
  // 동률 타이브레이크 — 값이 같으면 모델은 더 못 가른다. 그래서 **투자 문턱**으로 가른다:
  // 실제로 조이너로 들어오는 건 이론 순위가 아니라 "Lv.5 로 올라와 있는 영웅"이기 때문이다.
@@ -362,5 +460,12 @@ function calc(){
  const rivals=compRivals(comps);
  // 병비가 맞는 행이 없을 때만 — 리더가 같은 행을 안내한다(판정에는 안 쓴다)
  const near=comps.length?[]:nearComps(picks.map(p=>p.hero&&p.hero.id||""),gcap);
- render({mode,leaders,picks,r,buck,src,cls,hits,hitMul,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap,comp,rivals,near});
+ // ── 버킷 조합 Top 5 · 규칙 레이어 · 시트 비교 (2026-11-10) ──
+ // 기본 추천(#rec · 시트 우선)은 그대로 두고 **버킷 수학만의 답**을 따로 낸다(사용자 결정).
+ const combos=bestJoiners(base,rank,{top:5});
+ const skHeavy=!!document.getElementById("skHeavy").checked;
+ const ids=picks.map(p=>p.hero&&p.hero.id||"");
+ const rules=joinerRules(ids,r,combos[0],buck,skHeavy,gcap);
+ const sheetCmp=comp&&combos.length?sheetOverlap(comp,combos[0]):null;
+ render({mode,leaders,picks,r,buck,src,cls,leaderOnly,unknown,base,s0:s0.s,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap,comp,rivals,near,combos,rules,sheetCmp,skHeavy,ids});
 }

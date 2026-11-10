@@ -15,7 +15,7 @@ export {boot};
 export function api(lang = "ko") {
   const src = p => readFileSync(join(ROOT, "src", p), "utf8");
   const code = src("i18n.js") + src("data.js") + src("engine.js") +
-    "\n;globalThis.__api={HEROES,byId,norm,eVal,eK,eAdd,nbAdd,xShare,dmgShare,tgtRatio,nCls,ORDER,SLOTS,NA_SHARE,DW,SHEET_COMPS,matchComps,matchComp,compRivals,dist,HN};\n";
+    "\n;globalThis.__api={HEROES,byId,norm,eVal,eK,eAdd,nbAdd,xShare,dmgShare,tgtRatio,nCls,ORDER,SLOTS,NA_SHARE,DW,SHEET_COMPS,matchComps,matchComp,compRivals,dist,HN,GWEN_EFF};\n";
   const sb = {console, URLSearchParams, location: {search: "?lang=" + lang, href: "https://x/"},
     navigator: {language: "ko"}, history: {replaceState() {}}};
   vm.createContext(sb); vm.runInContext(code, sb, {filename: "bundle.js"});

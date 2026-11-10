@@ -45,7 +45,7 @@ function note(t) { console.log("   " + t); }
 
 // ── 로더 ───────────────────────────────────────────────────────────────
 const EXPORTS = "LANG,L,HN,CN,STR,HEROES,SLOTS,ORDER,byId,wpct,norm,tgtRatio,DW,dmgShare," +
-  "NA_SHARE,twoStat,anVal,tgtName,tgtStat,COUNTERS,BAND_TOL,ROW_TOL,MECH,dist,sheetVerdict,garrisonVerdict,eVal,eK,eAdd,xShare,nCls,matchComp,matchComps,compRivals,nearComps,SHEET_COMPS";
+  "NA_SHARE,twoStat,anVal,atoms,scoreAtoms,chanceEV,bestJoiners,joinerRules,sheetOverlap,sig,EXCL,ATK_B,DEF_B,W_DEF,GWEN_EFF,MIA_TYPE_MIN,tgtName,tgtStat,COUNTERS,BAND_TOL,ROW_TOL,MECH,dist,sheetVerdict,garrisonVerdict,eVal,eK,eAdd,xShare,nCls,matchComp,matchComps,compRivals,nearComps,SHEET_COMPS";
 function load(lang) {
   const code = src("i18n.js") + src("data.js") + src("engine.js") +
     "\n;globalThis.__api={" + EXPORTS + "};\n";
@@ -105,12 +105,13 @@ for (const h of E.HEROES) {
     if (!!e.p !== !!e.pe) errs.push(h.id + "/" + e.n + ": p/pe 짝 누락");
     if (e.slot === "X" && (!e.tgt || !e.k)) errs.push(h.id + "/" + e.n + ": X 인데 tgt/k 누락");
     if (e.k && !["dmg", "sur"].includes(e.k)) errs.push(h.id + "/" + e.n + ": k=" + e.k);
-    if (e.also && (!SLOTKEYS.has(e.also.slot) || typeof e.also.v !== "number"))
+    // v:null = Ton 버킷표가 버킷은 적었지만 수치가 없는 효과(배율 제외 · 2026-11-10). 지어내지 않는다.
+    if (e.also && (!SLOTKEYS.has(e.also.slot) || (typeof e.also.v !== "number" && e.also.v !== null)))
       errs.push(h.id + "/" + e.n + ": also 형식 이상");
     // X 에 붙는 also 는 그 자체가 병종 한정이라 tgt/k 가 있어야 한다
     if (e.also && e.also.slot === "X" && (!e.also.tgt || !e.also.k))
       errs.push(h.id + "/" + e.n + ": also X 인데 tgt/k 누락");
-    if (typeof e.v !== "number") errs.push(h.id + "/" + e.n + ": v 없음");
+    if (typeof e.v !== "number" && !(e.v === null && e.unsure)) errs.push(h.id + "/" + e.n + ": v 없음 (null 이면 unsure 가 있어야 한다)");
   }
 }
 ok(errs.length === 0, "스키마 위반 없음", errs.slice(0, 5).join(" | "));
@@ -218,7 +219,9 @@ ok(Math.abs(E.norm(60, 60, 0).inf - 50) < 1e-9, "병비 정규화 (합 120 → 5
 ok(E.tgtStat("marksman", E.norm(60, 40, 0))[0] === "dead", "궁병 0% → 사망 판정");
 ok(E.tgtStat("marksman", E.norm(50, 20, 30))[0] === "ok", "궁병 30% → 정상 판정");
 ok(E.DW.infantry === 0.3 && E.NA_SHARE === 0.5, "딜 지분 가정 고정 (NA_SHARE 0.5 — 2026-10-17 엔진 격자 · 상한 2/3 에서 여유)");
-ok(Math.abs(E.twoStat(.15, .10) - 1.25 / 1.265) < 1e-12 && E.twoStat(0, .2) === 1, "두 칸 스킬 교차항 제거 계수 (필리 1.265 → 1.250 · 한 칸이면 1)");
+ok(E.twoStat(.15, .10) === 1 && E.twoStat(0, .2) === 1, "두 칸 스킬은 곱한다 — 교차항 제거는 폐지됐다 (2026-11-10 · twoStat ≡ 1)");
+{ const ph = E.atoms(E.byId.philly.exp[0], {inf: 60, lan: 40, mar: 0});
+  const v = E.scoreAtoms(ph).s; ok(Math.abs(v - 1.15 * 1.10) < 1e-12 && !ph.some(a => a.t === "two"), "필리 S1 = 공격 1.15 × 방어 1.10 = ×1.265 (다른 버킷은 곱)", v); }
 ok(Math.abs(E.dmgShare("infantry", E.norm(50, 20, 30)) - (50 * 0.3) / (50 * 0.3 + 20 + 30)) < 1e-9,
    "보병 딜 지분에 가중치 0.3 적용");
 
@@ -352,10 +355,10 @@ section("렌더");
 section("X 슬롯");
 {
   const X = E.HEROES.flatMap(h => h.exp.filter(e => e.slot === "X").map(e => ({h, e})));
-  ok(X.length > 30, "X 스킬 표본", String(X.length));
+  // 2026-11-10: 추가피해 계열 X 를 SKILL 로 옮겨 38 → 27 로 줄었다
+  ok(X.length > 20, "X 스킬 표본", String(X.length));
   // 100% 를 넘는 X 는 대부분 환산을 빠뜨린 것이다. 진짜 예외는 여기 근거와 함께 적는다.
   const BIG_OK = {
-    "Dreamcatcher": "표식 대상 한정이지만 주기·확률이 없는 상시 효과 (창병 +150%)",
     "Rampant": "10회 감쇠 평균 0.535 를 이미 반영한 값 (보병 200%×0.535)",
   };
   const tooBig = X.filter(({e}) => e.v > 1.01 && !BIG_OK[e.n]).map(({h, e}) => h.id + "/" + e.n + "=" + e.v);
@@ -690,11 +693,12 @@ section("병종별 독립 시행 (pc)");
        "미야 조이너 배율 @" + ratio.join("/") + " = ×" + mul.toFixed(3),
        "화면 ×" + (m && m[1]));
   }
-  // pc 는 미야 S1 하나뿐이다 — 조용히 번지지 않게 못 박는다
+  // pc 는 미야 S1 · 플로라 S1 둘뿐이다 — 조용히 번지지 않게 못 박는다.
+  // 플로라는 2026-11-10 사용자 결정(Ton 영상 "플로라 = 미아")으로 붙었다. 같은 문구 7건(09-14 기각)은 여전히 아니다.
   const pcs = [];
   for (const h of E.HEROES)
     for (const e of h.exp) if (e.pc) pcs.push(h.id + "/" + e.n);
-  ok(pcs.join() === "mia/Bad Luck Streak", "pc 가 붙은 스킬은 미야 Bad Luck Streak 하나", pcs.join(" | "));
+  ok(pcs.join() === "mia/Bad Luck Streak,flora/Enmiring Vines", "pc 가 붙은 스킬은 미야 Bad Luck Streak · 플로라 Enmiring Vines 둘", pcs.join(" | "));
 
   // 병종이 하나뿐이면 원래 값으로 돌아온다 (n=1 → 항등)
   ok(Math.abs(0.25 * (1 - Math.pow(0.5, 1)) / 0.5 - 0.25) < 1e-12, "n=1 이면 pc 보정은 항등원");
@@ -743,12 +747,13 @@ section("조이너 동률 타이브레이크");
   }
   ok(bad.length === 0, "동률 안에서 시트 → 에픽 → 낮은 세대 순서가 지켜진다", bad.slice(0, 3).join(" | "));
 
-  // 회귀 표식: 예전에는 데이터 순서에 맡겨 그웬(이론·G5)이 헨드릭(시트·G8)을 앞섰다
+  // 회귀 표식: 예전에는 데이터 순서에 맡겨 그웬(이론·G5)이 헨드릭(시트·G8)을 앞섰다.
+  // 2026-11-10 그웬 S1 이 GWEN_EFF 로 감쇄돼 ×1.250 묶음을 떠났으므로 같은 버킷(F)의 이론 영웅 리지아(G12)로 잰다.
   const at = id => rows.findIndex(x => x.h.id === id);
-  const hen = at("hendrik"), gwen = at("gwen");
+  const hen = at("hendrik"), gwen = at("ligeia");
   ok(hen >= 0 && gwen >= 0 && rows[hen].mul === rows[gwen].mul && hen < gwen,
-     "같은 ×1.250 에서 헨드릭(시트)이 그웬(이론)보다 앞",
-     "헨드릭 " + (hen + 1) + "위 / 그웬 " + (gwen + 1) + "위");
+     "같은 ×1.250 에서 헨드릭(시트)이 리지아(이론)보다 앞",
+     "헨드릭 " + (hen + 1) + "위 / 리지아 " + (gwen + 1) + "위");
 
   // 타이브레이크는 값을 건드리지 않는다 — 배율은 여전히 내림차순이다
   const desc = rows.every((x, i) => i === 0 || +rows[i - 1].mul >= +x.mul);
@@ -835,11 +840,9 @@ section("리더 self-pick — 무포화 스킬도 자기끼리 합연산 (2026-0
     return null;
   };
   // [영웅, 계열, 리더로 쓴 편성, 안 쓴 편성, 병비, gcap]
+  // 2026-11-10: 레니(EXTRA)·웨인(SKILL)·고든(EXTRA) S1 은 버킷 수치 모델이 없어 **배율에서 빠졌다** → 이 절의 대상이 아니다.
+  // 지금 무포화 X 를 S1 으로 가진 조이너는 없지만 리더끼리는 남아 있으므로, 규칙 자체는 아래 원자 검사로 지킨다.
   const CASES = [
-    ["renee",  "X(bk없음)", ["jeronimo", "renee", "greg"],   ["jeronimo", "mia", "greg"],   [60, 40, 0], 6],
-    // 45/5/50 에서는 아모세(Viper also 추가 후)가 ⑤ 14행에서 웨인을 밀어내 안 보인다 → 20/80/0
-    ["wayne",  "AH",        ["logan", "philly", "wayne"],    ["logan", "philly", "zinman"], [20, 80, 0], 6],
-    ["gordon", "X(bk없음)", ["edith", "gordon", "bradley"],  ["edith", "mia", "bradley"],   [60, 40, 0], 7],
     ["flint",  "X(bk있음)", ["flint", "philly", "zinman"],   ["logan", "philly", "zinman"], [60, 40, 0], 2],
   ];
   for (const [id, kind, withL, without, r, g] of CASES) {
@@ -848,9 +851,13 @@ section("리더 self-pick — 무포화 스킬도 자기끼리 합연산 (2026-0
        "리더가 이미 든 " + kind + " 스킬은 조이너로 다시 집을 때 깎인다 — " + id,
        "리더일 때 " + w + " · 아닐 때 " + o2);
   }
-  // 회귀 표식: 예전 값(포화 0)으로 돌아가면 여기서 걸린다
-  const renee = val(["jeronimo", "renee", "greg"], [60, 40, 0], 6, "renee");
-  ok(renee < 1.5, "레니 자기 재선택이 옛 ×1.690 으로 돌아가지 않았다", String(renee));
+  const R6 = {inf: 60, lan: 40, mar: 0};
+  ok(["renee", "wayne", "gordon"].every(id => E.atoms(E.byId[id].exp[0], R6).length === 0),
+     "레니·웨인·고든 S1 은 배율 원자가 없다 (EXTRA·SKILL — 규칙 레이어로만 안내)");
+  // 무포화 X 의 자기 겹침 — 같은 스킬 두 장은 1+2v (nbAdd 와 같은 규칙)
+  const fx = {slot: "X", k: "dmg", v: .5, tgt: "lancer"}, one = E.atoms(fx, R6);
+  const s1 = E.scoreAtoms(one).s, s2 = E.scoreAtoms(one.concat(one)).s, v = one[0].v;
+  ok(Math.abs(s1 - (1 + v)) < 1e-12 && Math.abs(s2 - (1 + 2 * v)) < 1e-12, "무포화 X 두 장 = 1+2v (곱 (1+v)² 가 아니다)", s1 + " · " + s2);
   // nbAdd 항등식 — have=0 이면 예전과 같아야 한다(옛 동작을 포함한다는 증명)
   const nb = (v, h) => (1 + (h + 1) * v) / (1 + h * v);
   ok(Math.abs(nb(0.37, 0) - 1.37) < 1e-12, "nbAdd(v,0) === 1+v (리더가 없으면 예전 그대로)");
@@ -1057,11 +1064,11 @@ section("시트 행 대조 (조이너 순위)");
     return b ? [...b[1].matchAll(/heroes\/([a-z-]+)\.webp/g)].map(m => m[1]) : [];
   };
   let first = 0, anyP = 0, totP = 0, anyA = 0, totA = 0;
-  const missed = [];
+  const missed = [], missedRows = [];   // missedRows — 라벨이 같은 다른 행과 섞이지 않게 행 객체로도 든다
   for (const row of SHEET_ROWS) {
     const got = recOf(row);
     ok(got.length === 4, "추천 4명이 네 명이다 — G" + row.gen + " " + row.r.join("/"), got.join(","));
-    if (row.top.some(x => got.includes(x))) first++; else missed.push("G" + row.gen + " " + row.r.join("/"));
+    if (row.top.some(x => got.includes(x))) first++; else { missed.push("G" + row.gen + " " + row.r.join("/")); missedRows.push(row); }
     for (const j of row.pri) { totP++; if (got.includes(j)) anyP++; }
     for (const j of row.all) { totA++; if (got.includes(j)) anyA++; }
   }
@@ -1070,7 +1077,17 @@ section("시트 행 대조 (조이너 순위)");
   note("시트 #1~#4 겹침 " + anyP + "/" + totP + " (" + pp.toFixed(1) + "%) · 대체 칸까지 " +
        anyA + "/" + totA + " (" + ap.toFixed(1) + "%)");
   // 하한선은 실측에서 여유를 두고 잡았다. 떨어지면 모델이 시트에서 멀어진 것이다.
-  ok(fp >= 88, "시트 #1 조이너 재현이 88% 이상", fp.toFixed(1) + "% · 놓친 행: " + missed.slice(0, 4).join(", "));
+  // ⚠️ 2026-11-10 하한 88 → 78. 버킷 엔진이 레니(EXTRA)·무명(버킷 미확정)을 **일부러** 배율에서 뺐다(사용자 결정 —
+  // Ton 영상 버킷표에서 레니 S1 은 추가 피해, 무명 S1 은 미분류다). 시트 #1 이 레니인 행은 순수 계산이 구조적으로 못 맞힌다.
+  // 그래서 그 행을 뺀 값을 따로 찍고, 거기에 옛 하한(88)을 건다 — 레니 말고 다른 데서 무너지면 여기서 걸린다.
+  const RULE_ONLY = ["renee", "wuming"];
+  const rowsX = SHEET_ROWS.filter(row => !row.top.some(x => RULE_ONLY.includes(x)));
+  const missedX = missedRows.filter(row => rowsX.includes(row)).map(row => "G" + row.gen + " " + row.r.join("/") + " " + row.lead.join("+"));
+  const fpx = (rowsX.length - missedX.length) / rowsX.length * 100;
+  note("  └ 시트 #1 이 레니·무명(규칙 레이어)인 행 " + (SHEET_ROWS.length - rowsX.length) + "개를 빼면 " +
+       (rowsX.length - missedX.length) + "/" + rowsX.length + " (" + fpx.toFixed(1) + "%) · 놓친 행: " + missed.join(", "));
+  ok(fp >= 78, "시트 #1 조이너 재현이 78% 이상", fp.toFixed(1) + "% · 놓친 행: " + missed.slice(0, 4).join(", "));
+  ok(fpx >= 88, "레니·무명 #1 행을 뺀 #1 재현이 88% 이상", fpx.toFixed(1) + "% · 놓친 행: " + missedX.join(", "));
   ok(pp >= 58, "시트 #1~#4 조이너 겹침이 58% 이상", pp.toFixed(1) + "%");
 
   // 화면 캡션이 이 수치를 문자열로 적어 두고 있다 — 엔진이 바뀌면 같이 틀어진다.
@@ -1277,7 +1294,9 @@ section("애매하면 시트 우선");
   // 시트 칸은 거의 다 채워야 한다. 못 채우는 칸은 리더 중복처럼 **넣을 수 없는** 자리뿐이다.
   // 이건 회귀 검사다 — matchComp 이나 pick4 의 시트 따라가기가 깨지면 여기서 잡힌다.
   // **모델이 시트와 맞는지 보는 검사가 아니다.** 그건 바로 아래 줄이다.
-  ok(cellHit / cellTot >= 0.97, "시트 따라가기가 시트 칸을 97% 이상 베낀다 (복사 확인 · 검증 아님)",
+  // 2026-11-10: 97 → 90. 앞서 넣은 조이너와 같은 영웅·같은 버킷인 칸은 그대로 베끼지 않고 따져 본다(사용자 결정) —
+  // 실측 92.5%(17칸이 바뀐다). 안 겹치는 칸은 여전히 전부 베껴야 하므로 이 하한이 그 회귀를 잡는다.
+  ok(cellHit / cellTot >= 0.90, "시트 따라가기가 시트 칸을 90% 이상 베낀다 (복사 확인 · 검증 아님 · 겹치는 칸은 따져 본다)",
      (cellHit / cellTot * 100).toFixed(1) + "%");
   // 진짜 하한선. 순수 모델이 시트에서 멀어지면 여기가 먼저 내려간다.
   // 실측에서 여유를 두고 잡았다 — 올라가면 하한선도 같이 올린다.
@@ -1347,7 +1366,10 @@ section("애매하면 시트 우선");
     const line = a.paras().filter(x => x.includes("↘"))[0] || "";
     ok(line.includes("노라"), "겹쳐 넣은 영웅의 장당 값 문단이 뜬다", line.slice(0, 80));
     const mg = [...line.matchAll(/×([\d.]+)/g)].map(m => +m[1]);
-    ok(mg.length === 3, "노라 3장이면 값이 셋 찍힌다", mg.join(","));
+    // 2026-11-10: 시트는 노라 3장이지만 겹치는 칸은 따져 본다 — 2장째 ×1.228 은 필리 ×1.232 에 밀리고 마지막 칸에서 노라가 다시 이긴다.
+    ok(mg.length === 2, "노라는 2장만 남는다 — 값이 둘 찍힌다", mg.join(","));
+    const sw = /id="swaps">([\s\S]*?)<\/p>/.exec(html);
+    ok(!!sw && /노라<\/b> ×1\.228 → <b>필리<\/b> ×1\.232/.test(sw[1]), "바꾼 칸과 두 값이 화면에 찍힌다 (노라 ×1.228 → 필리 ×1.232)", sw ? sw[1].replace(/<[^>]+>/g, "").slice(0, 120) : "없음");
     ok(mg.every((v, i) => i === 0 || v < mg[i - 1]),
        "장마다 값이 줄어든다 (포화가 실제로 반영돼 있다)", mg.join(" → "));
     // 핵심 교차검증 — 첫 장의 값은 ⑤ 순위표의 그 영웅 배율과 같아야 한다.
@@ -1461,9 +1483,10 @@ section("애매하면 시트 우선");
   //     matchComp 이 하나만 돌려주던 시절엔 배열에서 먼저 나온 행이 조용히 이겼다.
   {
     const comps = JSON.parse(run(CTX_KO, "JSON.stringify(SHEET_COMPS)"));
-    ok(comps.length === 54, "SHEET_COMPS 는 시트 편성 행 54개다", String(comps.length));
+    // 2026-11-10 시트 재수집: Gen 5 헥터·노라·린 +1 · Gen 13 +5 → 60
+    ok(comps.length === 60, "SHEET_COMPS 는 시트 편성 행 60개다", String(comps.length));
     const metas = comps.filter(c => c.meta);
-    ok(metas.length === 3, "시트 라벨이 META 인 행 3개에 meta:1 이 붙어 있다", String(metas.length));
+    ok(metas.length === 5, "시트 라벨이 META 인 행 5개에 meta:1 이 붙어 있다 (Gen 13 둘 추가)", String(metas.length));
 
     // g12 60/20/20 은 시트에 두 줄이고, META 쪽 칸(가토)이 채워져야 한다.
     // 2026-09-12 수집 때 이 행을 중복으로 오분류해서 통째로 빠뜨렸다.
@@ -1619,18 +1642,21 @@ section("애매하면 시트 우선");
       const ids = pick(row, 1).ids;
       if (ids.filter(x => x === "norah").length >= 3) three++;
     }
-    ok(three >= 3, "시트가 노라를 3칸 적은 행에서 실제로 3장을 뽑는다", String(three));
+    // 2026-11-10: 예전엔 "3장을 그대로 따른다(≥3행)" 였다. 지금은 겹치는 칸을 따져 보므로 셋째 노라(계산상 손해)는 안 남는다.
+    ok(three === 0, "시트가 노라를 3칸 적어도 셋째 장은 따져 보고 바꾼다 (3장 행 0)", String(three));
     note("시트 우선 상태에서 노라 2장 이상 " + dupRows + "행 · 3장 이상 " + three + "행");
   }
   // ③b 보조 패널(#recAll)은 **시트를 전혀 안 본** 순수 계산이어야 한다.
   // 그래야 "시트를 따르느라 얼마를 포기했는지"가 화면에 보인다. 노라 3장 행은 그 차이가 8% 다.
   {
-    const row = {lead: ["magnus", "mia", "hendrik"], r: [48, 4, 48], gen: 9};
+    // 2026-11-10: 노라 3장 행(magnus+mia+hendrik)은 이제 겹침 판단으로 순수 계산과 같아져 보조 패널이 안 뜬다.
+    // 시트를 따르느라 포기하는 자리는 **레니 칸**(버킷 미확정 · 배율 1)이 남는다 → 그 행으로 본다.
+    const row = {lead: ["magnus", "sonya", "bradley"], r: [60, 40, 0], gen: 9};
     const a = boot("ko").leaders(row.lead[0], row.lead[1], row.lead[2]).mine(row.r);
     a.el("gcap").value = String(row.gen);
     const html = a.render();
     const i = html.indexOf('id="recAll"');
-    ok(i > 0, "노라 3장 행에서는 보조 패널이 뜬다 (추천과 다르니까)");
+    ok(i > 0, "시트가 레니를 적은 행에서는 보조 패널이 뜬다 (추천과 다르니까)");
     const alt = [...html.slice(i, html.indexOf("</b>", i)).matchAll(/heroes\/([a-z-]+)\.webp/g)].map(m => m[1]);
     // 둘째 노라는 순수 계산에서도 이득이면 뽑힌다(stack:1 · CLAUDE.md 「중복은 stack 인 영웅에게만」).
     // 2026-09-14 미아 Lucky Charm 이 A→B 로 옮겨가 A칸이 낮아지자 이 행도 그렇게 됐다. 막는 것은 **3장**이다.
@@ -1640,7 +1666,7 @@ section("애매하면 시트 우선");
     const recV = +(/전투 배율 ×([\d.]+)/.exec(html.slice(html.indexOf('id="rec"'))) || [0, 0])[1];
     ok(pureV > recV, "그 행에서 순수 계산이 추천보다 높다 — 포기한 양이 화면에 보인다",
        "순수 " + pureV + " vs 추천 " + recV);
-    note("노라 3장 행의 대가: 추천 ×" + recV + " vs 순수 계산 ×" + pureV +
+    note("레니 칸 행의 대가: 추천 ×" + recV + " vs 순수 계산 ×" + pureV +
          " (" + ((1 - recV / pureV) * 100).toFixed(1) + "% 포기)");
   }
   // ④ 사용자가 잡은 자리: 로건·필리·진먼 60/40/0 Gen 3 → 시트는 미아·패트릭·제시*·서윤
@@ -1654,6 +1680,143 @@ section("애매하면 시트 우선");
     ok(on.ids.filter(x => ["jessie", "jasser", "jeronimo"].includes(x)).length === 1,
        "제시* 칸은 한 명만 채운다 (평평하게 펴면 둘이 들어가던 자리)", on.ids.join(","));
   }
+}
+
+// ── N+9. 버킷 이론 (2026-11-10 · Ton 영상 + BUCKET-ENGINE-PROMPT §6) ──────
+// 숫자는 지시서 §6 과 시트 Rally Joiners 탭 그대로다. 테스트용 리더는 실제 영웅이 아니라 가짜 스킬 묶음이다 —
+// 시트가 제로니모를 "파괴력 .25 + 공격력 .25" 로만 계산하기 때문이다(S3 제외).
+section("버킷 이론 (2026-11-10)");
+{
+  const R3 = {inf: 40, lan: 20, mar: 40}, R2 = {inf: 50, lan: 0, mar: 50}, R1 = {inf: 100, lan: 0, mar: 0};
+  const S1 = id => E.byId[id].exp[0];
+  const at = (skills, r) => skills.flatMap(e => E.atoms(e, r || R3));
+  const abs = (lead, join, r) => E.scoreAtoms(at(lead.concat(join), r)).s;
+  const rel = (lead, join, r) => abs(lead, join, r) / abs(lead, [], r);
+  const near = (a, b) => Math.abs(a - b) < 1e-9;
+  const J = S1("jessie"), SY = S1("seoyoon");
+  // 1~3 — 같은 25% 넷을 어떻게 놓느냐
+  ok(near(abs([], [J, J, J, J]), 2.0), "1 같은 버킷 25%×4 → 2.000", abs([], [J, J, J, J]));
+  ok(near(abs([], [J, J, SY, SY]), 2.25), "2 두 버킷 2:2 → 2.250");
+  ok(near(abs([], [J, SY, S1("patrick"), S1("hendrik")]), 2.44140625), "3 네 버킷 1:1:1:1 → 2.44140625");
+  // 4 — Rally Joiners 탭 (리더 값은 시트가 적은 그대로)
+  const E25 = {slot: "E", v: .25}, B25 = {slot: "B", v: .25};
+  const rj = [[[], [2.0, 2.25, 2.1875]], [[E25, B25], [2.8125, 3.0625, 3.0]],
+              [[E25, B25, B25], [3.375, 3.5, 3.5]], [[B25, B25], [3.0, 3.0, 3.0625]]];
+  const sets = [[J, J, J, J], [J, J, SY, SY], [J, S1("jeronimo"), S1("jasser"), SY]];
+  rj.forEach(([lead, want]) => {
+    const got = sets.map(s => abs(lead, s));
+    ok(got.every((g, i) => near(g, want[i])), "4 Rally Joiners 탭 — 리더 " + (lead.map(x => x.slot).join("+") || "없음") + " → " + want.join(" · "), got.join(" · "));
+  });
+  // 5 — 같은 버킷 확률형: 효과는 안 겹치고 확률만 오른다
+  const AL = S1("alonso"), eb = n => E.scoreAtoms(at(Array(n).fill(AL))).b.E - 1;
+  ok([1, 2, 3].every((n, i) => near(eb(n), [.20, .32, .392][i])), "5 알론소 1/2/3 (NO_STACK) → +0.20 / +0.32 / +0.392", [1, 2, 3].map(eb).join(" · "));
+  run(CTX_KO, "CHANCE_NO_STACK=false");
+  const old = [1, 2, 3].map(eb);
+  run(CTX_KO, "CHANCE_NO_STACK=true");
+  ok([.20, .40, .60].every((v, i) => near(old[i], v)), "5b CHANCE_NO_STACK=false 면 예전 기대값 단순합 (0.20/0.40/0.60)", old.join(" · "));
+  // 6 — 미아 병종 판정
+  const MI = S1("mia"), gb = (k, r) => E.scoreAtoms(at(Array(k).fill(MI), r)).b.G - 1;
+  ok(near(gb(1, R1), .25) && near(gb(1, R2), .375) && near(gb(1, R3), .4375), "6 미아 k=1, n=1/2/3 → +0.25 / +0.375 / +0.4375", [gb(1, R1), gb(1, R2), gb(1, R3)].join(" · "));
+  ok(near(gb(2, R3), .4921875), "6b 미아 k=2, n=3 → +0.4921875 (두 번째 미아 +5.5%p 뿐)", gb(2, R3));
+  // 7 · 8 — 감소는 나눗셈 · 한계 이득
+  ok(near(abs([], [J]) / abs([], [S1("sergey")]), 1.25 / 1.2), "7 1.25 / 1.20 → 1.041666…");
+  const E75 = {slot: "E", v: .75};
+  ok(near(rel([E75], [J]), 2.0 / 1.75) && rel([E75], [S1("sergey")]) > rel([E75], [J]),
+     "8 버킷 1.75 에 +0.25 → ×1.142857 (빈 버킷 20% ×1.20 이 이긴다)", rel([E75], [J]));
+  // 9~11 — 리더가 채운 버킷의 조이너는 Top 1 조합에 안 든다 (실제 calc 로)
+  const top1 = (lead, ratio, gcap) => {
+    const a = boot("ko").mode("rally").leaders(...lead).gear(10).gcap(gcap).mine(ratio);
+    a.js("globalThis.__r0=render;render=function(d){globalThis.__d=d;return __r0(d);}");
+    a.render();
+    return a.js("__d.combos[0].cls.flatMap(c=>c.mem.map(x=>x.h.id))");
+  };
+  const t9 = top1(["eleonora", "lloyd", "bradley"], [60, 40, 0], 15);
+  ok(t9.indexOf("patrick") < 0, "9 리더 엘레오노라 → Top 1 에 패트릭 없음", t9.join(","));
+  const t10 = top1(["herbjorg", "lloyd", "ligeia"], [60, 20, 20], 15);
+  ok(!t10.some(id => ["hendrik", "ligeia", "estrella"].includes(id)), "10 리더 리지아 → Top 1 에 헨드릭류(F) 없음", t10.join(","));
+  const t11 = top1(["gisela", "flora", "vulcanus"], [60, 40, 0], 15);
+  ok(t11.indexOf("mia") < 0, "11 리더 플로라 → Top 1 에 미아 없음", t11.join(","));
+  // 12 · 13 — 슬롯 회귀
+  ok(["jessie", "jasser", "jeronimo", "blanchette"].every(id => S1(id).slot === "E"), "12 제시·제셀·제로니모·블랑쉬 S1 = E");
+  const sk = [["mia", "Lucky Charm"], ["alonso", "Poison Harpoon"], ["bahiti", "Fluorescence"]].map(([id, n]) => E.byId[id].exp.find(e => e.n === n));
+  ok(sk.every(e => e.slot === "SKILL" && E.atoms(e, R3).length === 0), "13 미아 S2 · 알론소 S3 · 바히티 S2 = SKILL, 배율 기여 0");
+  // Gen 1 행 — 제로니모 S1 + 몰리 S3 + 진먼 S3 가 파괴력 버킷을 1.75 까지 채워, 새 버킷을 여는 20% 가 제시*보다 낫다
+  const g1 = boot("ko").mode("rally").leaders("jeronimo", "molly", "zinman").gear(10).gcap(1).mine([60, 40, 0]);
+  g1.js("globalThis.__r0=render;render=function(d){globalThis.__d=d;return __r0(d);}"); g1.render();
+  const g1m = g1.js("Object.fromEntries(__d.rank.map(x=>[x.h.id,x.mul]))");
+  ok(g1m.lingxue > g1m.jessie && g1m.lumak > g1m.jessie, "Gen 1 — 링쉐·룸 보겐(20%)이 제시*보다 위 (시트 2026-11 변경의 이유)",
+     "lingxue " + g1m.lingxue.toFixed(3) + " · lumak " + g1m.lumak.toFixed(3) + " · jessie " + g1m.jessie.toFixed(3));
+  // 전수 탐색은 탐욕(#recAll)보다 못할 수 없다 — 탐욕의 넷도 후보 multiset 중 하나다
+  const cmp = boot("ko").mode("rally").leaders("jeronimo", "mia", "bradley").gear(10).gcap(12).mine([48, 4, 48]);
+  cmp.js("globalThis.__r0=render;render=function(d){globalThis.__d=d;return __r0(d);}"); cmp.render();
+  const [best, n5] = cmp.js("[__d.combos[0].rel,__d.combos.length]");
+  ok(n5 === 5, "Top 5 조합이 다섯 개 나온다", n5);
+  const html = cmp.render();
+  const greedy = +(/id="recAll"[\s\S]*?×([\d.]+)/.exec(html) || /id="rec"[\s\S]*?×([\d.]+)/.exec(html))[1];
+  ok(best >= greedy - 5e-4, "전수 탐색 #1 ≥ 계산 순위 그대로(탐욕)", best.toFixed(4) + " vs " + greedy);
+  ok(/id="combos"/.test(html) && /id="bmap"/.test(html), "버킷 점유 맵과 Top 5 패널이 렌더된다");
+  ok(/data-code="LV5"/.test(html), "규칙 레이어 LV5 칩이 항상 뜬다");
+  // ── 겹치는 시트 칸은 따져 본다 (2026-11-10 사용자 결정) ──
+  {
+    const rec = (lead, ratio, g) => { const h = boot("ko").mode("rally").leaders(...lead).gear(10).gcap(g).mine(ratio).render();
+      const i = h.indexOf('id="rec"'), j = h.indexOf("전투 배율", i);
+      return {ids: [...h.slice(i, j).matchAll(/heroes\/([a-z-]+)\.webp/g)].map(m => m[1]), v: +/×([\d.]+)/.exec(h.slice(j))[1],
+              sw: (/id="swaps">([\s\S]*?)<\/p>/.exec(h) || [0, ""])[1].replace(/<[^>]+>/g, "")}; };
+    // 같은 버킷의 다른 영웅 — 진먼(방어+체력)은 필리(방어)·패트릭(체력)과 겹친다 → 제시와 비교해 밀린다
+    const z = rec(["jeronimo", "reina", "greg"], [50, 20, 30], 4);
+    ok(/진먼 ×1\.16\d → 제시 ×1\.200/.test(z.sw) && !z.ids.includes("zinman"), "같은 버킷의 다른 영웅 칸도 따진다 (진먼 → 제시)", z.ids.join(",") + " · " + z.sw.slice(0, 90));
+    // 겹치지 않으면 시트 그대로 — 바꾼 표시도 없다
+    const k = rec(["logan", "philly", "zinman"], [60, 40, 0], 3);
+    ok(k.ids.join() === "mia,patrick,jessie,seoyoon" && !k.sw, "겹치지 않는 행은 시트 칸 그대로 (미아·패트릭·제시·서윤)", k.ids.join(","));
+    // 바꾼 화살표는 전부 오르는 방향이다 — 시트 쪽이 같거나 높으면 안 바꾼다
+    let down = [], rows = 0;
+    for (const row of SHEET_ROWS) { const x = rec(row.lead, row.r, row.gen); if (!x.sw) continue; rows++;
+      for (const m of x.sw.matchAll(/×(\d+\.\d+) → \S+ ×(\d+\.\d+)/g)) if (!(+m[2] >= +m[1])) down.push("G" + row.gen + " " + m[0]); }
+    ok(down.length === 0 && rows > 0, "바꾼 칸은 전부 값이 오르는 쪽이다 (" + rows + "행)", down.slice(0, 3).join(" · "));
+  }
+  // ── 중첩 효율 표 · 효율로 전부 따져 본 추천 (2026-11-11 사용자 요청 — 둘 다 안내) ──
+  {
+    const page = (lead, ratio, g) => boot("ko").mode("rally").leaders(...lead).gear(10).gcap(g).mine(ratio).render();
+    const tbl = (h, id) => { const i = h.indexOf('id="' + id + '"'); if (i < 0) return null;
+      return h.slice(i, h.indexOf("</table>", i)).split("<tr>").slice(2).map(tr => tr.split("</td>").map(td => td.replace(/<[^>]+>/g, ""))); };
+    const g5 = page(["jeronimo", "mia", "gwen"], [48, 4, 48], 5), r5 = tbl(g5, "effRec");
+    ok(!!r5 && r5.length === 4, "추천 4명마다 중첩 효율 행이 있다", r5 ? r5.map(x => x[0] + " " + x[3]).join(" · ") : "표 없음");
+    const nor = r5.filter(x => x[0] === "노라").map(x => parseFloat(x[3]));
+    ok(nor.length === 2 && nor[1] < nor[0] && nor[0] < 100, "노라 효율이 100% 미만이고 2장째가 더 낮다 (리더 + 앞선 노라)", nor.join(" → "));
+    ok(r5.filter(x => x[0] === "패트릭")[0][3] === "100%" && r5.filter(x => x[0] === "노라")[1][4].includes("노라"),
+       "안 겹치면 100% · 겹치면 누구와 겹치는지 적는다", r5.map(x => x[4]).join(" | "));
+    ok(g5.includes('id="recEffSame"') && !g5.includes('id="recEff"'), "효율로 전부 따져도 같으면 한 줄로만 알린다");
+    const g3 = page(["logan", "philly", "zinman"], [60, 40, 0], 3);
+    const num = s => +s.split("전투 배율 ×")[1].slice(0, 5);
+    const recV = num(g3.slice(g3.indexOf('id="rec"'))), effV = num(g3.slice(g3.indexOf('id="recEff"')));
+    ok(g3.includes('id="recEff"') && !!tbl(g3, "effAll") && effV >= recV, "다르면 「효율로 전부 따져 본 추천」 패널이 뜨고 배율이 추천 이상이다", "추천 ×" + recV + " · 효율 ×" + effV);
+    const off = boot("ko").mode("rally").leaders("logan", "philly", "zinman").gear(10).gcap(3).mine([55, 5, 40]).render();
+    ok(!off.includes('id="recEff"') && !off.includes('id="recEffSame"') && off.includes('id="effRec"'), "시트 행이 아니면 두 번째 안내는 없고 효율 표만 뜬다");
+  }
+  // ── 2026-11-10 리뷰 보강 ──
+  // 10b — 위 10 은 F 버킷을 없애도 통과했다(넷째 자리가 동률 순서로 정해지는 편성이라). 값을 직접 잰다.
+  const mulOf = (lead, id) => { const a = boot("ko").mode("rally").leaders(...lead).gear(10).gcap(15).mine([60, 20, 20]);
+    a.js("globalThis.__r0=render;render=function(d){globalThis.__d=d;return __r0(d);}"); a.render();
+    return a.js("__d.rank.filter(x=>x.h.id==='" + id + "')[0].mul"); };
+  { const m = mulOf(["herbjorg", "lloyd", "ligeia"], "hendrik"); ok(near(m, 1.5 / 1.25), "10b 리더 리지아(F 1.25) → 헨드릭 한계 ×1.200", m); }
+  { const m = mulOf(["herbjorg", "lloyd", "bradley"], "hendrik"); ok(near(m, 1.25), "10b 대조군 — 리지아가 없으면 헨드릭 ×1.250", m); }
+  // 스펙이 명시한 섞임: 알론소+린(같은 E 40%/50%) = 64% 발동 → 0.32 · 미아+플로라 3병종 = 미아 2장과 같다
+  const chOf = id => E.atoms(S1(id), R3);
+  { const v = E.scoreAtoms(chOf("alonso").concat(chOf("lynn"))).b.E; ok(near(v, 1.32), "알론소+린 = 파괴력 버킷 1.32 (발동 64%)", v); }
+  { const v = E.scoreAtoms(chOf("mia").concat(chOf("flora"))).b.G; ok(near(v, 1 + .5 * (1 - Math.pow(.5, 6))), "미아+플로라 3병종 = 1.4921875 (판정 6회)", v); }
+  // 규칙 칩 — 서버 세대 · 기본 추천(#rec)의 겹침 · 문턱
+  const chips = (lead, ratio, gcap) => { const h = boot("ko").mode("rally").leaders(...lead).gear(10).gcap(gcap).mine(ratio).render();
+    return (h.match(/data-code="[A-Z0-9_]+"/g) || []).map(x => x.slice(11, -1)); };
+  const c1 = chips(["jeronimo", "molly", "zinman"], [60, 40, 0], 1);
+  ok(!c1.includes("RENEE") && !c1.includes("REINA") && !c1.includes("NORAH_STACK"), "Gen 1 서버에는 레니·레이나·노라 칩이 안 뜬다", c1.join(","));
+  const c13 = chips(["gisela", "karol", "greg"], [60, 40, 0], 13);
+  ok(c13.includes("PATRICK_DUP"), "G13 기젤라·가로얼·그렉 — 기본 추천에 패트릭이 있으면 PATRICK_DUP (시트 비고 'No Patrick if Greg')", c13.join(","));
+  ok(!c13.includes("RENEE"), "기본 추천에 이미 레니가 있으면 RENEE 칩은 안 뜬다", c13.join(","));
+  const c19 = chips(["jeronimo", "mia", "bradley"], [48, 4, 48], 12), c20 = chips(["jeronimo", "reina", "greg"], [60, 20, 20], 12);
+  ok(c19.includes("NORAH_STACK") && !c19.includes("RENEE"), "48/4/48 — NORAH_STACK 뜨고 RENEE(창병 <20) 안 뜬다", c19.join(","));
+  ok(c20.includes("RENEE") && !c20.includes("NORAH_STACK") && !c20.includes("REINA"), "60/20/20 리더 레이나 — RENEE 뜨고 NORAH_STACK·REINA 안 뜬다", c20.join(","));
+  { const cm = chips(["logan", "philly", "zinman"], [60, 40, 0], 3);   // 시트 행 — 추천 첫 칸이 미아
+    ok(cm.includes("CHANCE"), "미아가 든 추천에 CHANCE 칩 (미아류도 확률형이다)", cm.join(",")); }
 }
 
 // ── 결과 ───────────────────────────────────────────────────────────────

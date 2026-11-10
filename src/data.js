@@ -17,20 +17,29 @@
 //   우리 순위표에서도 그렇게 나온다(사용자가 짚어준 이유이고, 숫자로 확인됐다).
 //   ⚠️ 단 **고를 수 있게만** 해 주는 플래그지 "쌀라"는 지시가 아니다. 둘째 장은 같은 칸에
 //   합연산으로 들어가 자기끼리 포화한다 — 순수 계산은 더 나을 때만 집는다.
-// slot:"AH" — 위 규칙의 짝이다. 원문이 "extra damage / extra attack / N% damage" 처럼
-//   **타격에 붙는** 것은 Damage Dealt 스탯이 아니므로 A칸(합연산)에 넣지 않는다.
-//   어느 칸인지는 자료가 없으니 칸을 만들지도 않는다 — 자기 계수로만 곱한다(포화 없음).
-//   X 스킬에서 extra damage 계열에 bk 를 달지 않는 것과 **같은 규칙**이고, 예전에는
-//   이 둘이 어긋나 있었다(X 는 칸을 피하는데 일반 칸은 A 에 합산). 2026-09-12 정정.
+// slot:"SKILL" — 스킬 데미지. **배율에 넣지 않는다** (2026-11-10, Ton 영상 버킷표 · 사용자 결정 "전 세대 일관 적용").
+//   예전 slot:"AH"(추가피해·추가공격·N% 피해 — 칸 없이 따로 곱함)와 병종 한정 추가피해 X 를 전부 여기로 옮겼다.
+//   Ton 표가 Gen 1~9 를 SKILL 로 분류했고, 표에 없는 Gen 10+ 는 **같은 원문 문구**(extra damage · extra attack ·
+//   N% damage · joint strike · crit rate)를 같은 쪽으로 보냈다. 스킬 데미지가 SkillMod 버킷과 어떻게 곱해지는지
+//   수치 모델이 없어서 "따로 곱한다"는 것도 가정이었다 — 이제는 진단 패널에만 칩으로 띄운다.
+// 리더 전용 버킷(조이너 S1 로는 못 가져오는 것 · 수치 모델 없음 → 배율 제외, 칩으로만 표시):
+//   SKILLUP=스킬 데미지↑(무명 S3) · VSTROOP=특정 적 병종 상대 피해↑(브레들리 S2 · 가로얼 S2 · 엘리노어 S3)
+//   TARGET=표식 대상 피해↑(레니 S2·S3) · EXTRA=추가 피해(레니 S1 · 고든 S1) · SHIELD=보호막(가토 S2 · 엘리프 S3)
+// v:null — Ton 표가 버킷은 적었는데 data 에 수치가 없는 효과. **값을 지어내지 않는다** → 배율 제외 + "수치 미확인".
+//   무명 S1 · 헤르보르 S2 · 시걸 S3(일반공격 받피 −25% / 스킬 받피 −30%)도 버킷이 미확정이라 v:null 이다.
+//   조이너로서 레니·무명은 수치 대신 규칙 레이어(engine.js joinerRules)가 안내한다.
+// unsure:1 — Ton 표에서도 "?" 로 적힌 자리. 값은 그대로 배율에 들어가고 화면에 플래그만 단다.
+// partial:1 — 그웬 S1. "일부 공격에만 걸린다"(Ton) → engine.js 의 GWEN_EFF(0.5) 로 감쇄. 0.5 는 근거 없는 값이다(사용자 결정).
 // 제시·제셀·제로니모(S1)·린(S1) 은 slot:"E"(파괴력) 다 — wosheroes 원문은 "damage dealt" 지만
 //   실험으로 나눈 집결원 스킬 분류표(2026-10-17 사용자 제공)가 넷을 블랑쉬·알론소와 같은 LETHALITY UP 에,
 //   소냐·도미닉을 따로 DAMAGE DEALT UP 에 둔다. 시트 Rally Joiners 범례 "Blanchette type of skills
-//   (lethality) is also additive" 와도 맞는다. 제로니모 S3 Expert Swordsmanship 은 표에 없어 A 그대로다.
+//   (lethality) is also additive" 와도 맞는다. 2026-11-10 Ton 버킷표가 같은 분류를 다시 확인했고,
+//   나탈리아 S3 · 몰리 S3("all troops damage +25%")도 같은 표에서 파괴력이라 E 로 옮겼다.
 //   같은 표가 가토·기젤라(병종 한정 방어력)를 DEFENSE UP 에 넣어 bk:"DEF" 를 붙였다(bk 규칙 그대로).
 //   표의 룸 보겐(적 파괴력↓)·그레고리 방어 10%* 는 원문과 달라 따르지 않았다.
-// slot 코드: A=피해량↑ AH=타격 추가피해(칸 아님) An=일반공격피해↑ B=공격력↑ C=체력↑ D=받는피해↓ DEF=방어력↑
-//            E=파괴력↑ F=적방어↓ G=적받는피해↑ H=적공격↓ I=적파괴력↓ J=적피해량↓
-//            DODGE=회피 CRIT=치명률 X=병종한정/주기형 ECO=비전투
+// slot 코드 — 공격 버킷: A=피해량↑ An=일반공격피해↑ B=공격력↑ E=파괴력↑ F=적방어↓ G=적받는피해↑
+//            방어 버킷: C=체력↑ D=받는피해↓ DEF=방어력↑ H=적공격↓ I=적파괴력↓ J=적피해량↓ DODGE=회피
+//            배율 제외: SKILL SKILLUP VSTROOP TARGET EXTRA SHIELD · X=병종한정/주기형 · ECO=비전투
 // s:1 = Ton 시트의 **조이너 명단**에 오른 영웅 (19명). 리더로만 나오는 영웅은 붙이지 않는다 —
 //       이 플래그를 쓰는 곳이 ⑤ 의 "시트 등재 영웅만" 조이너 추천 하나뿐이기 때문이다.
 //       2026-09-01 갱신(시트 Gen 10+ 탭 신설): 범례의 "Sergey = Bahiti, Lumak Bokan" 과
@@ -55,9 +64,9 @@ const HEROES = [
       {n:"Weaken",slot:"H",v:.20,t:"적 전 부대 공격력 −20%",te:"all enemy troops attack −20%"}],w:null},
 {id:"bahiti",s:1,kr:"바히티",en:"Bahiti",cls:"marksman",gen:0,rar:"epic",
  exp:[{n:"Sixth Sense",slot:"D",v:.20,t:"전 부대 받는 피해 −20%",te:"all troops damage taken −20%"},
-      {n:"Fluorescence",slot:"A",v:.25,p:"50%",pe:"50% chance",t:"50% 확률 피해량 +50%",te:"50% chance: damage +50%"}],w:null},
+      {n:"Fluorescence",slot:"SKILL",v:.25,p:"50%",pe:"50% chance",t:"50% 확률 피해량 +50%",te:"50% chance: damage +50%"}],w:null},
 {id:"lumak",s:1,kr:"룸 보겐",en:"Lumak Bokan",cls:"lancer",gen:0,rar:"epic",
- exp:[{n:"Tactical Deception",slot:"J",v:.20,t:"적 전 부대 피해량 −20%",te:"all enemy troops damage −20%"},
+ exp:[{n:"Tactical Deception",slot:"I",v:.20,t:"적 전 부대 피해량 −20% (Ton 버킷표 두 장 모두 적 파괴력↓ 칸)",te:"all enemy troops damage −20% (both Ton bucket tables: enemy lethality down)"},
       {n:"Emerald Warrior",slot:"ECO",v:0,t:"사냥 행군 속도 +100%",te:"hunting march speed +100%"}],w:null},
 {id:"gina",kr:"지나",en:"Gina",cls:"marksman",gen:0,rar:"epic",
  exp:[{n:"Endurance Training",slot:"ECO",v:0,t:"체력 소모 −20%",te:"stamina cost −20%"},
@@ -74,12 +83,12 @@ const HEROES = [
 {id:"natalia",kr:"나탈리아",en:"Natalia",cls:"infantry",gen:1,rar:"leg",
  exp:[{n:"Feral Protection",slot:"D",v:.20,p:"40%",pe:"40% chance",t:"40% 확률 받는 피해 −50%",te:"40% chance: damage taken −50%"},
       {n:"Queen of the Wild",slot:"B",v:.25,t:"전 부대 공격력 +25%",te:"all troops attack +25%"},
-      {n:"Call of the Wild",slot:"A",v:.25,t:"전 부대 피해량 +25%",te:"all troops damage +25%"}],
+      {n:"Call of the Wild",slot:"E",v:.25,t:"전 부대 피해량 +25% (Ton 버킷표: 파괴력 칸)",te:"all troops damage +25% (Ton bucket table: lethality)"}],
  w:{side:"rally",stat:"Lethality",name:"Invincibles"}},
 {id:"molly",kr:"몰리",en:"Molly",cls:"lancer",gen:1,rar:"leg",
  exp:[{n:"Snow's Grace",slot:"D",v:.20,p:"40%",pe:"40% chance",t:"40% 확률 받는 피해 −50%",te:"40% chance: damage taken −50%"},
-      {n:"Ice Dominion",slot:"A",v:.25,p:"50%",pe:"50% chance",t:"50% 확률 피해량 +50%",te:"50% chance: damage +50%"},
-      {n:"Youthful Rage",slot:"A",v:.25,t:"전 부대 피해량 +25%",te:"all troops damage +25%"}],
+      {n:"Ice Dominion",slot:"SKILL",v:.25,p:"50%",pe:"50% chance",t:"50% 확률 피해량 +50%",te:"50% chance: damage +50%"},
+      {n:"Youthful Rage",slot:"E",v:.25,t:"전 부대 피해량 +25% (Ton 버킷표: 파괴력 칸)",te:"all troops damage +25% (Ton bucket table: lethality)"}],
  w:{side:"defender",stat:"Lethality",name:"Snowy Blessing"}},
 {id:"zinman",s:1,kr:"진먼",en:"Zinman",cls:"marksman",gen:1,rar:"leg",
  exp:[{n:"Implacable",slot:"DEF",v:.10,t:"방어력 +10% / 체력 +10%",te:"defense +10% / health +10%",also:{slot:"C",v:.10}},
@@ -96,13 +105,13 @@ const HEROES = [
  exp:[{n:"Vigor Tactics",slot:"B",v:.15,t:"공격력 +15% / 방어력 +10%",te:"attack +15% / defense +10%",also:{slot:"DEF",v:.10}},
       // 2026-09-14 정정: "25% chance of dealing 200% damage" — 그 공격이 200% 가 되는 것이라 증분은 +100% → .25×1.00 = .25.
       // 레이나 Shadow Blade 는 "extra attack" 이라 별도 타격이므로 .50 그대로다.
-      {n:"Dosage Boost",slot:"AH",v:.25,p:"25%",pe:"25% chance",t:"25% 확률 200% 피해",te:"25% chance: 200% damage"},
+      {n:"Dosage Boost",slot:"SKILL",v:.25,p:"25%",pe:"25% chance",t:"25% 확률 200% 피해",te:"25% chance: 200% damage"},
       {n:"Energizing Shot",slot:"D",v:.20,p:"40%",pe:"40% chance",t:"40% 확률 받는 피해 −50%",te:"40% chance: damage taken −50%"}],
  w:{side:"defender",stat:"Health",name:"First Aid Training"}},
 {id:"alonso",kr:"알론소",en:"Alonso",cls:"marksman",gen:2,rar:"leg",
  exp:[{n:"Onslaught",slot:"E",v:.20,p:"40%",pe:"40% chance",t:"40% 확률 파괴력 +50%",te:"40% chance: lethality +50%"},
       {n:"Iron Strength",slot:"J",v:.10,p:"20%",pe:"20% chance",t:"20% 확률 적 피해량 −50%",te:"20% chance: enemy damage −50%"},
-      {n:"Poison Harpoon",slot:"AH",v:.25,p:"50%",pe:"50% chance",t:"50% 확률 추가피해 +50%",te:"50% chance: +50% extra damage"}],
+      {n:"Poison Harpoon",slot:"SKILL",v:.25,p:"50%",pe:"50% chance",t:"50% 확률 추가피해 +50%",te:"50% chance: +50% extra damage"}],
  w:{side:"rally",stat:"Lethality",name:"Harpoon Enhancement"}},
 // ── Gen 3 ──
 {id:"logan",kr:"로건",en:"Logan",cls:"infantry",gen:3,rar:"leg",
@@ -112,9 +121,9 @@ const HEROES = [
  w:{side:"defender",stat:"Defense",name:"Strong Protection"}},
 {id:"mia",s:1,kr:"미야",en:"Mia",cls:"lancer",gen:3,rar:"leg",
  exp:[{n:"Bad Luck Streak",slot:"G",v:.25,p:"50%",pe:"50% chance",pc:.5,t:"병종마다 50% 확률 적 받는 피해 +50%",te:"each troop type: 50% chance, enemy damage taken +50%"},
-      // 2026-09-14 정정: 원문 "granting a 50% chance of boosting troops' Attack by 50%" — A(피해량)가 아니라 B(공격력).
-      // 형제 문장인 몰리 Ice Dominion · 바히티 Fluorescence 는 "damage dealt" 라 A 가 맞고, 미아만 "Attack" 이다.
-      {n:"Lucky Charm",slot:"B",v:.25,p:"50%",pe:"50% chance",t:"50% 확률 공격력 +50%",te:"50% chance: attack +50%"},
+      // 2026-11-10: Ton 버킷표가 스킬 데미지(SKILL)로 분류 → 배율 제외. (09-14 에 원문 "Attack" 을 근거로 A→B 로 옮겼던 것을 다시 뒤집었다.
+      // 형제 문장 몰리 Ice Dominion · 바히티 Fluorescence 도 같은 표에서 SKILL 이다.)
+      {n:"Lucky Charm",slot:"SKILL",v:.25,p:"50%",pe:"50% chance",t:"50% 확률 공격력 +50%",te:"50% chance: attack +50%"},
       {n:"Ritual Deciphering",slot:"D",v:.20,p:"40%",pe:"40% chance",t:"40% 확률 받는 피해 −50%",te:"40% chance: damage taken −50%"}],
  w:{side:"rally",stat:"Attack",name:"Rally of Fate"}},
 {id:"greg",kr:"그렉",en:"Greg",cls:"marksman",gen:3,rar:"leg",
@@ -131,123 +140,123 @@ const HEROES = [
       // #recAll(이론) 에는 든다(2026-09-14 실측: bk 없이 39행 · bk 넣고 16행 · also 없던 예전 2행).
       {n:"Viper Formation",slot:"X",k:"sur",v:.35,tgt:"infantry",bk:"D",also:{slot:"X",k:"sur",v:.15,tgt:"mar+lan",bk:"D"},t:"4공격마다 2턴 보병 받피 −70%, 창·궁 −30%",te:"every 4th attack, 2 turns: infantry damage taken −70%, lancer/marksman −30%"},
       {n:"Prayer of Flame",slot:"X",k:"dmg",v:1.0,tgt:"infantry",bk:"A",t:"보병 피해량 +100%",te:"infantry damage +100%"},
-      {n:"Blade of Light",slot:"X",k:"dmg",v:.60,tgt:"infantry",t:"보병 공격당 피해 +60% & 대상 받피 +25%",te:"infantry, per attack: +60% damage & target takes +25% damage"}],
+      {n:"Blade of Light",slot:"X",k:"dmg",v:.60,tgt:"infantry",unsure:1,also:{slot:"G",v:null},t:"보병 공격당 피해 +60% & 대상 받피 +25%",te:"infantry, per attack: +60% damage & target takes +25% damage"}],
  w:{side:"defender",stat:"Health",name:"Oath of Guardian"}},
 {id:"reina",s:1,kr:"레이나",en:"Reina",cls:"lancer",gen:4,rar:"leg",
  exp:[{n:"Assassin's Instinct",slot:"An",v:.30,t:"일반공격 피해 +30%",te:"normal-attack damage +30%"},
       {n:"Swift Jive",slot:"DODGE",v:.20,t:"일반공격 20% 회피",te:"20% chance to dodge normal attacks"},
-      {n:"Shadow Blade",slot:"X",k:"dmg",v:.50,tgt:"lancer",t:"창병 25% 확률 200% 추가공격",te:"lancers, 25% chance: a 200% extra attack"}],
+      {n:"Shadow Blade",slot:"SKILL",k:"dmg",v:.50,tgt:"lancer",t:"창병 25% 확률 200% 추가공격",te:"lancers, 25% chance: a 200% extra attack"}],
  w:{side:"rally",stat:"Lethality",name:"Fiery Invasion"}},
 {id:"lynn",s:1,kr:"린",en:"Lynn",cls:"marksman",gen:4,rar:"leg",
  exp:[{n:"Song of Lion",slot:"E",v:.20,p:"40%",pe:"40% chance",t:"40% 확률 피해량 +50% (실험 분류: 파괴력 칸)",te:"40% chance: damage +50% (tested: lethality slot)"},
-      {n:"Melancholic Ballad",slot:"J",v:.20,t:"적 전 부대 피해량 −20%",te:"all enemy troops damage −20%"},
-      {n:"Oonai Cadenza",slot:"X",k:"dmg",v:.05,tgt:"marksman",t:"궁병 3공격마다 공격력 +5% 누적",te:"marksmen, every 3rd attack: attack +5%, stacking"}],
+      {n:"Melancholic Ballad",slot:"J",v:.20,unsure:1,t:"적 전 부대 피해량 −20%",te:"all enemy troops damage −20%"},
+      {n:"Oonai Cadenza",slot:"B",v:.05,t:"궁병 3공격마다 공격력 +5% 누적 (Ton 버킷표: 공격력 칸 · 값은 1회분)",te:"marksmen, every 3rd attack: attack +5%, stacking (Ton bucket table: attack · value is one stack)"}],
  w:{side:"defender",stat:"Lethality",name:"Iranon's Determination"}},
 // ── Gen 5 ──
 {id:"hector",kr:"헥터",en:"Hector",cls:"infantry",gen:5,rar:"leg",
  exp:[{n:"Survival Instincts",slot:"D",v:.20,p:"40%",pe:"40% chance",t:"40% 확률 받는 피해 −50%",te:"40% chance: damage taken −50%"},
       {n:"Rampant",slot:"X",k:"dmg",v:1.07,tgt:"infantry",bk:"A",also:{slot:"X",k:"dmg",v:.535,tgt:"marksman",bk:"A"},t:"보병 피해량 +200% · 궁병 +100% (10회 동안 매 공격 85%로 감쇠 → 평균 0.535 환산)",te:"infantry damage +200%, marksmen +100% (decays over 10 procs)"},
-      {n:"Blitz",slot:"AH",v:.25,p:"25%",pe:"25% chance",t:"25% 확률 200% 피해",te:"25% chance: 200% damage"}],   // 필리 Dosage Boost 와 같은 문장·같은 정정(2026-09-14)
+      {n:"Blitz",slot:"SKILL",v:.25,p:"25%",pe:"25% chance",t:"25% 확률 200% 피해",te:"25% chance: 200% damage"}],   // 필리 Dosage Boost 와 같은 문장·같은 정정(2026-09-14)
  w:{side:"defender",stat:"Attack",name:"Goliath"}},
 {id:"norah",s:1,stack:1,kr:"노라",en:"Norah",cls:"lancer",gen:5,rar:"leg",
- exp:[{n:"Combined Arms",slot:"X",k:"dmg",v:.15,tgt:"inf+mar",bk:"A",also:{slot:"X",k:"sur",v:.15,tgt:"inf+mar",bk:"D"},t:"보병·궁병 받피 −15% & 피해량 +15%",te:"infantry & marksmen: damage taken −15% and damage +15%"},
-      {n:"Sneak Strike",slot:"X",k:"dmg",v:.20,tgt:"lancer",t:"창병 20% 확률 추가피해 +100%",te:"lancers, 20% chance: +100% extra damage"},
+ exp:[{n:"Combined Arms",slot:"X",k:"dmg",v:.15,tgt:"inf+mar",bk:"A",also:{slot:"X",k:"sur",v:.15,tgt:"inf+mar",bk:"D",unsure:1},t:"보병·궁병 받피 −15% & 피해량 +15%",te:"infantry & marksmen: damage taken −15% and damage +15%"},
+      {n:"Sneak Strike",slot:"SKILL",k:"dmg",v:.20,tgt:"lancer",t:"창병 20% 확률 추가피해 +100%",te:"lancers, 20% chance: +100% extra damage"},
       {n:"Momentum",slot:"A",v:.25,p:"창병 5공격마다",pe:"lancers, every 5th attack",t:"피해량 +25% & 받피 −25% (2턴)",te:"damage +25% & damage taken −25% (2 turns)",also:{slot:"D",v:.25}}],
  w:{side:"defender",stat:"Defense",name:"True Grit"}},
 {id:"gwen",kr:"그웬",en:"Gwen",cls:"marksman",gen:5,rar:"leg",
- exp:[{n:"Eagle Vision",slot:"G",v:.25,t:"적 받는 피해 +25%",te:"enemy damage taken +25%"},
-      {n:"Air Dominance",slot:"AH",v:.20,p:"5공격마다",pe:"every 5th attack",t:"5공격마다 추가피해 +100%",te:"every 5th attack: +100% extra damage"},
-      {n:"Blastmaster",slot:"X",k:"dmg",v:.125,tgt:"marksman",t:"궁병 4공격마다 추가피해 +50%",te:"marksmen, every 4th attack: +50% extra damage"}],
+ exp:[{n:"Eagle Vision",slot:"G",v:.25,partial:1,t:"적 받는 피해 +25% (일부 공격에만 → GWEN_EFF 감쇄)",te:"enemy damage taken +25% (only some attacks → scaled by GWEN_EFF)"},
+      {n:"Air Dominance",slot:"SKILL",also:{slot:"G",v:null},v:.20,p:"5공격마다",pe:"every 5th attack",t:"5공격마다 추가피해 +100%",te:"every 5th attack: +100% extra damage"},
+      {n:"Blastmaster",slot:"SKILL",k:"dmg",v:.125,tgt:"marksman",t:"궁병 4공격마다 추가피해 +50%",te:"marksmen, every 4th attack: +50% extra damage"}],
  w:{side:"rally",stat:"Lethality",name:"Marauder"}},
 // ── Gen 6 ──
 {id:"wuming",s:1,kr:"무명",en:"Wu Ming",cls:"infantry",gen:6,rar:"leg",
- exp:[{n:"Shadow's Evasion",slot:"X",k:"sur",v:.30,tgt:"infantry",t:"보병 일반공격 받피 −25% / 스킬 받피 −30%",te:"infantry: normal-attack damage taken −25% / skill damage taken −30%"},
+ exp:[{n:"Shadow's Evasion",slot:"D",v:null,unsure:1,tgt:"infantry",t:"보병 일반공격 받피 −25% / 스킬 받피 −30%",te:"infantry: normal-attack damage taken −25% / skill damage taken −30%"},
       {n:"Crescent Uplift",slot:"A",v:.20,t:"전 부대 피해량 +20%",te:"all troops damage +20%"},
-      {n:"Elemental Resonance",slot:"A",v:.25,t:"전 부대 스킬 피해 +25%",te:"all troops skill damage +25%"}],
+      {n:"Elemental Resonance",slot:"SKILLUP",v:.25,t:"전 부대 스킬 피해 +25%",te:"all troops skill damage +25%"}],
  w:{side:"defender",stat:"Defense",name:"Steel Discipline"}},
 {id:"renee",s:1,kr:"레니",en:"Renee",cls:"lancer",gen:6,rar:"leg",
- exp:[{n:"Nightmare Trace",slot:"X",k:"dmg",v:1.0,tgt:"lancer",t:"창병 2턴마다 추가딜 200%",te:"lancers, every 2 turns: +200% extra damage"},
-      {n:"Dreamcatcher",slot:"X",k:"dmg",v:1.5,tgt:"lancer",t:"표식 대상 창병 피해량 +150%",te:"vs marked targets: lancer damage +150%"},
-      {n:"Dreamslice",slot:"A",v:.35,t:"표식 대상 전 부대 피해량 +75%",te:"vs marked targets: all troops damage +75%"}],
+ exp:[{n:"Nightmare Trace",slot:"EXTRA",k:"dmg",v:1.0,tgt:"lancer",t:"창병 2턴마다 추가딜 200%",te:"lancers, every 2 turns: +200% extra damage"},
+      {n:"Dreamcatcher",slot:"TARGET",k:"dmg",v:1.5,tgt:"lancer",t:"표식 대상 창병 피해량 +150%",te:"vs marked targets: lancer damage +150%"},
+      {n:"Dreamslice",slot:"TARGET",v:.35,t:"표식 대상 전 부대 피해량 +75%",te:"vs marked targets: all troops damage +75%"}],
  w:{side:"rally",stat:"Lethality",name:"Wistful Enchantment"}},
 {id:"wayne",kr:"웨인",en:"Wayne",cls:"marksman",gen:6,rar:"leg",
- exp:[{n:"Thunder Strike",slot:"AH",v:.25,p:"4턴마다",pe:"every 4 turns",t:"4턴마다 전 부대 추가공격 100%",te:"every 4 turns: all troops deal a 100% extra attack"},
+ exp:[{n:"Thunder Strike",slot:"SKILL",v:.25,p:"4턴마다",pe:"every 4 turns",t:"4턴마다 전 부대 추가공격 100%",te:"every 4 turns: all troops deal a 100% extra attack"},
       // 2026-09-14 정정: "On every other attack" 주기형 단발 → .40÷2 = .20. 같은 문장인 블랑쉬 Crimson Sniper ·
       // 카라 Witch's Wrath 는 이미 .20 이었고 웨인만 원값이 들어가 있었다(웨인 리더 4행 과대).
-      {n:"Roundabout Hit",slot:"X",k:"dmg",v:.20,tgt:"marksman",p:"2공격마다",pe:"every 2nd attack",t:"궁병 격턴 적 창병 +40%/궁병 +20% 추가피해",te:"marksmen, every other turn: +40% extra vs enemy lancers, +20% vs marksmen"},
-      {n:"Fleet",slot:"CRIT",v:.25,t:"전 부대 치명률 +25%",te:"all troops crit rate +25%"}],
+      {n:"Roundabout Hit",slot:"SKILL",k:"dmg",v:.20,tgt:"marksman",p:"2공격마다",pe:"every 2nd attack",t:"궁병 격턴 적 창병 +40%/궁병 +20% 추가피해",te:"marksmen, every other turn: +40% extra vs enemy lancers, +20% vs marksmen"},
+      {n:"Fleet",slot:"SKILL",v:.25,t:"전 부대 치명률 +25%",te:"all troops crit rate +25%"}],
  w:{side:"defender",stat:"Lethality",name:"Offensive Defense"}},
 // ── Gen 7 ──
 {id:"edith",kr:"에디스",en:"Edith",cls:"infantry",gen:7,rar:"leg",
  // 2026-09-14 정정: 한 스킬의 두 효과를 tgt:"mar+lan" 한 항목(k:"sur")으로 뭉쳐 창병까지 생존 효과를 받고
  // 창병 딜↑는 통째로 빠져 있었다. 원문 "reducing Damage Taken by 20% for Marksmen … increasing Damage Dealt
  // by 20% for Lancers" — 문자 그대로 두 스탯이라 노라 Combined Arms 와 같은 꼴(also + bk)이다.
- exp:[{n:"Strategic Balance",slot:"X",k:"sur",v:.20,tgt:"marksman",bk:"D",also:{slot:"X",k:"dmg",v:.20,tgt:"lancer",bk:"A"},t:"궁병 받피 −20% / 창병 피해량 +20%",te:"marksman damage taken −20% / lancer damage +20%"},
-      {n:"Ironclad",slot:"X",k:"sur",v:.20,tgt:"infantry",t:"보병 받는 피해 −20%",te:"infantry damage taken −20%"},
+ exp:[{n:"Strategic Balance",slot:"X",k:"sur",v:.20,tgt:"marksman",bk:"D",unsure:1,also:{slot:"X",k:"dmg",v:.20,tgt:"lancer",bk:"A"},t:"궁병 받피 −20% / 창병 피해량 +20%",te:"marksman damage taken −20% / lancer damage +20%"},
+      {n:"Ironclad",slot:"X",k:"sur",v:.20,tgt:"infantry",bk:"D",unsure:1,t:"보병 받는 피해 −20%",te:"infantry damage taken −20%"},
       {n:"Steel Sentinel",slot:"C",v:.25,t:"전 부대 체력 +25%",te:"all troops health +25%"}],
  w:{side:"defender",stat:"Health",name:"Fortworks"}},
 {id:"gordon",kr:"고든",en:"Gordon",cls:"lancer",gen:7,rar:"leg",
- exp:[{n:"Venom Infusion",slot:"X",k:"dmg",v:.50,tgt:"lancer",t:"창병 2공격마다 추가딜 100% + 독(적 딜 −20%)",te:"lancers, every 2nd attack: +100% extra damage + poison (enemy damage −20%)"},
-      {n:"Chemical Terror",slot:"X",k:"dmg",v:.50,tgt:"lancer",bk:"A",t:"창병 피해량 +150% & 적 피해량 −30% (3턴마다)",te:"lancer damage +150% & enemy damage −30% (every 3 turns)"},
-      {n:"Toxic Release",slot:"G",v:.30,p:"4턴마다 2턴",pe:"2 turns out of every 4",t:"적 보병 받피 +30% & 적 궁병 피해량 −30%",te:"enemy infantry damage taken +30% & enemy marksman damage −30%"}],
+ exp:[{n:"Venom Infusion",slot:"EXTRA",also:{slot:"D",v:null,unsure:1},k:"dmg",v:.50,tgt:"lancer",t:"창병 2공격마다 추가딜 100% + 독(적 딜 −20%)",te:"lancers, every 2nd attack: +100% extra damage + poison (enemy damage −20%)"},
+      {n:"Chemical Terror",slot:"X",k:"dmg",v:.50,tgt:"lancer",bk:"A",also:{slot:"J",v:null,unsure:1},t:"창병 피해량 +150% & 적 피해량 −30% (3턴마다)",te:"lancer damage +150% & enemy damage −30% (every 3 turns)"},
+      {n:"Toxic Release",slot:"G",v:.15,also:{slot:"J",v:null,unsure:1},p:"4턴마다 2턴",pe:"2 turns out of every 4",t:"적 보병 받피 +30% & 적 궁병 피해량 −30%",te:"enemy infantry damage taken +30% & enemy marksman damage −30%"}],
  w:{side:"rally",stat:"Lethality",name:"Bio Assault"}},
 {id:"bradley",kr:"브레들리",en:"Bradley",cls:"marksman",gen:7,rar:"leg",
  exp:[{n:"Veteran's Might",slot:"B",v:.25,t:"전 부대 공격력 +25%",te:"all troops attack +25%"},
-      {n:"Power Shot",slot:"AH",v:.25,t:"적 창병에 +30% / 적 보병에 +25% 피해",te:"+30% damage vs enemy lancers / +25% vs enemy infantry"},
+      {n:"Power Shot",slot:"VSTROOP",v:.25,t:"적 창병에 +30% / 적 보병에 +25% 피해",te:"+30% damage vs enemy lancers / +25% vs enemy infantry"},
       {n:"Tactical Assistance",slot:"A",v:.15,p:"4턴중 2턴",pe:"2 turns out of 4",t:"4턴마다 2턴 피해량 +30%",te:"2 turns out of every 4: damage +30%"}],
  w:{side:"defender",stat:"Attack",name:"Siege Insight"}},
 // ── Gen 8 ──
 {id:"gatot",s:1,kr:"가토",en:"Gatot",cls:"infantry",gen:8,rar:"leg",
- exp:[{n:"Golden Guard",slot:"X",bk:"DEF",k:"sur",v:.30,tgt:"infantry",t:"보병 방어력 +30%",te:"infantry defense +30%"},
-      {n:"King's Bestowal",slot:"X",k:"sur",v:.30,tgt:"infantry",t:"보병 공격 시 보호막(공격력 30%)",te:"infantry attacks grant a shield (30% of attack)"},
-      {n:"Royal Legion",slot:"H",v:.25,t:"적 전 부대 공격력 −25%",te:"all enemy troops attack −25%"}],
+ exp:[{n:"Golden Guard",slot:"X",bk:"DEF",unsure:1,k:"sur",v:.30,tgt:"infantry",t:"보병 방어력 +30%",te:"infantry defense +30%"},
+      {n:"King's Bestowal",slot:"SHIELD",k:"sur",v:.30,tgt:"infantry",t:"보병 공격 시 보호막(공격력 30%)",te:"infantry attacks grant a shield (30% of attack)"},
+      {n:"Royal Legion",slot:"H",v:.25,unsure:1,t:"적 전 부대 공격력 −25%",te:"all enemy troops attack −25%"}],
  w:{side:"defender",stat:"Defense",name:"Indestructible City"}},
 {id:"sonya",kr:"소냐",en:"Sonya",cls:"lancer",gen:8,rar:"leg",
  exp:[{n:"Treasure Hunter",slot:"A",v:.20,t:"전 부대 피해량 +20%",te:"all troops damage +20%"},
       {n:"Bounty Temptation",slot:"B",v:.25,p:"2공격마다",pe:"every 2nd attack",t:"창병 피해 +75% & 전 부대 공격력 +25%(1턴)",te:"lancer damage +75% & all troops attack +25% (1 turn)"},
-      {n:"Torrential Impact",slot:"X",k:"dmg",v:.50,tgt:"lancer",t:"창병 5턴마다 250% 피해 + 기절",te:"lancers, every 5 turns: 250% damage + stun"}],
+      {n:"Torrential Impact",slot:"SKILL",k:"dmg",v:.50,tgt:"lancer",t:"창병 5턴마다 250% 피해 + 기절",te:"lancers, every 5 turns: 250% damage + stun"}],
  w:{side:"defender",stat:"Lethality",name:"Vortex Turret"}},
 {id:"hendrik",s:1,kr:"헨드릭",en:"Hendrik",cls:"marksman",gen:8,rar:"leg",
  exp:[{n:"Worm's Ravage",slot:"F",v:.25,t:"적 전 부대 방어력 −25%",te:"all enemy troops defense −25%"},
-      {n:"Armor of Barnacles",slot:"DEF",v:.15,p:"4턴중 2턴",pe:"2 turns out of 4",t:"4턴마다 2턴 방어력 +30%",te:"2 turns out of every 4: defense +30%"},
-      {n:"Dagon's Heir",slot:"X",k:"dmg",v:.133,tgt:"marksman",t:"궁병과 3턴마다 합공 40%",te:"joint strike with marksmen every 3 turns, 40%"}],
+      {n:"Armor of Barnacles",slot:"DEF",v:.15,unsure:1,p:"4턴중 2턴",pe:"2 turns out of 4",t:"4턴마다 2턴 방어력 +30%",te:"2 turns out of every 4: defense +30%"},
+      {n:"Dagon's Heir",slot:"SKILL",k:"dmg",v:.133,tgt:"marksman",t:"궁병과 3턴마다 합공 40%",te:"joint strike with marksmen every 3 turns, 40%"}],
  w:{side:"rally",stat:"Attack",name:"Abyssal Blessing"}},
 // ── Gen 9 ──
 {id:"magnus",kr:"마그누스",en:"Magnus",cls:"infantry",gen:9,rar:"leg",
  exp:[{n:"Rapacious",slot:"B",v:.25,t:"전 부대 공격력 +25%",te:"all troops attack +25%"},
-      {n:"Iron Phalanx",slot:"X",k:"sur",v:.20,tgt:"infantry",p:"40%",pe:"40% chance",t:"보병 40% 확률 방어력 +50%",te:"infantry, 40% chance: defense +50%"},
-      {n:"Iceman",slot:"X",k:"sur",v:.10,tgt:"inf+mar",t:"보병 받피 −10% / 궁병 피해 +10%",te:"infantry damage taken −10% / marksman damage +10%"}],
+      {n:"Iron Phalanx",slot:"X",k:"sur",v:.20,tgt:"infantry",bk:"DEF",p:"40%",pe:"40% chance",t:"보병 40% 확률 방어력 +50%",te:"infantry, 40% chance: defense +50%"},
+      {n:"Iceman",slot:"X",k:"sur",v:.10,tgt:"infantry",bk:"D",also:{slot:"X",k:"dmg",v:.10,tgt:"marksman",bk:"A"},t:"보병 받피 −10% / 궁병 피해 +10%",te:"infantry damage taken −10% / marksman damage +10%"}],
  w:{side:"defender",stat:"Health",name:"Valoric Inspiration"}},
 {id:"fred",kr:"프레드",en:"Fred",cls:"lancer",gen:9,rar:"leg",
  exp:[{n:"Hydraulic Suppression",slot:"I",v:.20,t:"적 전 부대 파괴력 −20%",te:"all enemy troops lethality −20%"},
-      {n:"Acidification",slot:"G",v:.20,t:"적 보병 받는 피해 +20%",te:"enemy infantry damage taken +20%"},
-      {n:"Floodbringer",slot:"X",k:"dmg",v:.50,tgt:"lancer",t:"창병 4격마다 추가피해 +200% & 적 딜 −20%",te:"lancers, every 4th hit: +200% extra damage & enemy damage −20%"}],
+      {n:"Acidification",slot:"G",v:.20,unsure:1,t:"적 보병 받는 피해 +20%",te:"enemy infantry damage taken +20%"},
+      {n:"Floodbringer",slot:"SKILL",unsure:1,also:{slot:"J",v:null,unsure:1},k:"dmg",v:.50,tgt:"lancer",t:"창병 4격마다 추가피해 +200% & 적 딜 −20%",te:"lancers, every 4th hit: +200% extra damage & enemy damage −20%"}],
  w:{side:"rally",stat:"Attack",name:"Call of the Firefighter"}},
 {id:"xura",kr:"쇠라",en:"Xura",cls:"marksman",gen:9,rar:"leg",
  exp:[{n:"Fungal Fog",slot:"D",v:.20,t:"전 부대 받는 피해 −20%",te:"all troops damage taken −20%"},
-      {n:"Piercing Arrow",slot:"X",k:"dmg",v:.50,tgt:"marksman",t:"궁병 2격마다 추가피해 +100% & 대상 받피 +25%",te:"marksmen, every 2nd hit: +100% extra damage & target takes +25% damage"},
-      {n:"Unorthodoxy",slot:"X",k:"dmg",v:.10,tgt:"marksman",bk:"A",also:{slot:"X",k:"sur",v:.15,tgt:"marksman",bk:"D"},t:"궁병 피해량 +10% / 받피 −15%",te:"marksman damage +10% / damage taken −15%"}],
+      {n:"Piercing Arrow",slot:"SKILL",also:{slot:"G",v:null},k:"dmg",v:.50,tgt:"marksman",t:"궁병 2격마다 추가피해 +100% & 대상 받피 +25%",te:"marksmen, every 2nd hit: +100% extra damage & target takes +25% damage"},
+      {n:"Unorthodoxy",slot:"X",k:"dmg",v:.10,tgt:"marksman",bk:"A",also:{slot:"X",k:"sur",v:.15,tgt:"marksman",bk:"D",unsure:1},t:"궁병 피해량 +10% / 받피 −15%",te:"marksman damage +10% / damage taken −15%"}],
  w:{side:"defender",stat:"Attack",name:"Gaiac Hymn"}},
 // ── Gen 10 ──
 {id:"gregory",kr:"그레고리",en:"Gregory",cls:"infantry",gen:10,rar:"leg",
  exp:[{n:"Legion of the Sun",slot:"B",v:.15,t:"공격력 +15% / 방어력 +10%",te:"attack +15% / defense +10%",also:{slot:"DEF",v:.10}},
-      {n:"Charged Assault",slot:"CRIT",v:.25,t:"전 부대 치명 확률 +25%",te:"all troops crit chance +25%"},
-      {n:"Unbroken",slot:"X",k:"sur",v:.20,tgt:"infantry",t:"보병 받는 피해 −20%",te:"infantry damage taken −20%"}],
+      {n:"Charged Assault",slot:"SKILL",v:.25,t:"전 부대 치명 확률 +25%",te:"all troops crit chance +25%"},
+      {n:"Unbroken",slot:"X",k:"sur",v:.20,tgt:"infantry",bk:"D",t:"보병 받는 피해 −20%",te:"infantry damage taken −20%"}],
  w:{side:"defender",stat:"Lethality",name:"Day of the Guard"}},
 {id:"freya",kr:"프레야",en:"Freya",cls:"lancer",gen:10,rar:"leg",
  exp:[{n:"Fog of War",slot:"H",v:.20,t:"적 전 부대 공격력 −20%",te:"all enemy troops attack −20%"},
-      {n:"Blood Moon Scythe",slot:"X",k:"dmg",v:.50,tgt:"lancer",p:"50%",pe:"50% chance",t:"창병 50% 확률 100% 추가피해",te:"lancers, 50% chance: +100% extra damage"},
+      {n:"Blood Moon Scythe",slot:"SKILL",k:"dmg",v:.50,tgt:"lancer",p:"50%",pe:"50% chance",t:"창병 50% 확률 100% 추가피해",te:"lancers, 50% chance: +100% extra damage"},
       {n:"Night's Vengeance",slot:"X",k:"dmg",v:.15,tgt:"inf+mar",bk:"A",also:{slot:"X",k:"sur",v:.15,tgt:"inf+mar",bk:"D"},t:"보병·궁병 받피 −15% & 피해량 +15%",te:"infantry & marksmen: damage taken −15% and damage +15%"}],
  w:{side:"defender",stat:"Defense",name:"Defender of the Watch"}},
 {id:"blanchette",kr:"블랑쉬",en:"Blanchette",cls:"marksman",gen:10,rar:"leg",
  exp:[{n:"Armed to the Teeth",slot:"E",v:.25,t:"전 부대 파괴력 +25%",te:"all troops lethality +25%"},
-      {n:"Blood Hunter",slot:"X",k:"dmg",v:.25,tgt:"marksman",t:"궁병 3라운드마다 추가피해 +75%",te:"marksmen, every 3rd round: +75% extra damage"},
-      {n:"Crimson Sniper",slot:"X",k:"dmg",v:.20,tgt:"marksman",t:"궁병 2격마다 적 창병 +40%/궁병 +20%",te:"marksmen, every 2nd hit: +40% vs enemy lancers, +20% vs marksmen"}],
+      {n:"Blood Hunter",slot:"SKILL",k:"dmg",v:.25,tgt:"marksman",t:"궁병 3라운드마다 추가피해 +75%",te:"marksmen, every 3rd round: +75% extra damage"},
+      {n:"Crimson Sniper",slot:"SKILL",k:"dmg",v:.20,tgt:"marksman",t:"궁병 2격마다 적 창병 +40%/궁병 +20%",te:"marksmen, every 2nd hit: +40% vs enemy lancers, +20% vs marksmen"}],
  w:{side:"rally",stat:"Lethality",name:"Lightning Strike"}},
 // ── Gen 11 ──
 {id:"eleonora",kr:"엘레오노라",en:"Eleonora",cls:"infantry",gen:11,rar:"leg",
  exp:[{n:"Scorching Sun",slot:"C",v:.25,t:"전 부대 체력 +25%",te:"all troops health +25%"},
-      {n:"Solaris Nexus",slot:"X",k:"sur",v:.10,tgt:"inf+mar",t:"보병 받피 −10% / 궁병 피해량 +10%",te:"infantry damage taken −10% / marksman damage +10%"},
+      {n:"Solaris Nexus",slot:"X",k:"sur",v:.10,tgt:"infantry",bk:"D",also:{slot:"X",k:"dmg",v:.10,tgt:"marksman",bk:"A"},t:"보병 받피 −10% / 궁병 피해량 +10%",te:"infantry damage taken −10% / marksman damage +10%"},
       {n:"Soaring Flame",slot:"A",v:.25,p:"보병 5공격마다",pe:"infantry, every 5th attack",t:"피해량 +25% & 받피 −25% (2턴)",te:"damage +25% & damage taken −25% (2 turns)",also:{slot:"D",v:.25}}],
  w:{side:"defender",stat:"Health",name:"Last Fortress"}},
 {id:"lloyd",kr:"로이드",en:"Lloyd",cls:"lancer",gen:11,rar:"leg",
@@ -257,34 +266,34 @@ const HEROES = [
  w:{side:"defender",stat:"Attack",name:"Steel Maze"}},
 {id:"rufus",kr:"루퍼스",en:"Rufus",cls:"marksman",gen:11,rar:"leg",
  exp:[{n:"Inferno Regiment",slot:"B",v:.25,t:"전 부대 공격력 +25%",te:"all troops attack +25%"},
-      {n:"Armor Crush",slot:"X",k:"dmg",v:.60,tgt:"marksman",t:"궁병 매 공격 추가피해 +60% & 대상 받피 +25%",te:"marksmen, every attack: +60% extra damage & target takes +25% damage"},
+      {n:"Armor Crush",slot:"SKILL",also:{slot:"G",v:null},k:"dmg",v:.60,tgt:"marksman",t:"궁병 매 공격 추가피해 +60% & 대상 받피 +25%",te:"marksmen, every attack: +60% extra damage & target takes +25% damage"},
       {n:"Wrathful Quake",slot:"I",v:.10,p:"20%",pe:"20% chance",t:"20% 확률 적 파괴력 −50%(2턴)",te:"20% chance: enemy lethality −50% (2 turns)"}],
  w:{side:"rally",stat:"Attack",name:"Blazing Legion"}},
 // ── Gen 12~13 ──
 {id:"herbjorg",kr:"헤르보르",en:"Hervor",cls:"infantry",gen:12,rar:"leg",
  exp:[{n:"Call For Blood",slot:"E",v:.25,t:"전 부대 파괴력 +25%",te:"all troops lethality +25%"},
-      {n:"Undying",slot:"X",k:"sur",v:.30,tgt:"infantry",t:"보병 일반 받피 −25% / 스킬 받피 −30%",te:"infantry: normal-attack damage taken −25% / skill damage taken −30%"},
-      {n:"Battlethirsty",slot:"X",k:"sur",v:.15,tgt:"infantry",t:"보병 받피 −15% / 피해량 +10%",te:"infantry damage taken −15% / damage +10%"}],
+      {n:"Undying",slot:"D",v:null,unsure:1,tgt:"infantry",t:"보병 일반 받피 −25% / 스킬 받피 −30%",te:"infantry: normal-attack damage taken −25% / skill damage taken −30%"},
+      {n:"Battlethirsty",slot:"X",k:"sur",v:.15,tgt:"infantry",bk:"D",also:{slot:"X",k:"dmg",v:.10,tgt:"infantry",bk:"A"},t:"보병 받피 −15% / 피해량 +10%",te:"infantry damage taken −15% / damage +10%"}],
  w:{side:"defender",stat:"Defense",name:"Fort of Rock"}},
 {id:"karol",kr:"가로얼",en:"Karol",cls:"lancer",gen:12,rar:"leg",
  exp:[{n:"In the Wings",slot:"D",v:.20,t:"전 부대 받는 피해 −20%",te:"all troops damage taken −20%"},
-      {n:"Shieldbreaker",slot:"AH",v:.25,t:"적 창병에 +30% / 적 보병에 +25% 피해",te:"+30% damage vs enemy lancers / +25% vs enemy infantry"},
+      {n:"Shieldbreaker",slot:"VSTROOP",v:.25,t:"적 창병에 +30% / 적 보병에 +25% 피해",te:"+30% damage vs enemy lancers / +25% vs enemy infantry"},
       {n:"Standard of Ages",slot:"B",v:.15,t:"공격력 +15% / 방어력 +10%",te:"attack +15% / defense +10%",also:{slot:"DEF",v:.10}}],
  w:{side:"rally",stat:"Attack",name:"Triumphant March"}},
 {id:"ligeia",kr:"리지아",en:"Ligeia",cls:"marksman",gen:12,rar:"leg",
  exp:[{n:"Nerf Poison",slot:"F",v:.25,t:"적 전 부대 방어력 −25%",te:"all enemy troops defense −25%"},
-      {n:"Corrosion",slot:"X",k:"dmg",v:.50,tgt:"marksman",t:"궁병 2격마다 추가피해 +100% & 대상 받피 +25%",te:"marksmen, every 2nd hit: +100% extra damage & target takes +25% damage"},
-      {n:"Toxic Tip",slot:"X",k:"dmg",v:.50,tgt:"marksman",t:"궁병 2격마다 피해 +100% & 적 피해량 −20%",te:"marksmen, every 2nd hit: +100% damage & enemy damage −20%"}],
+      {n:"Corrosion",slot:"SKILL",also:{slot:"G",v:null},k:"dmg",v:.50,tgt:"marksman",t:"궁병 2격마다 추가피해 +100% & 대상 받피 +25%",te:"marksmen, every 2nd hit: +100% extra damage & target takes +25% damage"},
+      {n:"Toxic Tip",slot:"SKILL",also:{slot:"J",v:null,unsure:1},k:"dmg",v:.50,tgt:"marksman",t:"궁병 2격마다 피해 +100% & 적 피해량 −20%",te:"marksmen, every 2nd hit: +100% damage & enemy damage −20%"}],
  w:{side:"defender",stat:"Lethality",name:"Trap Nest"}},
 {id:"vulcanus",kr:"올카누스",en:"Vulcanus",cls:"marksman",gen:13,rar:"leg",
  exp:[{n:"Raging Storm",slot:"H",v:.20,t:"적 전 부대 공격력 −20%",te:"all enemy troops attack −20%"},
-      {n:"Breaker Steel",slot:"AH",v:.20,p:"5공격마다",pe:"every 5th attack",t:"5공격마다 추가피해 +100%",te:"every 5th attack: +100% extra damage"},
+      {n:"Breaker Steel",slot:"SKILL",v:.20,p:"5공격마다",pe:"every 5th attack",t:"5공격마다 추가피해 +100%",te:"every 5th attack: +100% extra damage"},
       {n:"True Strike",slot:"X",k:"dmg",v:.60,tgt:"marksman",t:"적 보·창 방어력 −60% & 궁병 공격력 +60%",te:"enemy infantry & lancer defense −60% and marksman attack +60%"}],
  w:{side:"rally",stat:"Attack",name:"Born King"}},
 {id:"flora",kr:"플로라",en:"Flora",cls:"lancer",gen:13,rar:"leg",
- exp:[{n:"Enmiring Vines",slot:"G",v:.25,p:"50%",pe:"50% chance",
-       t:"50% 확률 적 받는 피해 +50%",te:"50% chance: enemy damage taken +50%"},
-      {n:"Plantage",slot:"X",k:"dmg",v:.25,tgt:"lancer",also:{slot:"X",k:"sur",v:.25,tgt:"infantry"},
+ exp:[{n:"Enmiring Vines",slot:"G",v:.25,p:"50%",pe:"50% chance",pc:.5,
+       t:"병종마다 50% 확률 적 받는 피해 +50% (미아와 같은 판정 — 2026-11-10 사용자 결정)",te:"each troop type: 50% chance, enemy damage taken +50% (same roll as Mia — user decision 2026-11-10)"},
+      {n:"Plantage",slot:"SKILL",k:"dmg",v:.25,tgt:"lancer",also:{slot:"X",k:"sur",v:.25,tgt:"infantry",bk:"D"},
        t:"창병 협공 피해 +25% · 보병 받는 피해 −25%",te:"lancers deal +25% joint-attack damage; infantry take −25% damage"},
       {n:"Confusion Pollen",slot:"G",v:.15,p:"4턴마다 2턴",pe:"2 turns every 4 turns",
        t:"4턴마다 2턴 적 보병 받는 피해 +30% · 적 궁병 피해량 −30%",te:"every 4 turns for 2 turns: enemy infantry take +30% damage, enemy marksmen deal −30%"}],
@@ -301,7 +310,7 @@ const HEROES = [
 {id:"cara",kr:"카라",en:"Cara",cls:"marksman",gen:14,rar:"leg",
  exp:[{n:"Smoky Encounter",slot:"I",v:.20,t:"적 전 부대 파괴력 −20%",te:"all enemy troops lethality −20%"},
       {n:"Mech Pet",slot:"An",v:.30,t:"전 부대 일반공격 피해 +30%",te:"all troops normal-attack damage +30%"},
-      {n:"Witch's Wrath",slot:"X",k:"dmg",v:.20,tgt:"marksman",p:"2공격마다",pe:"every 2nd attack",
+      {n:"Witch's Wrath",slot:"SKILL",k:"dmg",v:.20,tgt:"marksman",p:"2공격마다",pe:"every 2nd attack",
        t:"궁병 2공격마다 적 창병에 +40% · 적 궁병에 +20% 추가피해",te:"marksmen, every 2nd attack: +40% vs enemy lancers / +20% vs enemy marksmen"}],
  w:{side:"defender",stat:"Lethality",name:"Shrouded Haven"}},
 {id:"dominic",kr:"도미니카",en:"Dominic",cls:"lancer",gen:14,rar:"leg",
@@ -314,7 +323,7 @@ const HEROES = [
 {id:"elif",kr:"엘리프",en:"Elif",cls:"infantry",gen:14,rar:"leg",
  exp:[{n:"Shackling Veil",slot:"H",v:.25,t:"적 전 부대 공격력 −25%",te:"all enemy troops attack −25%"},
       {n:"Slash Formation",slot:"B",v:.15,t:"전 부대 공격력 +15% / 방어력 +10%",te:"all troops attack +15% / defense +10%",also:{slot:"DEF",v:.10}},
-      {n:"Enchanting Tapestry",slot:"X",k:"sur",v:.30,tgt:"infantry",
+      {n:"Enchanting Tapestry",slot:"SHIELD",k:"sur",v:.30,tgt:"infantry",
        t:"보병 공격 시 공격력 30% 실드 1턴",te:"infantry gain a shield worth 30% of attack for 1 turn"}],
  w:{side:"defender",stat:"Defense",name:"Guardian's Grace"}},
 {id:"estrella",kr:"에스텔라",en:"Estrella",cls:"lancer",gen:15,rar:"leg",
@@ -332,30 +341,30 @@ const HEROES = [
  w:{side:"defender",stat:"Health",name:"Wall of Despair"}},
 {id:"viveca",kr:"비비카",en:"Viveca",cls:"marksman",gen:15,rar:"leg",
  exp:[{n:"Nightfall Legion",slot:"B",v:.25,t:"전 부대 공격력 +25%",te:"all troops attack +25%"},
-      {n:"Shadow World",slot:"X",k:"dmg",v:.20,tgt:"marksman",p:"20%",pe:"20% chance",
+      {n:"Shadow World",slot:"SKILL",k:"dmg",v:.20,tgt:"marksman",p:"20%",pe:"20% chance",
        t:"궁병 공격 20% 확률로 추가피해 +100%",te:"marksmen: 20% chance of +100% extra damage"},
       {n:"Children of the Mist",slot:"X",k:"dmg",v:.10,tgt:"marksman",bk:"A",also:{slot:"X",k:"sur",v:.10,tgt:"infantry",bk:"D"},
        t:"궁병 피해량 +10% · 보병 받는 피해 −10%",te:"marksmen deal +10% damage; infantry take −10% damage"}],
  w:{side:"rally",stat:"Lethality",name:"Song of Dawn"}},
 {id:"aisling",kr:"애슐린",en:"Aisling",cls:"marksman",gen:16,rar:"leg",
  exp:[{n:"Songs of the Ancestors",slot:"A",v:.20,t:"전 부대 피해량 +20%",te:"all troops damage +20%"},
-      {n:"Rock Storm",slot:"X",k:"dmg",v:.50,tgt:"marksman",p:"3턴마다",pe:"every 3 turns",
+      {n:"Rock Storm",slot:"SKILL",k:"dmg",v:.50,tgt:"marksman",p:"3턴마다",pe:"every 3 turns",
        t:"궁병 3턴마다 추가피해 +150% · 적 피해량 −30%",te:"marksmen every 3 turns: +150% extra damage, enemy damage −30%"},
-      {n:"Forest Fury",slot:"X",k:"dmg",v:.133,tgt:"marksman",p:"3턴마다",pe:"every 3 turns",
+      {n:"Forest Fury",slot:"SKILL",k:"dmg",v:.133,tgt:"marksman",p:"3턴마다",pe:"every 3 turns",
        t:"궁병 3턴마다 전 병종 상대 추가피해 +40%",te:"marksmen every 3 turns: +40% extra damage vs all troops"}],
  w:{side:"defender",stat:"Defense",name:"Forest Guardian"}},
 {id:"seigel",kr:"시걸",en:"Seigel",cls:"infantry",gen:16,rar:"leg",
  exp:[{n:"Armor of Night",slot:"C",v:.25,t:"전 부대 체력 +25%",te:"all troops health +25%"},
       {n:"Night's Defense",slot:"H",v:.35,
        t:"적 창병·궁병 공격력 −35% (내 보병 공격력 −20% 감수)",te:"enemy lancer & marksman attack −35% (own infantry attack −20%)"},
-      {n:"Vanguard of Eternity",slot:"X",k:"sur",v:.30,tgt:"infantry",
+      {n:"Vanguard of Eternity",slot:"D",v:null,unsure:1,tgt:"infantry",
        t:"보병 일반공격 받피 −25% / 스킬 받피 −30%",te:"infantry: normal-attack damage taken −25% / skill damage taken −30%"}],
  w:{side:"defender",stat:"Lethality",name:"Hell's Vow"}},
 {id:"ursar",kr:"우르사",en:"Ursar",cls:"lancer",gen:16,rar:"leg",
  exp:[{n:"Forest Spores",slot:"H",v:.25,t:"적 전 부대 공격력 −25%",te:"all enemy troops attack −25%"},
       {n:"Horn of the Ancients",slot:"X",k:"dmg",v:.30,tgt:"mar+lan",
        t:"창병·궁병 파괴력 +30% 2턴 · 적 방어력 −30%",te:"lancers & marksmen lethality +30% for 2 turns; enemy defense −30%"},
-      {n:"Poison Tips",slot:"X",k:"dmg",v:.50,tgt:"lancer",p:"2공격마다",pe:"every 2nd attack",
+      {n:"Poison Tips",slot:"SKILL",also:{slot:"G",v:null},k:"dmg",v:.50,tgt:"lancer",p:"2공격마다",pe:"every 2nd attack",
        t:"창병 2공격마다 추가피해 +100% · 대상 받는 피해 +25%",te:"lancers every 2nd attack: +100% extra damage, target takes +25% damage"}],
  w:{side:"rally",stat:"Attack",name:"Typhoon Drums"}},
 {id:"aiden",kr:"에이든",en:"Aiden",cls:"infantry",gen:17,rar:"leg",
@@ -374,15 +383,16 @@ const HEROES = [
  w:{side:"defender",stat:"Lethality",name:"Antibodies"}},
 {id:"eleanor",kr:"엘리노어",en:"Eleanor",cls:"marksman",gen:17,rar:"leg",
  exp:[{n:"Theoretical Advantage",slot:"F",v:.25,t:"적 전 부대 방어력 −25%",te:"all enemy troops defense −25%"},
-      {n:"Pierce Caliber",slot:"X",k:"dmg",v:.50,tgt:"marksman",p:"50%",pe:"50% chance",
+      {n:"Pierce Caliber",slot:"SKILL",k:"dmg",v:.50,tgt:"marksman",p:"50%",pe:"50% chance",
        t:"궁병 50% 확률 추가피해 +100% · 궁병 피해량 +40% 1턴",te:"marksmen: 50% chance of +100% extra damage; marksman damage +40% for 1 turn"},
-      {n:"Trajectoids",slot:"X",k:"dmg",v:.30,tgt:"marksman",p:"2공격마다",pe:"every 2 attacks",
+      {n:"Trajectoids",slot:"VSTROOP",k:"dmg",v:.30,tgt:"marksman",p:"2공격마다",pe:"every 2 attacks",
        t:"궁병 2공격마다 적 궁병에 피해 +60%",te:"marksmen every 2 attacks: +60% damage vs enemy marksmen"}],
  w:{side:"rally",stat:"Lethality",name:"Doom Patrol"}}
 ];
 
 // ── Ton 시트의 편성 행 ───────────────────────────────────────────
-// EN 툴 둘("Gen 1~9" · "Gen 10+")의 편성 행을 그대로 옮겼다 (2026-09-12, CSV 수집).
+// EN 툴 둘("Gen 1~9" · "Gen 10+")의 편성 행을 그대로 옮겼다 (2026-09-12, CSV 수집 · 2026-11-10 재수집:
+//   Gen 5 헥터/로건·노라·진먼 행 제시*→서윤 · Gen 5 헥터·노라·린 50/20/30 신설 · Gen 7 궁병 리더에 웨인 추가 · Gen 13 5행 신설).
 //   g  = 세대 · l = 리더 [보병[], 창병[], 궁병[]] (슬래시 대안을 배열로 다 담았다)
 //   rs = 라벨에 적힌 병비 **전부** ("60/40 or 60/30/10" 이면 둘 다)
 //   j  = 조이너 **칸 단위** [[칸1 후보], [칸2 후보], …]
@@ -439,11 +449,12 @@ const SHEET_COMPS = [
  {g:4,l:[["jeronimo"],["mia"],["greg","alonso"]],rs:[[48,4,48],[40,10,50]],j:[["patrick"],["philly"],["zinman"],["reina"]],alt:[["jessie","jasser","jeronimo"],["seoyoon"]]},
  {g:4,l:[["jeronimo"],["reina","mia"],["greg"]],rs:[[60,40,0],[40,60,0]],j:[["patrick"],["philly"],["zinman"],["mia","reina"]],alt:[["jessie","jasser","jeronimo"],["seoyoon"]]},
  {g:4,l:[["ahmose","logan"],["molly","philly"],["lynn"]],rs:[[50,2,48]],j:[["mia"],["patrick"],["jessie","jasser","jeronimo"],["seoyoon"]],alt:[["zinman"]]},
- {g:5,l:[["hector","logan"],["norah"],["zinman"]],rs:[[60,40,0]],j:[["mia"],["patrick"],["jessie","jasser","jeronimo"],["philly"]]},
+ {g:5,l:[["hector","logan"],["norah"],["zinman"]],rs:[[60,40,0]],j:[["mia"],["patrick"],["seoyoon"],["philly"]]},
  {g:5,l:[["jeronimo"],["reina"],["gwen"]],rs:[[50,20,30],[30,20,50]],j:[["mia"],["jessie","jasser","jeronimo"],["seoyoon"],["norah"]],alt:[["patrick"],["philly"]]},
  {g:5,l:[["jeronimo"],["mia"],["gwen"]],rs:[[48,4,48],[40,10,50]],j:[["norah"],["norah"],["norah"],["patrick"]],alt:[["philly"]]},
  {g:5,l:[["jeronimo"],["norah"],["greg"]],rs:[[60,40,0],[40,60,0]],j:[["mia"],["patrick"],["jessie","jasser","jeronimo"],["philly"]],alt:[["zinman"]]},
  {g:5,l:[["logan"],["norah"],["greg"]],rs:[[60,40,0]],j:[["mia"],["norah"],["jessie","jasser","jeronimo"],["philly"]],alt:[["norah"]]},
+ {g:5,l:[["hector"],["norah"],["lynn"]],rs:[[50,20,30]],j:[["mia"],["patrick"],["philly"],["jessie","jasser","jeronimo"]],alt:[["norah"]]},
  {g:6,l:[["wuming"],["norah"],["zinman"]],rs:[[60,40,0]],j:[["renee"],["mia"],["patrick"],["jessie","jasser","jeronimo"]],alt:[["wuming"]]},
  {g:6,l:[["jeronimo"],["renee"],["gwen"]],rs:[[50,20,30],[30,20,50]],j:[["jessie","jasser","jeronimo"],["seoyoon"],["mia"],["norah"]],alt:[["patrick"],["wuming"]]},
  {g:6,l:[["jeronimo","hector"],["mia"],["wayne","gwen"]],rs:[[48,4,48],[40,10,50]],j:[["norah"],["norah"],["norah"],["norah","patrick"]]},
@@ -452,7 +463,7 @@ const SHEET_COMPS = [
  {g:6,l:[["hector"],["norah"],["wayne"]],rs:[[45,15,40]],j:[["mia"],["patrick"],["philly"],["lynn"]],alt:[["wuming"]]},
  {g:6,l:[["hector"],["molly"],["wayne"]],rs:[[50,0,50]],j:[["mia"],["patrick"],["norah"],["norah"]],alt:[["norah"],["wuming"]]},
  {g:7,l:[["edith"],["gordon"],["bradley"]],rs:[[60,40,0]],j:[["renee"],["mia"],["reina"],["jessie","jasser","jeronimo"]],alt:[["wuming"]]},
- {g:7,l:[["edith"],["molly","philly"],["bradley"]],rs:[[40,0,60],[48,4,48]],j:[["mia"],["norah"],["norah"],["lynn"]]},
+ {g:7,l:[["edith"],["molly","philly"],["bradley","wayne"]],rs:[[40,0,60],[48,4,48]],j:[["mia"],["norah"],["norah"],["lynn"]]},
  {g:7,l:[["jeronimo","edith"],["mia"],["bradley"]],rs:[[48,4,48],[40,10,50]],j:[["norah"],["norah"],["norah"],["patrick"]],alt:[["philly"]]},
  {g:8,l:[["gatot"],["sonya"],["bradley"]],rs:[[60,40,0]],j:[["renee"],["patrick"],["mia"],["hendrik"]],alt:[["wuming"]]},
  {g:8,l:[["gatot"],["molly","philly"],["bradley"]],rs:[[40,0,60],[48,4,48]],j:[["mia"],["patrick"],["norah"],["lynn"]]},
@@ -482,4 +493,12 @@ const SHEET_COMPS = [
  // 시트 Gen 12 의 **마지막 행** "META - Mix Defense - 60/20/20". 위 60/20/20 행과 리더·병비가
  // 같고 조이너만 다르다 — 2026-09-12 수집 때 중복으로 오분류해서 빠져 있었다(2026-09-13 발견).
  {g:12,l:[["herbjorg"],["lloyd"],["ligeia"]],rs:[[60,20,20]],j:[["mia"],["gatot"],["patrick"],["seoyoon"]],meta:1,alt:[["norah"]]},
+ // ── Gen 13 (2026-11-10 시트 신설 · Ton 작업 중이라 빈칸이 있다) ──
+ // 시트가 비워 둔 조이너 칸은 **싣지 않는다**(칸이 넷보다 적다) — 남는 자리는 pick4 의 탐욕이 메운다.
+ // "50/5-10/40-45" 는 양 끝을 둘 다 rs 에 넣었다(중간값 50/7.5/42.5 도 COMP_TOL 안이다).
+ {g:13,l:[["gisela"],["flora"],["vulcanus"]],rs:[[60,40,0]],j:[["hendrik"],["patrick"],["renee"]]},
+ {g:13,l:[["gisela"],["karol"],["vulcanus"]],rs:[[50,10,40]],j:[["mia"],["hendrik"],["patrick"]],meta:1,alt:[["wuming"],["norah"]]},
+ {g:13,l:[["gisela"],["mia"],["vulcanus"]],rs:[[48,4,48],[40,10,50]],j:[["hendrik"],["patrick"]],alt:[["wuming"],["norah"]]},
+ {g:13,l:[["gisela"],["karol"],["greg","bradley"]],rs:[[60,40,0]],j:[["mia"],["hendrik"],["patrick"],["renee"]]},
+ {g:13,l:[["gisela"],["flora"],["ligeia"]],rs:[[50,5,45],[50,10,40]],j:[["patrick"],["seoyoon"],["jessie","jasser","jeronimo"]],meta:1,alt:[["wuming"],["norah"]]},
 ];

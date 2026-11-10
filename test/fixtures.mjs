@@ -184,6 +184,20 @@ export const X_BUCKETED = [
   // 분류)도 둘을 DEFENSE UP 에 필리·진먼·그레고리와 같이 넣었다. 가토 원문은 "Infantry Defense" 그대로다.
   {id:"gatot",    n:"Golden Guard",         bk:"DEF"},
   {id:"gisela",   n:"Alloyed Defense",      bk:"DEF"},
+  // 2026-11-10 Ton 버킷표 — 병종 한정이지만 표가 버킷을 적은 셋. 에디스 Ironclad "infantry damage taken −20%"(D?) ·
+  // 마그누스 Iron Phalanx "infantry defense +50% (40%)"(DEF) · Iceman "infantry damage taken −10% / marksman damage +10%"(A+D)
+  {id:"edith",    n:"Ironclad",             bk:"D"},
+  {id:"magnus",   n:"Iron Phalanx",         bk:"DEF"},
+  {id:"magnus",   n:"Iceman",               bk:"D", alsoBk:"A"},
+  // 2026-11-10 리뷰 — 위 셋과 **같은 원문**인데 Gen 10+ 라 빠져 있던 넷 (wosheroes 대조).
+  // 그레고리 Unbroken "reducing Infantry's Damage Taken by 20%" · 엘레오노라 Solaris Nexus "damage taken −10% for her Infantries
+  // and damage dealt +10% for her Marksmen"(Iceman 과 같은 구조 — inf+mar 한 덩어리로 뭉쳐 있었다) ·
+  // 헤르보르 Battlethirsty "Infantry's damage taken −15% and damage dealt +10%"(딜 몫이 통째로 빠져 있었다) ·
+  // 플로라 Plantage 의 보병 받피 몫(주 효과는 SKILL 이라 bk 없음).
+  {id:"gregory",  n:"Unbroken",             bk:"D"},
+  {id:"eleonora", n:"Solaris Nexus",        bk:"D", alsoBk:"A"},
+  {id:"herbjorg", n:"Battlethirsty",        bk:"D", alsoBk:"A"},
+  {id:"flora",    n:"Plantage",             alsoBk:"D"},
 ];
 
 // ── 시트 세대별 행 — 조이너 순위 대조용 ──────────────────────
@@ -219,11 +233,12 @@ export const SHEET_ROWS = [
   {gen:4, lead:["jeronimo","mia","greg"], r:[48,4,48], top:["patrick"], pri:["patrick","philly","zinman","reina"], all:["patrick","philly","zinman","reina","jessie","jasser","jeronimo","seoyoon"]},
   {gen:4, lead:["jeronimo","reina","greg"], r:[60,40,0], top:["patrick"], pri:["patrick","philly","zinman","mia","reina"], all:["patrick","philly","zinman","mia","reina","jessie","jasser","jeronimo","seoyoon"]},
   {gen:4, lead:["ahmose","molly","lynn"], r:[50,2,48], top:["mia"], pri:["mia","patrick","jessie","jasser","jeronimo","seoyoon"], all:["mia","patrick","jessie","jasser","jeronimo","seoyoon","zinman"]},
-  {gen:5, lead:["hector","norah","zinman"], r:[60,40,0], top:["mia"], pri:["mia","patrick","jessie","jasser","jeronimo","philly"], all:["mia","patrick","jessie","jasser","jeronimo","philly"]},
+  {gen:5, lead:["hector","norah","zinman"], r:[60,40,0], top:["mia"], pri:["mia","patrick","seoyoon","philly"], all:["mia","patrick","seoyoon","philly"]},   // 2026-11-10 시트: 제시* → 서윤
   {gen:5, lead:["jeronimo","reina","gwen"], r:[50,20,30], top:["mia"], pri:["mia","jessie","jasser","jeronimo","seoyoon","norah"], all:["mia","jessie","jasser","jeronimo","seoyoon","norah","patrick","philly"]},
   {gen:5, lead:["jeronimo","mia","gwen"], r:[48,4,48], top:["norah"], pri:["norah","patrick"], all:["norah","patrick","philly"]},
   {gen:5, lead:["jeronimo","norah","greg"], r:[60,40,0], top:["mia"], pri:["mia","patrick","jessie","jasser","jeronimo","philly"], all:["mia","patrick","jessie","jasser","jeronimo","philly","zinman"]},
   {gen:5, lead:["logan","norah","greg"], r:[60,40,0], top:["mia"], pri:["mia","norah","jessie","jasser","jeronimo","philly"], all:["mia","norah","jessie","jasser","jeronimo","philly"]},
+  {gen:5, lead:["hector","norah","lynn"], r:[50,20,30], top:["mia"], pri:["mia","patrick","philly","jessie","jasser","jeronimo"], all:["mia","patrick","philly","jessie","jasser","jeronimo","norah"]},   // 2026-11-10 신설
   {gen:6, lead:["wuming","norah","zinman"], r:[60,40,0], top:["renee"], pri:["renee","mia","patrick","jessie","jasser","jeronimo"], all:["renee","mia","patrick","jessie","jasser","jeronimo","wuming"]},
   {gen:6, lead:["jeronimo","renee","gwen"], r:[50,20,30], top:["jessie","jasser","jeronimo"], pri:["jessie","jasser","jeronimo","seoyoon","mia","norah"], all:["jessie","jasser","jeronimo","seoyoon","mia","norah","patrick","wuming"]},
   {gen:6, lead:["jeronimo","mia","wayne"], r:[48,4,48], top:["norah"], pri:["norah","patrick"], all:["norah","patrick"]},
@@ -258,4 +273,10 @@ export const SHEET_ROWS = [
   {gen:12, lead:["herbjorg","mia","rufus"], r:[48,4,48], top:["patrick"], pri:["patrick","hendrik","norah","gatot"], all:["patrick","hendrik","norah","gatot"]},
   {gen:12, lead:["herbjorg","karol","rufus"], r:[50,10,40], top:["mia"], pri:["mia","patrick","hendrik","norah"], all:["mia","patrick","hendrik","norah"]},
   {gen:12, lead:["herbjorg","karol","bradley"], r:[60,40,0], top:["mia"], pri:["mia","renee","gatot","hendrik"], all:["mia","renee","gatot","hendrik","patrick"]},
+  // 2026-11-10 시트 Gen 13 신설 5행 — 시트가 비워 둔 칸은 싣지 않는다(pri 가 넷보다 짧다)
+  {gen:13, lead:["gisela","flora","vulcanus"], r:[60,40,0], top:["hendrik"], pri:["hendrik","patrick","renee"], all:["hendrik","patrick","renee"]},
+  {gen:13, lead:["gisela","karol","vulcanus"], r:[50,10,40], top:["mia"], pri:["mia","hendrik","patrick"], all:["mia","hendrik","patrick","wuming","norah"]},
+  {gen:13, lead:["gisela","mia","vulcanus"], r:[48,4,48], top:["hendrik"], pri:["hendrik","patrick"], all:["hendrik","patrick","wuming","norah"]},
+  {gen:13, lead:["gisela","karol","greg"], r:[60,40,0], top:["mia"], pri:["mia","hendrik","patrick","renee"], all:["mia","hendrik","patrick","renee"]},
+  {gen:13, lead:["gisela","flora","ligeia"], r:[50,7,43], top:["patrick"], pri:["patrick","seoyoon","jessie","jasser","jeronimo"], all:["patrick","seoyoon","jessie","jasser","jeronimo","wuming","norah"]},
 ];

@@ -21,26 +21,44 @@ export function makeSim(E, opt = {}) {
   };
   // 세트(스킬 목록)를 칸별로 모은다. 반환: {bucket -> Σv}, pc 그룹은 복사본 수로 한 번에.
   // 두 칸 스킬(공격+방어 등)은 합으로 — 각 칸에는 넣되 교차항 (1+a)(1+b)-(1+a+b)=ab 를 cross 로 걷어낸다 (2026-10-10, 시트 재현 목표)
+  // 2026-11-10 버킷 이론 — 스킬 데미지(SKILL)·리더 전용 버킷은 수치 모델이 없어 빼고, v:null 도 뺀다.
+  // 확률형(p 가 "N%" · pc)은 버킷별로 모아 "같은 버킷이면 효과는 안 겹치고 확률만 오른다"(Ton)로 기대값을 낸다.
+  // 같은 스킬 여러 장은 판정 횟수만 합친다. 그웬 S1(partial)은 GWEN_EFF 로 감쇄.
+  const EXCL = new Set(["SKILL", "SKILLUP", "VSTROOP", "TARGET", "EXTRA", "SHIELD"]);
+  const GW = opt.GWEN_EFF ?? E.GWEN_EFF, NOSTACK = opt.CHANCE_NO_STACK ?? true;
+  const chanceOf = q => q.pc ? q.pc : (/^(\d+(?:\.\d+)?)%$/.exec(q.p || "") ? parseFloat(q.p) / 100 : 0);
   function collect(skills, r) {
-    const add = {}, self = {}, pcg = {}; let cross = 1;
+    const add = {}, self = {}, ch = {}; let cross = 1;
     const put = (k, v) => { add[k] = (add[k] || 0) + v; };
+    const n = cls(r);
     for (const {h, e} of skills) {
-      if (e.slot === "ECO") continue;
-      if (e.pc) { const k = h.id + "/" + e.n; pcg[k] = pcg[k] || {e, n: 0}; pcg[k].n++; continue; }
-      if (e.slot === "X") {
-        const parts = [e]; if (e.also && e.also.slot === "X") parts.push(Object.assign({}, e, e.also));
-        for (const q of parts) {
+      const parts = [e].concat(e.also ? [Object.assign({}, e, e.also, {also: null})] : []);
+      const plain = [];
+      parts.forEach((q, idx) => {
+        if (q.slot === "ECO" || EXCL.has(q.slot) || q.v == null) return;
+        if (q.slot === "X") {
           const v = q.v * share(q, r);
           if (q.bk) put(q.bk, v); else { const k = "self:" + h.id + "/" + e.n + "/" + q.tgt; self[k] = (self[k] || 0) + v; }
+          return;
         }
-        continue;
-      }
-      if (e.slot === "AH") { const k = "self:" + h.id + "/" + e.n; self[k] = (self[k] || 0) + e.v; continue; }
-      if (e.slot === "An") { const k = "self:" + h.id + "/" + e.n; self[k] = (self[k] || 0) + e.v * NA_SHARE; continue; }
-      put(e.slot, e.v); if (e.also) { put(e.also.slot, e.also.v); cross *= (1 + e.v + e.also.v) / ((1 + e.v) * (1 + e.also.v)); }
+        if (q.slot === "An") { const k = "self:" + h.id + "/" + e.n; self[k] = (self[k] || 0) + q.v * NA_SHARE; return; }
+        const p = idx === 0 ? chanceOf(q) : 0;
+        if (p > 0) {
+          const k = h.id + "/" + e.n, g = (ch[q.slot] = ch[q.slot] || {});
+          g[k] = g[k] || {p, m: q.v / p, rolls: 0, copies: 0, pc: !!q.pc}; g[k].rolls += q.pc ? n : 1; g[k].copies++;
+          return;
+        }
+        const v = q.partial ? q.v * GW : q.v; put(q.slot, v); plain.push(v);
+      });
+      // 2026-11-10: 교차항 제거 폐지 — 다른 버킷은 곱한다(cross 는 1 로 남는다)
     }
-    const n = cls(r);
-    for (const k in pcg) { const {e, n: copies} = pcg[k]; const v = n > 0 ? e.v * (1 - Math.pow(1 - e.pc, n * copies)) / e.pc : 0; put(e.slot, v); if (e.also) put(e.also.slot, e.also.v * copies); }
+    for (const b in ch) {
+      const L = Object.values(ch[b]);
+      if (!NOSTACK) { put(b, L.reduce((a, x) => a + (x.pc ? x.m * (1 - Math.pow(1 - x.p, x.rolls)) : x.copies * x.p * x.m), 0)); continue; }
+      L.sort((a, c) => c.m - a.m); let miss = 1, ev = 0;
+      for (const x of L) { const f = Math.pow(1 - x.p, x.rolls); ev += x.m * (1 - f) * miss; miss *= f; }
+      put(b, ev);
+    }
     return {add, self, cross};
   }
   const prod = ({add, self, cross}) => Object.values(add).reduce((a, v) => a * (1 + v), 1) * Object.values(self).reduce((a, v) => a * (1 + v), 1) * (cross ?? 1);
