@@ -37,8 +37,12 @@ function makeEl(id) {
   };
 }
 
-/** 번들을 실행하고 조작 핸들을 돌려준다. lang 은 "ko" | "en". */
-export function boot(lang = "ko") {
+/** 번들을 실행하고 조작 핸들을 돌려준다. lang 은 "ko" | "en".
+ *  globals — 샌드박스에 더 넣을 전역(localStorage · setTimeout · clearTimeout 등). 기본 스텁에는 저장소도 타이머도 없다 —
+ *  "저장이 막힌 환경에서도 계산은 돈다" 가 그 상태로 검사되고, 편성 저장·이전 편성 검사만 가짜 저장소를 넣어 돌린다.
+ *  opts.reset — false 면 부팅 뒤 입력칸을 테스트 기본값으로 다시 채우지 않는다. **저장된 편성을 되살렸는지 보려면 반드시 false** —
+ *  안 그러면 앱이 되살린 값을 이 스텁이 덮어써서 "복원이 안 된다" 로 보인다(실제로 그렇게 한 번 헛짚었다). */
+export function boot(lang = "ko", globals = {}, opts = {}) {
   const els = new Map();
   const el = id => {
     if (!els.has(id)) els.set(id, makeEl(id));
@@ -59,6 +63,11 @@ export function boot(lang = "ko") {
     history: {replaceState() {}},
     Event: function () {},
   };
+  Object.assign(sandbox, globals);
+  // part1.html 마크업이 들고 있는 초깃값 — 스텁에는 마크업이 없으므로 init 이 돌기 전에 채워 둔다(공성 모드 · 전무 10 · 내 병비 48/4/48)
+  el("mAtk").classList.add("on");
+  ["wInf", "wLan", "wMar"].forEach(id => { el(id).value = "10"; });
+  ["r1", "r2", "r3"].forEach((id, i) => { el(id).value = ["48", "4", "48"][i]; });
   vm.createContext(sandbox);
   const code = PARTS.map(p => readFileSync(join(ROOT, "src", p), "utf8")).join("")
     .replace(/<\/script>[\s\S]*$/, "");
@@ -110,6 +119,7 @@ export function boot(lang = "ko") {
     gearText() { return api.gearRender().replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(); },
     el,
   };
-  // 기본값 — init IIFE 와 같은 조합에서 출발한다
+  if (opts.reset === false) return api;   // init 이 만든 상태 그대로 — 처음 방문(서버 세대 4)이거나, 저장된 편성을 되살린 상태다
+  // 기본값 — init IIFE 와 같은 조합에서 출발한다(서버 세대만 전체로 푼다)
   return api.mode("rally").leaders("jeronimo", "mia", "alonso").gear(10).gcap(99).mine([48, 4, 48]);
 }

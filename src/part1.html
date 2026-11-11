@@ -112,6 +112,23 @@ td.cdone{opacity:.45}
 .chip{display:inline-block;font-size:11px;padding:3px 9px;margin:4px 4px 0 0;border-radius:20px;background:var(--card2);border:1px solid var(--line);color:var(--sub);cursor:pointer;font-family:inherit}
 .chip:hover{border-color:var(--accent);color:#fff}
 .sumwarn{font-size:11px;margin-top:5px;color:var(--skip)}
+/* 이전 편성 — 입력 패널 아래의 칩 줄. 비어 있으면 자리도 안 차지한다. 좁은 화면에서는 줄바꿈 대신 가로로 민다(본문은 안 넘친다) */
+#hist:empty{display:none}
+#hist{margin-top:12px;padding-top:10px;border-top:1px dashed var(--line)}
+.hhd{font-size:12px;color:var(--sub);margin-bottom:6px}.hhd b{color:var(--ink);font-weight:600;margin-right:6px}
+.hrow{display:flex;flex-wrap:wrap;gap:6px}
+.hchip{display:inline-flex;flex:0 0 auto;align-items:stretch;border:1px solid var(--line);border-radius:10px;background:var(--card2);overflow:hidden}
+.hchip:hover{border-color:var(--accent)}
+.hchip button{background:none;border:none;color:var(--ink);font:inherit;cursor:pointer}
+.hchip button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.hgo{display:inline-flex;align-items:center;gap:5px;padding:4px 9px 4px 7px;font-size:12px;white-space:nowrap}
+.hgo .hpic.sm{margin:0}
+.hgo b{font-weight:600;margin-left:3px}
+.hgo i{font-style:normal}
+.hgo .hnone{display:inline-block;width:24px;text-align:center;color:var(--muted)}
+.hchip .hx{padding:0 9px;color:var(--muted);border-left:1px solid var(--line);font-size:12px}
+.hchip .hx:hover{color:var(--skip)}
+@media(max-width:700px){.hrow{flex-wrap:nowrap;overflow-x:auto;padding-bottom:6px}}
 .pill{display:inline-block;font-size:11px;padding:2px 9px;border-radius:20px;background:var(--card2);border:1px solid var(--line);color:var(--sub);margin:0 4px 4px 0}
 .pill.dim{opacity:.55;border-style:dashed}.pill.empty{opacity:.6}.pill.on{color:var(--ink);border-color:var(--accent)}
 .combo{border-top:1px solid var(--line);padding:6px 0 2px}.combo.hi p:first-child{color:var(--star)}
@@ -236,6 +253,7 @@ textarea{width:100%;background:var(--card2);color:var(--ink);border:1px solid va
     <div><label id="eLab">상대 방어 병비 (선택)</label><div class="ratio3"><input id="e1" type="number" placeholder="보"><input id="e2" type="number" placeholder="창"><input id="e3" type="number" placeholder="궁"></div><div id="ePre"></div><div id="eSum" class="sumwarn"></div></div>
     <div><label id="lbGcap"></label><select id="gcap"></select><label class="note" style="display:block;margin-top:8px"><input type="checkbox" id="skHeavy"> <span id="lbSkHeavy"></span></label></div>
   </div>
+  <div id="hist"></div>
   <div class="note" style="margin-top:10px" id="assump"></div>
 </div>
 

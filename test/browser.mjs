@@ -50,9 +50,13 @@ const browser = await chromium.launch({executablePath: execPath()});
 const errors = [];
 const ctx = await browser.newContext();
 ctx.on("weberror", e => errors.push(String(e.error())));
+// 편성 탭은 마지막 편성을 localStorage 에 두고 다음에 열 때 되살린다(2026-11-11). 이 컨텍스트의 페이지들은 저장소를 같이 쓰므로,
+// 그대로 두면 앞 페이지가 남긴 편성으로 뒤 페이지가 열려 검사끼리 물린다 → 열 때마다 지운다. 저장·복원 자체는 아래 별도 컨텍스트에서 본다.
+const COMP_KEY = "wos-calc:comp:v1";
+await ctx.addInitScript(k => { try { localStorage.removeItem(k); } catch (e) {} }, COMP_KEY);
 
-async function open(query) {
-  const page = await ctx.newPage();
+async function open(query, c = ctx) {
+  const page = await c.newPage();
   page.on("pageerror", e => errors.push(String(e)));
   page.on("console", m => { if (m.type() === "error") errors.push("console: " + m.text()); });
   await page.goto(PAGE + (query || ""));
@@ -491,6 +495,8 @@ section("조이너 안내 — 시트 카드 · 계산 카드");
   const after = await ko.evaluate(() => ({r: [r1.value, r2.value, r3.value].join("/"), near: !!document.querySelector('#sheet [data-k="near"]'),
     mult: !!document.querySelector("#sheet .srow .mult"), cmp: !!document.getElementById("cmp")}));
   ok(after.r === "50/2/48" && !after.near && after.mult && after.cmp, "병비 버튼을 누르면 그 병비로 바뀌고 시트 행이 잡힌다", JSON.stringify(after));
+  ok((await ko.evaluate(k => ((JSON.parse(localStorage.getItem(k) || "{}").cur || {}).r || []).join("/"), COMP_KEY)) === "50/2/48",
+     "병비 버튼으로 바꾼 것도 마지막 편성으로 저장된다 (입력칸을 거치지 않는 경로)");
 
   // 시트가 답을 둘 적어 둔 자리 — 블록 두 개
   await ko.evaluate(() => {
@@ -548,6 +554,201 @@ section("조이너 안내 — 시트 카드 · 계산 카드");
   ok(await dl.isVisible("#tab-gear"), "?tab=gear 딥링크로 바로 장비 탭이 열린다");
   ok(!(await dl.isVisible("#tab-comp")), "딥링크에서 편성 탭은 감춰져 있다");
   await dl.close();
+}
+
+// ── 3.8 편성 저장 · 이전 편성 (2026-11-11) ─────────────────────────────
+// 저장이 살아 있는 별도 컨텍스트 — 위의 공유 컨텍스트는 열 때마다 저장된 편성을 지운다.
+// 머무는 시간(HIST_SETTLE_MS)은 검사가 그때그때 바꾼다: "금방 지나간다" 는 기본값(초 단위)에 맡기고, "머물렀다" 는 100ms 로 줄여 기다린다.
+// 타이머와 경주하는 단계는 한 번의 evaluate 로 묶었다(값 바꾸기 + 픽커 열기) — 클릭 사이 시간에 기대면 느린 기계에서 흔들린다.
+section("편성 저장 · 이전 편성");
+{
+  const hctx = await browser.newContext();
+  hctx.on("weberror", e => errors.push(String(e.error())));
+  // 이 절은 앞 단계가 만든 칩을 다음 단계가 누른다 — 한 군데가 어긋나면 "없는 칩을 기다리다" 30초 뒤에 스크립트가 통째로 죽고 요약이 안 나온다
+  // (사보타주에서 변형 4종이 그렇게 걸렸다). 기다림을 줄이고, 멈추면 실패 한 줄로 남긴 뒤 다음 절로 넘어간다.
+  hctx.setDefaultTimeout(6000);
+  try {
+  const p = await open("", hctx);
+  const reload = async pg => { await pg.reload(); await pg.waitForSelector("#out h2", {state: "attached"}); };
+  const stored = pg => pg.evaluate(k => JSON.parse(localStorage.getItem(k) || "null"), COMP_KEY);
+  const state = pg => pg.evaluate(() => {
+    const v = id => document.getElementById(id).value, t = id => document.getElementById(id).textContent.trim();
+    return {l: ["hInf", "hLan", "hMar"].map(v).join(), w: ["wInf", "wLan", "wMar"].map(v).join(), r: ["r1", "r2", "r3"].map(v).join("/"),
+            e: ["e1", "e2", "e3"].map(v).join("/"), g: v("gcap"), def: document.getElementById("mDef").classList.contains("on"),
+            sk: document.getElementById("skHeavy").checked, pick: ["sInf", "sLan", "sMar"].map(t).join(" | "), lab: t("eLab"), key: luKey(luState())};
+  });
+  const outHtml = pg => pg.evaluate(() => document.getElementById("out").innerHTML);
+  const chips = pg => pg.evaluate(() => [...document.querySelectorAll("#hist .hgo")].map(b => b.getAttribute("data-k")));
+  const histHidden = pg => pg.evaluate(() => getComputedStyle(document.getElementById("hist")).display === "none");
+  const pick = async (pg, det, id) => { await pg.click("#" + det + " > summary"); await pg.click("#" + det + " .pk[data-id='" + id + "']"); await pg.waitForTimeout(40); };
+  const settle = (pg, ms) => pg.evaluate(n => { HIST_SETTLE_MS = n; }, ms);
+  const chipSel = k => '#hist .hgo[data-k="' + k + '"]';
+
+  // ── 처음 방문 ──
+  ok((await stored(p)) === null && (await histHidden(p)), "처음 열면 아무것도 저장하지 않고 이전 편성 자리는 감춰져 있다");
+
+  // ── ① 마지막 편성이 새로 고쳐도 그대로다 — 진짜 클릭·타이핑으로 만든다 ──
+  await pick(p, "pMar", "wayne");
+  await p.selectOption("#gcap", "6");
+  await p.fill("#wMar", "8");
+  await setRatio(p, "e", [60, 40, 0]);
+  await p.check("#skHeavy");
+  await p.click("#mDef");
+  await p.waitForTimeout(60);
+  const s1 = await state(p), out1 = await outHtml(p);
+  await reload(p);
+  const s2 = await state(p), out2 = await outHtml(p);
+  ok(s2.l === "jeronimo,mia,wayne" && s2.w === "10,10,8" && s2.r === "48/4/48" && s2.e === "60/40/0" && s2.g === "6" && s2.def && s2.sk,
+     "새로 고쳐도 리더 · 전무 · 내 병비 · 상대 병비 · 서버 세대 · 모드 · 토글이 그대로다", JSON.stringify(s2));
+  ok(/웨인/.test(s2.pick) && JSON.stringify(s2) === JSON.stringify(s1), "초상 픽커 표시와 상대 병비 라벨도 닫기 전과 같다", s2.pick + " / " + s2.lab);
+  ok(out2 === out1, "새로 고친 화면의 결과가 닫기 전과 같다", out1.length + " → " + out2.length);
+  ok((await chips(p)).length === 0, "지금 화면의 편성은 이전 편성 칩으로 나오지 않는다");
+  const kA = s2.key;
+
+  // ── ② 언제 칩이 생기는가 ──
+  await pick(p, "pInf", "flint");          // 되살린 편성을 떠난다
+  ok((await chips(p)).join(" ; ") === kA && (await p.isVisible(chipSel(kA))), "되살린 편성을 떠나면 그 편성이 칩으로 생긴다", (await chips(p)).join(" ; "));
+  await pick(p, "pLan", "philly");         // 곧바로 다음 리더 — 중간 편성(플린트·미아·웨인)은 머문 적이 없다
+  ok((await chips(p)).join(" ; ") === kA, "리더를 이어서 바꾸는 중간 편성은 칩으로 남지 않는다", (await chips(p)).join(" ; "));
+  // 머문다 — 전무를 고치면(같은 편성의 딸린 값) 그때부터 다시 잰다
+  await settle(p, 100);
+  await p.fill("#wInf", "9");
+  await p.waitForTimeout(350);
+  await settle(p, 3000);
+  await setRatio(p, "r", [60, 40, 0]);
+  const kX = "defender|flint,philly,wayne|48/4/48|6";
+  ok((await chips(p)).join(" ; ") === [kX, kA].join(" ; "), "머물렀던 편성을 떠나면 맨 앞 칩으로 들어가고, 병비를 타이핑하는 중간 숫자는 안 남는다", (await chips(p)).join(" ; "));
+  ok((await stored(p)).hist[0].w.join() === "9,10,8", "떠날 때의 전무 레벨이 그 편성과 같이 저장된다");
+  // 픽커를 열어 둔 시간은 머문 시간이 아니다 — 값 바꾸기와 픽커 열기를 한 번에 해서 타이머와 경주하지 않는다
+  await settle(p, 100);
+  await p.evaluate(() => { const w = document.getElementById("wInf"); w.value = "10"; w.dispatchEvent(new Event("input", {bubbles: true}));
+                           document.getElementById("pMar").open = true; });
+  await p.waitForTimeout(450);
+  await settle(p, 3000);
+  await p.click("#gMar .pk[data-id='alonso']");
+  await p.waitForTimeout(40);
+  ok((await chips(p)).join(" ; ") === [kX, kA].join(" ; "), "픽커를 열어 둔 채 흐른 시간은 머문 것으로 치지 않는다 (60/40 중간 편성이 안 남는다)", (await chips(p)).join(" ; "));
+
+  // ── ③ 불러오기 ──
+  const beforeLoad = await outHtml(p);
+  await p.click(chipSel(kA));
+  await p.waitForTimeout(60);
+  const s3 = await state(p);
+  ok(s3.key === kA && s3.l === "jeronimo,mia,wayne" && s3.w === "10,10,8" && s3.r === "48/4/48" && s3.e === "60/40/0" && s3.def && s3.sk,
+     "칩을 누르면 그 편성이 입력칸에 통째로 들어간다", JSON.stringify(s3));
+  ok(/웨인/.test(s3.pick) && (await outHtml(p)) === out1 && out1 !== beforeLoad, "픽커 표시와 결과도 불러온 편성의 것이다", s3.pick);
+  // 방금까지의 편성(플린트·필리·알론소 60/40)은 머문 적이 없다 — 그래도 칩으로 덮어쓸 때는 남긴다. 안 남기면 만들던 편성으로 돌아갈 길이 없다
+  const kZ = "defender|flint,philly,alonso|60/40/0|6";
+  ok((await chips(p)).join(" ; ") === [kZ, kX].join(" ; "), "불러온 편성은 목록에서 빠지고, 방금까지의 편성은 머문 적이 없어도 맨 앞 칩으로 남는다", (await chips(p)).join(" ; "));
+  // 병비를 고친 직후의 첫 클릭이 삼켜지지 않는다 — 포커스가 빠지며 오는 change 가 목록을 다시 그리면 누르던 칩이 사라진다
+  await p.fill("#r1", "47");
+  await p.click(chipSel(kA));
+  await p.waitForTimeout(60);
+  ok((await state(p)).r === "48/4/48", "병비 칸을 만진 직후에도 칩이 첫 클릭에 불러와진다", (await state(p)).r);
+  // 더블클릭 — 첫 클릭에 목록이 한 칸 밀려 같은 자리에 방금까지의 편성이 와 있다. 둘째 클릭을 받으면 제자리로 돌아가 버린다
+  await p.dblclick(chipSel(kX));
+  await p.waitForTimeout(80);
+  ok((await state(p)).key === kX && (await chips(p))[0] === kA, "칩을 더블클릭해도 한 번만 불러온다 (방금 떠난 편성이 첫 칩이다)", (await state(p)).key + " · 칩 " + (await chips(p)).join(" ; "));
+  // 키보드 — 칩은 버튼이라 Enter 로도 불러와진다. 눌린 칩은 사라지므로 포커스를 맨 앞 칩(방금 떠난 편성)으로 옮긴다
+  const focusAt = () => p.evaluate(() => { const a = document.activeElement; return a && a.closest && a.closest("#hist") ? a.className + "|" + a.getAttribute("data-k") : "밖(" + (a ? a.tagName : "") + ")"; });
+  await p.focus(chipSel(kA));
+  await p.keyboard.press("Enter");
+  await p.waitForTimeout(60);
+  ok((await state(p)).key === kA && (await chips(p))[0] === kX, "칩에 포커스를 두고 Enter 를 눌러도 불러와진다", (await state(p)).key);
+  ok((await focusAt()) === "hgo|" + kX, "불러온 뒤 포커스가 맨 앞 칩에 있다 — body 로 빠지지 않는다 (Enter 한 번 더면 되돌아간다)", await focusAt());
+
+  // ── ④ 지우기 — 새로 고쳐도 지워진 채다 ──
+  const kT = "defender|jeronimo,mia,wayne|47/4/48|6";   // 위에서 47 을 치다 만 편성 — 칩으로 떠났으므로 남아 있다
+  // 가운데 칩을 지운다 — 맨 앞 칩을 지우면 "그 자리" 와 "맨 앞" 이 같아서 포커스 검사가 헛돈다
+  ok((await chips(p)).join(" ; ") === [kX, kT, kZ].join(" ; "), "(전제) 칩 셋 — 방금 떠난 편성 · 47 을 치다 만 편성 · 만들다 떠난 편성", (await chips(p)).join(" ; "));
+  await p.focus('#hist .hx[data-k="' + kT + '"]');
+  await p.keyboard.press("Enter");
+  await p.waitForTimeout(40);
+  ok((await chips(p)).join(" ; ") === [kX, kZ].join(" ; ") && (await state(p)).key === kA, "✕ 는 그 칩만 지운다 — 나머지 칩과 지금 편성은 그대로다", (await chips(p)).join(" ; "));
+  ok((await focusAt()) === "hx|" + kZ, "지운 뒤 포커스가 그 자리에 온 칩의 ✕ 에 있다", await focusAt());
+  // ✕ 에는 더블클릭 가드가 없다 — 이어 누르는 클릭(detail 2)도 지워야 한다. 가드를 걸면 연달아 지울 때 첫 번째만 지워진다
+  // (detail 2 인 클릭을 직접 쏜다 — Playwright 의 clickCount 옵션으로는 detail 이 안 올라가서, 가드를 일부러 걸어도 이 검사가 통과했다)
+  await p.click("#hist .hx");
+  await p.evaluate(() => document.querySelector("#hist .hx").dispatchEvent(new MouseEvent("click", {bubbles: true, cancelable: true, detail: 2})));
+  await p.waitForTimeout(40);
+  ok((await chips(p)).length === 0 && (await histHidden(p)) && (await state(p)).key === kA, "칩을 다 지우면 자리도 감춘다 (✕ 는 이어 누르는 클릭도 받는다)", (await chips(p)).join(" ; "));
+  await reload(p);
+  ok((await chips(p)).length === 0 && (await state(p)).key === kA, "지운 편성은 새로 고쳐도 돌아오지 않는다", (await chips(p)).join(" ; "));
+  // 모드 버튼도 편성을 바꾸는 것이다
+  await p.click("#mAtk");
+  await p.waitForTimeout(40);
+  ok((await stored(p)).cur.m === "rally" && (await chips(p)).join(" ; ") === kA, "공성/수성을 바꾸면 저장되고, 떠난 쪽이 칩으로 남는다", (await chips(p)).join(" ; "));
+
+  // ── ⑤ 칩이 많을 때 — 12개 ──
+  await p.evaluate(k => {
+    const d = JSON.parse(localStorage.getItem(k));
+    d.hist = Array.from({length: 12}, (_, i) => ({m: i % 2 ? "defender" : "rally", l: ["jeronimo", i % 3 ? "mia" : "", "alonso"], w: ["10", "10", "10"],
+      r: [String(40 + i), "10", String(50 - i)], e: ["", "", ""], g: i % 4 ? "6" : "99", sk: 0, t: 100 - i}));
+    localStorage.setItem(k, JSON.stringify(d));
+  }, COMP_KEY);
+  await reload(p);
+  const many = await p.evaluate(async () => {
+    const row = document.querySelector("#hist .hrow");
+    row.scrollIntoView(); await new Promise(r => setTimeout(r, 250));
+    const imgs = [...document.querySelectorAll("#hist img")];
+    return {n: document.querySelectorAll("#hist .hchip").length, body: document.body.scrollWidth, vw: window.innerWidth,
+            rowFits: row.scrollWidth <= row.clientWidth + 1, rows: new Set([...row.children].map(c => Math.round(c.getBoundingClientRect().top))).size,
+            broken: imgs.filter(i => i.complete && i.naturalWidth === 0).length, imgs: imgs.length};
+  });
+  ok(many.n === 12 && many.imgs === 32 && many.broken === 0, "칩 12개가 다 뜨고 초상이 깨지지 않는다", JSON.stringify(many));
+  ok(many.body <= many.vw + 1 && many.rowFits && many.rows > 1, "넓은 화면에서는 칩이 여러 줄로 접힌다 (본문이 넘치지 않는다)", JSON.stringify(many));
+  await p.setViewportSize({width: 390, height: 900});
+  const narrow = await p.evaluate(() => { const row = document.querySelector("#hist .hrow");
+    return {body: document.body.scrollWidth, scrolls: row.scrollWidth > row.clientWidth + 1, rows: new Set([...row.children].map(c => Math.round(c.getBoundingClientRect().top))).size,
+            chipH: Math.round(row.children[0].getBoundingClientRect().height)}; });
+  ok(narrow.body <= 392, "390px 에서 칩 12개가 본문을 가로로 밀지 않는다", narrow.body + "px");
+  ok(narrow.scrolls && narrow.rows === 1, "좁은 화면에서는 한 줄로 두고 그 줄만 옆으로 민다 (입력 패널이 길어지지 않는다)", JSON.stringify(narrow));
+  ok(narrow.chipH >= 30, "칩이 손가락으로 누를 만한 높이다", narrow.chipH + "px");
+  await p.setViewportSize({width: 320, height: 800});
+  ok((await p.evaluate(() => document.body.scrollWidth)) <= 322, "320px 에서도 넘치지 않는다");
+  await p.setViewportSize({width: 1280, height: 720});
+
+  // ── ⑥ 언어 ──
+  await p.click("#lgEn");
+  await p.waitForTimeout(120);
+  const enHist = await p.evaluate(() => document.getElementById("hist").innerHTML);
+  ok(/Earlier lineups/.test(enHist) && !/[가-힣]/.test(enHist), "English 로 바꾸면 칩의 툴팁 · 접근명 · 머리말까지 영어가 된다", (enHist.match(/[가-힣]+/g) || []).slice(0, 5).join(","));
+  await p.click("#lgKo");
+  await p.waitForTimeout(120);
+  ok(/이전 편성/.test(await p.textContent("#hist")), "한국어로 돌아오면 칩도 한국어다");
+  {
+    const e = await open("?lang=en", hctx);
+    const h = await e.evaluate(() => document.getElementById("hist").innerHTML);
+    ok((await chips(e)).length === 12 && !/[가-힣]/.test(h), "?lang=en 으로 바로 열어도 저장된 편성이 영어 칩으로 뜬다", (h.match(/[가-힣]+/g) || []).slice(0, 5).join(","));
+    await e.close();
+  }
+
+  // ── ⑦ 깨진 저장값 · 저장이 막힌 브라우저 ──
+  await p.evaluate(k => localStorage.setItem(k, "{bad"), COMP_KEY);
+  await reload(p);
+  const s7 = await state(p);
+  ok(s7.l === "jeronimo,mia,alonso" && s7.g === "4" && (await chips(p)).length === 0, "저장값이 깨졌으면 기본 편성으로 열린다", JSON.stringify(s7).slice(0, 120));
+  await pick(p, "pMar", "wayne");
+  ok((await stored(p)).cur.l.join() === "jeronimo,mia,wayne", "깨진 저장값은 다음 저장 때 멀쩡한 값으로 덮인다");
+  await hctx.close();
+  {
+    const bctx = await browser.newContext();
+    bctx.on("weberror", e => errors.push(String(e.error())));
+    await bctx.addInitScript(() => { Object.defineProperty(window, "localStorage", {get() { throw new Error("storage blocked"); }}); });
+    const b = await open("", bctx);
+    await pick(b, "pMar", "wayne");
+    await setRatio(b, "r", [60, 40, 0]);
+    const sb = await state(b);
+    ok(sb.l === "jeronimo,mia,wayne" && sb.r === "60/40/0" && /웨인/.test(await outText(b)) && (await histHidden(b)),
+       "저장소 접근이 막힌 브라우저에서도 계산은 그대로 돈다 (목록만 없다)", JSON.stringify(sb).slice(0, 120));
+    await bctx.close();
+  }
+  } catch (e) {
+    ok(false, "편성 저장 시나리오가 끝까지 돈다", String(e).split("\n")[0].slice(0, 200));
+  } finally {
+    await hctx.close().catch(() => {});
+  }
+  ok(errors.length === 0, "편성 저장 시나리오에서 에러 없음", errors.slice(0, 3).join(" | "));
 }
 
 // ── 4. 언어 ────────────────────────────────────────────────────────────

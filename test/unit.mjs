@@ -1862,6 +1862,222 @@ section("버킷 이론 (2026-11-10)");
     ok(cm.includes("CHANCE"), "미아가 든 추천에 CHANCE 칩 (미아류도 확률형이다)", cm.join(",")); }
 }
 
+// ── 편성 저장 · 이전 편성 (2026-11-11) ──────────────────────────────────
+// 마지막 편성은 다음에 열었을 때 그대로 되살아나고, 그 전에 조합했던 편성은 칩 목록으로 남는다(src/render.js 「편성 저장 · 이전 편성」).
+// 기본 스텁에는 localStorage 도 타이머도 없다 — 위의 모든 절이 그 상태로 돌았으니 "저장이 막혀도 계산은 돈다" 는 이미 검사된 셈이고,
+// 여기서는 가짜 저장소·가짜 타이머를 넣어 규칙을 본다.
+section("편성 저장 · 이전 편성");
+{
+  const KEY = "wos-calc:comp:v1";
+  const fakeLS = (init = {}) => { const m = new Map(Object.entries(init));
+    return {getItem: k => (m.has(k) ? m.get(k) : null), setItem: (k, v) => { m.set(k, String(v)); }, removeItem: k => { m.delete(k); }, raw: () => m.get(KEY)}; };
+  const fakeTimers = () => { const q = new Map(); let n = 0;
+    return {setTimeout: f => { q.set(++n, f); return n; }, clearTimeout: id => { q.delete(id); },
+            fire: () => { const fs = [...q.values()]; q.clear(); fs.forEach(f => f()); }, pending: () => q.size}; };
+  // 사용자가 입력을 건드린 것과 같은 일 — init 의 touched() 가 하는 순서 그대로
+  const touch = a => { a.js("showSums();calc();luTrack()"); return a; };
+  const set = (a, lead, ratio, gcap) => touch(a.mode("rally").leaders(...lead).gcap(gcap).mine(ratio));
+  const stored = ls => JSON.parse(ls.raw() || "{}");
+  const chips = a => (a.el("hist").innerHTML.match(/class="hchip"/g) || []).length;
+  const keys = a => [...a.el("hist").innerHTML.matchAll(/class="hgo" data-k="([^"]+)"/g)].map(m => m[1]);
+  const A = [["jeronimo", "mia", "wayne"], [48, 4, 48], 6], B = [["flint", "philly", "zinman"], [60, 40, 0], 2], C = [["hector", "norah", "lynn"], [50, 20, 30], 5];
+  const kOf = ([l, r, g]) => "rally|" + l.join(",") + "|" + r.join("/") + "|" + g;
+
+  // ── 저장소가 없는 환경 ──
+  {
+    const a = boot("ko", {}, {reset: false});
+    const empty = JSON.parse(a.js("JSON.stringify(luRead())"));
+    ok(empty.cur === null && empty.hist.length === 0, "저장소가 없으면 빈 상태로 읽는다");
+    let threw = null; try { set(a, A[0], A[1], A[2]); a.js("histDel('x');histLoad('x')"); } catch (e) { threw = e; }
+    ok(!threw && /id="sheet"/.test(a.el("out").innerHTML) && a.el("hist").innerHTML === "", "저장소가 없어도 계산·기록 호출이 던지지 않고 목록은 비어 있다", threw ? String(threw) : "");
+  }
+
+  // ── ① 마지막 편성이 다음에 열었을 때 그대로다 ──
+  {
+    const ls = fakeLS(), a = boot("ko", {localStorage: ls}, {reset: false});
+    a.mode("rally").leaders(...A[0]).gear(8).gcap(6).mine(A[1]).enemy([60, 40, 0]); a.js("document.getElementById('skHeavy').checked=true"); touch(a);
+    const html1 = a.el("out").innerHTML;
+    const b = boot("ko", {localStorage: ls}, {reset: false});
+    const got = {l: ["hInf", "hLan", "hMar"].map(i => b.el(i).value), w: ["wInf", "wLan", "wMar"].map(i => b.el(i).value), r: ["r1", "r2", "r3"].map(i => b.el(i).value),
+                 e: ["e1", "e2", "e3"].map(i => b.el(i).value), g: b.el("gcap").value, atk: b.el("mAtk").classList.contains("on"), sk: b.el("skHeavy").checked};
+    ok(got.l.join() === A[0].join() && got.w.join() === "8,8,8" && got.r.join() === "48,4,48" && got.e.join() === "60,40,0" && got.g === "6" && got.atk && got.sk === true,
+       "다시 열면 리더·전무·내 병비·상대 병비·서버 세대·모드·토글이 그대로다", JSON.stringify(got));
+    ok(b.el("out").innerHTML === html1, "다시 연 화면의 결과가 닫기 전과 글자 하나까지 같다");
+    ok(/웨인/.test(b.el("sMar").innerHTML), "초상 픽커 표시도 되살린 리더를 따른다 (숨은 select 만 바뀌고 픽커가 옛 영웅을 보이면 안 된다)", b.el("sMar").innerHTML.slice(0, 80));
+    // 수성 모드 · 리더를 전부 비운 상태도 "마지막 편성" 이다
+    a.mode("defender"); touch(a);
+    const c = boot("ko", {localStorage: ls}, {reset: false});
+    ok(c.el("mDef").classList.contains("on") && !c.el("mAtk").classList.contains("on"), "수성 모드로 닫았으면 수성 모드로 열린다");
+    a.leaders("", "", ""); touch(a);
+    const d = boot("ko", {localStorage: ls}, {reset: false});
+    ok(d.el("hInf").value === "" && d.el("hLan").value === "" && d.el("hMar").value === "" && /리더를 한 명 이상/.test(d.el("out").innerHTML), "리더를 비운 채 닫았으면 비운 채로 열린다(기본 편성으로 덮지 않는다)");
+    ok(JSON.parse(d.js("JSON.stringify(luRead().hist)")).every(x => x.l.some(Boolean)), "리더가 하나도 없는 편성은 이전 편성에 넣지 않는다");
+  }
+
+  // ── ② 언제 이전 편성에 넣는가 — 머물렀던 편성을 떠나는 순간 ──
+  {
+    const ls = fakeLS(), tm = fakeTimers(), a = boot("ko", {localStorage: ls, setTimeout: tm.setTimeout, clearTimeout: tm.clearTimeout}, {reset: false});
+    ok(ls.raw() === undefined && a.el("hist").innerHTML === "", "처음 연 화면은 아무것도 저장하지 않고 목록도 비어 있다");
+    tm.fire();
+    set(a, ...A);
+    ok(stored(ls).hist.length === 0 && stored(ls).cur.l.join() === A[0].join(), "처음 뜬 기본 편성은 건드리지 않고 떠나면 기록하지 않는다 — 고른 적이 없는 편성이다", JSON.stringify(stored(ls).hist));
+    set(a, ...B);
+    ok(stored(ls).hist.length === 0, "금방 지나간 편성(머무르기 전에 바꾼 것)은 기록하지 않는다 — 리더를 하나씩 바꾸는 중간 상태가 쌓이지 않는다");
+    ok(tm.pending() === 1, "머무는 시간을 재는 타이머는 한 번에 하나다(건드릴 때마다 다시 잰다)", String(tm.pending()));
+    const before = a.el("hist").innerHTML, rawBefore = ls.raw();
+    tm.fire();
+    ok(a.el("hist").innerHTML === before && ls.raw() === rawBefore, "타이머는 표시만 세운다 — 화면도 저장값도 건드리지 않는다(칩을 누르려는 찰나에 목록이 밀리지 않는다)");
+    set(a, ...C);
+    ok(keys(a).join(" ; ") === kOf(B), "머물렀던 편성을 떠나면 그 편성이 이전 편성에 들어간다", keys(a).join(" ; "));
+    tm.fire(); set(a, ...B);
+    ok(keys(a).join(" ; ") === kOf(C) && stored(ls).hist.map(x => x.l[0]).join() === "hector,flint",
+       "지금 화면의 편성은 목록에서 빠진다 — 저장에는 남아 있고 칩만 안 그린다", keys(a).join(" ; ") + " / " + stored(ls).hist.map(x => x.l[0]).join());
+    tm.fire(); set(a, ...A);
+    ok(keys(a).join(" ; ") === [kOf(B), kOf(C)].join(" ; ") && stored(ls).hist.length === 2, "같은 편성은 한 번만 남고 맨 앞으로 올라온다(가장 최근에 떠난 편성이 첫 칩)", keys(a).join(" ; "));
+    // 딸린 값(전무·상대 병비·토글)은 같은 편성으로 본다 — 칩이 늘지 않고 값만 최신으로 덮인다
+    tm.fire(); a.gear(4).enemy([70, 30, 0]); touch(a); a.gear(6); touch(a);
+    ok(stored(ls).hist.length === 2 && tm.pending() === 0, "전무·상대 병비만 고치는 것은 편성을 떠나는 게 아니다", stored(ls).hist.length + "개");
+    set(a, ...C);
+    const top = stored(ls).hist[0];
+    ok(top.l.join() === A[0].join() && top.w.join() === "6,6,6" && top.e.join() === "70,30,0", "떠날 때의 전무·상대 병비가 그 편성과 같이 저장된다", JSON.stringify(top));
+    // 기본 편성이라도 사용자가 건드리고 머물렀으면 조합한 편성이다
+    const ls2 = fakeLS(), tm2 = fakeTimers(), b = boot("ko", {localStorage: ls2, setTimeout: tm2.setTimeout, clearTimeout: tm2.clearTimeout}, {reset: false});
+    b.mode("rally").gear(7); touch(b); tm2.fire(); set(b, ...A);
+    ok(stored(ls2).hist.length === 1 && stored(ls2).hist[0].l.join() === "jeronimo,mia,alonso", "기본 편성도 건드리고 머문 뒤 떠나면 기록한다", JSON.stringify(stored(ls2).hist.map(x => x.l)));
+
+    // 리더 픽커를 열어 둔 동안은 머문 시간으로 세지 않는다 — 리더 셋을 차례로 바꾸는 중간 편성이 쌓이지 않게
+    const ls3 = fakeLS(), tm3 = fakeTimers(), c = boot("ko", {localStorage: ls3, setTimeout: tm3.setTimeout, clearTimeout: tm3.clearTimeout}, {reset: false});
+    const h3 = () => stored(ls3).hist.map(x => x.l[0]).join();
+    set(c, ...A); c.el("pLan").open = true; tm3.fire();
+    ok(tm3.pending() === 1, "픽커가 열려 있을 때 타이머가 울리면 머문 것으로 치지 않고 다시 잰다", String(tm3.pending()));
+    set(c, ...B);
+    ok(h3() === "", "픽커를 열어 둔 채 흐른 시간은 머문 시간이 아니다 — 그사이의 편성은 기록하지 않는다", h3());
+    c.el("pLan").open = false; tm3.fire(); set(c, ...C);
+    ok(h3() === "flint", "픽커를 닫고 머물렀으면 떠날 때 기록한다", h3());
+    // 칩으로 불러온 편성은 타이머를 기다리지 않는다 — 이미 조합했던 편성이다. 칩을 이어서 눌러도 "방금 떠난 편성이 첫 칩" 이 지켜져야 한다
+    tm3.fire(); set(c, ...A); tm3.fire();                       // 저장 [C, B] · 지금 A(머묾)
+    c.js("histLoad(" + JSON.stringify(kOf(B)) + ")");           // 저장 [A, C, B] · 지금 B
+    ok(tm3.pending() === 0, "불러온 편성에는 머무는 시간 타이머를 걸지 않는다", String(tm3.pending()));
+    set(c, ...C);                                               // 타이머를 한 번도 안 울린 채 입력을 바꾼다 → 저장 [B, A, C] · 지금 C
+    ok(keys(c).join(" ; ") === [kOf(B), kOf(A)].join(" ; "), "불러온 편성은 곧바로 머문 것으로 친다 — 불러오자마자 입력을 바꿔도 그 편성이 첫 칩으로 올라온다", keys(c).join(" ; "));
+    // 칩을 눌러 떠날 때만은 머문 시간을 묻지 않는다 — 방금 만든(아직 안 머문) 편성을 칩으로 덮어도 잃지 않는다. 독립 검증이 짚은 자리다
+    const D = [["jeronimo", "philly", "alonso"], [40, 20, 40], 4];
+    set(c, ...D);
+    ok(tm3.pending() === 1 && keys(c).indexOf(kOf(D)) < 0 && h3().split(",").length === 3, "입력으로 바꾼 직후의 편성은 아직 머문 게 아니다(타이머가 돌고 있다)", tm3.pending() + " · " + h3());
+    c.js("histLoad(" + JSON.stringify(kOf(A)) + ")");
+    ok(keys(c)[0] === kOf(D) && c.el("hLan").value === "mia", "칩을 눌러 떠나면 머문 적 없는 편성도 맨 앞 칩으로 남는다 — 만들던 편성으로 되돌아갈 수 있다", keys(c).join(" ; "));
+    c.js("histLoad(" + JSON.stringify(kOf(D)) + ")");
+    ok(c.el("hLan").value === "philly" && c.el("r1").value === "40" && keys(c)[0] === kOf(A), "첫 칩을 누르면 방금 화면으로 되돌아간다(왕복)", keys(c).join(" ; "));
+    // 다만 리더가 하나도 없는 화면은 칩으로 떠나도 남기지 않는다
+    c.leaders("", "", ""); touch(c); c.js("histLoad(" + JSON.stringify(kOf(A)) + ")");
+    ok(stored(ls3).hist.every(x => x.l.some(Boolean)), "리더가 없는 화면은 칩으로 떠나도 기록하지 않는다");
+
+    // 되살린 편성도 이미 조합했던 편성이다 — 열자마자 다른 편성으로 바꿔도(타이머가 한 번도 안 울려도) 기록한다.
+    // 사보타주에서 이 자리가 비어 있었다: init 의 LU_SETTLED=!!saved 를 false 로 바꿔도 단위 검사가 전부 통과했다.
+    const curA = {m: "rally", l: A[0], w: ["10", "10", "10"], r: A[1].map(String), e: ["", "", ""], g: String(A[2]), sk: 0};
+    const ls4 = fakeLS({[KEY]: JSON.stringify({v: 1, cur: curA, hist: []})}), tm4 = fakeTimers();
+    const r4 = boot("ko", {localStorage: ls4, setTimeout: tm4.setTimeout, clearTimeout: tm4.clearTimeout}, {reset: false});
+    ok(r4.el("hMar").value === "wayne" && tm4.pending() === 0, "되살린 편성으로 열 때는 타이머를 걸지 않는다", r4.el("hMar").value + " · " + tm4.pending());
+    set(r4, ...B);
+    ok(stored(ls4).hist.map(x => x.l[0]).join() === "jeronimo" && keys(r4).join(" ; ") === kOf(A),
+       "되살린 편성은 열자마자 떠나도 기록한다 — 지난번에 조합했던 편성이다", keys(r4).join(" ; "));
+  }
+
+  // ── ③ 불러오기 · 지우기 · 상한 ──
+  {
+    const ls = fakeLS(), a = boot("ko", {localStorage: ls}, {reset: false});
+    a.js("HIST_SETTLE_MS=0");   // 타이머 없이 — 건드리는 즉시 머문 것으로 친다
+    a.mode("rally").leaders(...A[0]).gear(9).gcap(A[2]).mine(A[1]).enemy([40, 0, 60]); touch(a);
+    set(a, ...B); a.gear(10).enemy(["", "", ""]); touch(a);
+    set(a, ...C);
+    ok(keys(a).join(" ; ") === [kOf(B), kOf(A)].join(" ; "), "칩 순서는 최근에 떠난 편성부터다", keys(a).join(" ; "));
+    const cOut = a.el("out").innerHTML;
+    a.js("histLoad(" + JSON.stringify(kOf(A)) + ")");
+    const got = {l: ["hInf", "hLan", "hMar"].map(i => a.el(i).value).join(), w: a.el("wInf").value, r: ["r1", "r2", "r3"].map(i => a.el(i).value).join("/"), e: ["e1", "e2", "e3"].map(i => a.el(i).value).join("/"), g: a.el("gcap").value};
+    ok(got.l === A[0].join() && got.w === "9" && got.r === "48/4/48" && got.e === "40/0/60" && got.g === "6", "칩을 누르면 그 편성의 리더·전무·병비·상대 병비·세대가 입력칸에 들어간다", JSON.stringify(got));
+    ok(a.el("out").innerHTML !== cOut && /웨인/.test(a.el("out").innerHTML) && /웨인/.test(a.el("sMar").innerHTML), "결과와 초상 픽커가 불러온 편성으로 바뀐다");
+    ok(keys(a).join(" ; ") === [kOf(C), kOf(B)].join(" ; ") && stored(ls).cur.l.join() === A[0].join(),
+       "불러오면 방금까지의 편성이 맨 앞에 생기고 불러온 편성은 목록에서 빠진다", keys(a).join(" ; "));
+    a.js("histLoad(" + JSON.stringify(kOf(B)) + ")"); a.js("histLoad(" + JSON.stringify(kOf(C)) + ")");
+    ok(keys(a).join(" ; ") === [kOf(B), kOf(A)].join(" ; "), "칩을 이어서 눌러도 방금 떠난 편성이 첫 칩이다", keys(a).join(" ; "));
+    a.js("histDel(" + JSON.stringify(kOf(B)) + ")");
+    ok(keys(a).join(" ; ") === kOf(A) && stored(ls).hist.map(x => x.l[0]).join() === "jeronimo,hector" && stored(ls).cur.l.join() === C[0].join(), "✕ 는 그 편성만 지운다 — 지금 편성과 나머지는 그대로다", keys(a).join(" ; "));
+    a.js("histLoad('rally|nobody|0/0/0|1')");
+    ok(a.el("hInf").value === C[0][0], "목록에 없는 키로 불러오면 아무 일도 없다");
+    // 다른 탭이 그사이 칩을 지웠다 — 이 탭의 칩은 묵은 채다. 그 칩을 누르면 편성은 그대로 두고 목록만 지금 저장값으로 다시 그린다(죽은 칩이 남지 않게)
+    const st = stored(ls); st.hist = st.hist.filter(x => x.l[0] !== A[0][0]); ls.setItem(KEY, JSON.stringify(st));
+    ok(keys(a).join(" ; ") === kOf(A), "(전제) 저장값만 바뀌었을 때 화면의 칩은 아직 그대로다", keys(a).join(" ; "));
+    a.js("histLoad(" + JSON.stringify(kOf(A)) + ")");
+    ok(keys(a).length === 0 && a.el("hInf").value === C[0][0], "이미 지워진 칩을 누르면 편성은 안 바뀌고 그 칩이 목록에서 사라진다", keys(a).join(" ; "));
+    // 상한 — 서로 다른 편성 15개
+    for (let i = 0; i < 15; i++) set(a, A[0], [40 + i, 10, 50 - i], 6);
+    const h = stored(ls).hist;
+    ok(h.length === 12 && h[0].r.join("/") === "53/10/37" && chips(a) === 12, "이전 편성은 12개까지다 — 오래된 것부터 밀려난다", h.length + "개 · 첫 칩 " + h[0].r.join("/") + " · 화면 " + chips(a));
+    ok(h.every((x, i) => i === 0 || h[i - 1].t >= x.t), "저장 순서가 시각 내림차순이다");
+  }
+
+  // ── ④ 칩이 싣는 것 ──
+  {
+    const ls = fakeLS(), a = boot("ko", {localStorage: ls}, {reset: false});
+    a.js("HIST_SETTLE_MS=0");
+    a.mode("defender").leaders("jeronimo", "", "wayne").gear(10).gcap(99).mine([60, 40, 0]).enemy([40, 20, 40]); touch(a);
+    a.enemy(["", "", ""]); set(a, ...A); set(a, ...B);
+    const nm = id => a.js("HN(byId[" + JSON.stringify(id) + "])");
+    const html = a.el("hist").innerHTML, first = html.split('class="hchip"')[1] || "", second = html.split('class="hchip"')[2] || "";
+    ok(/이전 편성/.test(html) && /이 브라우저에만 저장/.test(html), "목록 머리가 무엇인지 · 어디에 저장되는지를 적는다");
+    // 영웅 이름은 데이터에서 읽는다 — 표기를 여기 박아 두면 이름을 고칠 때 엉뚱한 검사가 깨진다(미아의 한글 표기는 위키를 따라 「미야」다)
+    const tipA = 'title="' + A[0].map(nm).join(" · ") + ' — 공성 · 48/4/48 · Gen 6 이하"';
+    ok(/⚔️/.test(first) && /<b>48\/4\/48<\/b>/.test(first) && />G6</.test(first) && first.includes(tipA),
+       "칩에 모드 · 내 병비 · 서버 세대가 보이고 툴팁에 리더 이름이 있다(상대 병비를 안 넣은 편성은 그 말이 없다)", first.slice(0, 260));
+    ok(/🛡️/.test(second) && /class="hnone"/.test(second) && />전체</.test(second) && second.includes('title="' + nm("jeronimo") + " · " + nm("wayne") + " — 수성 · 60/40/0 · 세대 전체 · 상대 40/20/40\""),
+       "수성 · 빈 리더 칸(칩에는 – 자리, 툴팁에는 고른 이름만) · 세대 전체 · 상대 병비도 그대로 싣는다", second.slice(0, 300));
+    const imgs = [...html.matchAll(/<img class="hpic sm"[^>]*alt="([^"]*)"[^>]*src="([^"]+)"/g)];
+    ok(imgs.length === 5 && imgs.every(m => m[1] && existsSync(join(ROOT, decodeURIComponent(m[2])))) && !/onerror/.test(html),
+       "칩의 초상은 실제 파일을 가리키고 alt 에 영웅 이름이 있다 — 그림이 안 떠도 누구의 편성인지 읽힌다", imgs.map(m => m[1]).join(","));
+    ok((html.match(/class="hx"/g) || []).length === 2 && /aria-label="지우기: /.test(html) && /aria-label="불러오기: /.test(html), "칩마다 지우기 버튼이 있고 두 버튼 모두 접근명이 있다");
+    // 언어 전환 — 칩도 다시 그린다
+    a.setLang("en");
+    const en = a.el("hist").innerHTML;
+    ok(!/[가-힣]/.test(en) && /Earlier lineups/.test(en) && /Jeronimo · Mia · Wayne — Rally · 48\/4\/48 · Gen 6 and below/.test(en) && /Garrison/.test(en),
+       "English 로 바꾸면 칩의 이름·툴팁·머리말이 영어가 된다(한글이 남지 않는다)", (en.match(/[가-힣]+/g) || []).slice(0, 5).join(","));
+  }
+
+  // ── ⑤ 깨진 저장값 — 버리되 죽지 않는다 ──
+  {
+    const good = {m: "rally", l: A[0], w: ["10", "10", "10"], r: ["48", "4", "48"], e: ["", "", ""], g: "6", sk: 0, t: 5};
+    const cases = [["JSON 이 아니다", "{bad"], ["배열이다", "[1,2]"], ["null", "null"], ["빈 문자열", ""], ["cur 가 숫자다", '{"cur":7,"hist":"x"}']];
+    cases.forEach(([nm, raw]) => {
+      let a = null, threw = null; try { a = boot("ko", {localStorage: fakeLS({[KEY]: raw})}, {reset: false}); } catch (e) { threw = e; }
+      ok(!threw && a.el("hInf").value === "jeronimo" && a.el("hist").innerHTML === "", "저장값이 깨졌으면(" + nm + ") 기본 편성으로 연다", threw ? String(threw) : "");
+    });
+    const dirty = {cur: {m: "whatever", l: ["mia", "mia", "nobody"], w: ["15", "-3", "x"], r: ["48", "4", "48"], e: ["", null, "1e9"], g: "42", sk: "yes"},
+                   hist: [1, null, good, Object.assign({}, good, {t: 9}), {m: "rally", l: ["", "", ""], w: [], r: [], e: []}, Object.assign({}, good, {l: ["flint", "philly", "zinman"], g: "2"}), "x"]};
+    const a = boot("ko", {localStorage: fakeLS({[KEY]: JSON.stringify(dirty)})}, {reset: false});
+    const s = JSON.parse(a.js("JSON.stringify(luState())"));
+    ok(s.m === "rally" && s.l.join("|") === "|mia|" && s.w.join() === "10,0," && s.e.join("|") === "||9999" && s.g === "99" && s.sk === 1,
+       "엉뚱한 값은 칸마다 걸러서 되살린다 — 병종이 안 맞는 영웅·없는 영웅은 빈 칸, 범위 밖 숫자는 잘라 넣고, 없는 세대는 전체", JSON.stringify(s));
+    const h = JSON.parse(a.js("JSON.stringify(luRead().hist)"));
+    ok(h.length === 2 && h[0].l.join() === A[0].join() && h[0].t === 5 && h[1].l[0] === "flint", "이전 편성에서 쓰레기 · 리더 없는 것 · 같은 편성의 둘째는 버린다", JSON.stringify(h.map(x => x.l)));
+    ok(chips(a) === 2, "걸러진 목록만 칩으로 나온다", String(chips(a)));
+    // 세대는 숫자로 고쳐 쓴다 — "007" 을 그대로 넣으면 select 에 없는 옵션이라 칸이 빈다(독립 검증이 변조 저장값으로 잡았다)
+    const gOf = g => a.js("luClean(" + JSON.stringify({m: "rally", l: ["", "", ""], w: ["", "", ""], r: ["", "", ""], e: ["", "", ""], g}) + ").g");
+    ok(gOf("007") === "7" && gOf("17") === "17" && gOf("99") === "99" && gOf("18") === "99" && gOf("0") === "99" && gOf("x") === "99" && gOf(6) === "6",
+       "서버 세대는 select 옵션 값 그대로(1~17 · 99)로만 되살린다", [gOf("007"), gOf("17"), gOf("18"), gOf("0"), gOf(6)].join(","));
+  }
+
+  // ── 소스 규칙 ──
+  {
+    const src = readFileSync(join(ROOT, "src", "render.js"), "utf8");
+    const uses = src.split("\n").filter(l => /localStorage\./.test(l));
+    ok(uses.length === 2 && uses.every(l => /try\{/.test(l)), "render.js 의 localStorage 접근은 읽기·쓰기 한 곳씩이고 둘 다 try 안이다", uses.map(l => l.trim().slice(0, 60)).join(" | "));
+    ok(/LU_TIMER=setTimeout\(\(\)=>\{LU_TIMER=null;if\(luBusy\(\)\)luArm\(\);else LU_SETTLED=true;\},HIST_SETTLE_MS\)/.test(src), "머무는 시간 타이머의 콜백은 표시만 바꾸거나 다시 잴 뿐이다(DOM · 저장소를 건드리는 코드가 들어가면 안 된다)");
+    const busy = (src.match(/function luBusy\(\)\{[^\n]*/) || [""])[0];
+    ok(busy && !/innerHTML|\.value\s*=|\.open\s*=|luWrite|histDraw/.test(busy), "픽커가 열렸는지는 읽기만 한다", busy.slice(0, 120));
+    ok(/ev\.detail>1\)return/.test(src), "칩 불러오기는 더블클릭의 둘째 클릭을 버린다");
+    ok(/<div id="hist"><\/div>/.test(readFileSync(join(ROOT, "src", "part1.html"), "utf8")), "이전 편성 자리(#hist)가 입력 패널에 있다");
+  }
+}
+
 // ── 결과 ───────────────────────────────────────────────────────────────
 console.log("\n" + "=".repeat(62));
 console.log("통과 " + pass + " · 실패 " + fail + (known ? " · 알려진 결함 " + known + "건" : ""));

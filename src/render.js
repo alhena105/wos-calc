@@ -502,6 +502,122 @@ function mountPicker(selId,detId,sumId,gridId,cls){
  syncPicker(selId,sumId,gridId);
 }
 
+// ── 편성 저장 · 이전 편성 (localStorage) ───────────────────────────────
+// 두 가지를 한다: ① 마지막 편성(cur)을 다음에 열었을 때 그대로 되살린다 ② 그 전에 조합했던 편성(hist)을 칩으로 깔아 눌러서 불러온다.
+// 저장이 막힌 환경(사생활 보호 창 · 스텁)에서도 계산은 돌아야 하므로 읽기·쓰기를 전부 try 로 감싼다 — 장비 탭(GEAR_LS)과 같은 방식이다.
+//
+// 편성 하나 = {m 모드, l 리더 3, w 전무 3, r 내 병비 3, e 상대 병비 3, g 서버 세대, sk 토글}. 값은 입력칸의 문자열 그대로다.
+// 같은 편성인지는 luKey(모드 · 리더 · 내 병비 · 세대)로 가린다 — 전무·상대 병비·토글은 같은 편성의 딸린 값이라 덮어쓴다.
+//
+// 언제 hist 에 넣는가: **그 편성을 떠나는 순간**, 그리고 그 편성이 HIST_SETTLE_MS 동안 그대로였을 때만.
+//  · 리더 셋을 하나씩 바꾸는 중간 상태 · 병비를 타이핑하는 중간 숫자는 금방 지나가므로 안 남는다. 픽커를 열어 둔 시간은 세지 않는다(luBusy).
+//  · 타이머는 "머물렀다" 는 표시(LU_SETTLED)만 세운다 — **DOM 을 건드리지 않는다.** 목록이 바뀌는 건 언제나 사용자가 무언가를 누른 순간이라,
+//    칩을 누르려는 찰나에 목록이 밀려 엉뚱한 편성을 부르는 일이 없다.
+//  · **칩을 눌러 떠날 때만은 머문 시간을 묻지 않는다** — 화면에 있던 편성을 언제나 남긴다. 방금 다 고른 편성을 3초 안에 칩으로 덮으면
+//    어디에도 안 남아 되돌아갈 길이 없었다(독립 검증이 짚었다). 목록이 바뀌는 순간이 어차피 그 클릭이라 "누르려는 찰나에 밀림" 과도 무관하다.
+//  · 지금 화면의 편성은 목록에서 뺀다(입력칸이 곧 그것이다). 그래서 칩을 누르면 그 칩이 사라지고 방금까지의 편성이 맨 앞에 생긴다 — 첫 칩을 누르면 되돌아간다.
+const COMP_LS="wos-calc:comp:v1",HIST_MAX=12,LU_CLS=["infantry","lancer","marksman"];
+let HIST_SETTLE_MS=3000;   // let — 검사가 0 으로 내려 타이머 없이 돌린다. 값 자체는 우리가 고른 것이다(픽커에서 옆 픽커로 넘어가는 1~2초보다 길고, 결과를 훑어보는 시간보다 짧게)
+let LU_PREV=null,LU_SETTLED=false,LU_TIMER=null,HIST_HTML=null;
+function luClean(x){
+ if(!x||typeof x!=="object")return null;
+ const a3=a=>Array.isArray(a)&&a.length===3;
+ if(!a3(x.l)||!a3(x.w)||!a3(x.r)||!a3(x.e))return null;
+ const num=(v,max)=>{const t=String(v==null?"":v).trim();if(t==="")return "";const n=+t;return isFinite(n)?String(Math.max(0,Math.min(max,n))):"";};
+ const g=String(x.g),maxGen=Math.max.apply(null,HEROES.map(h=>h.gen||0));
+ return {m:x.m==="defender"?"defender":"rally",
+  l:x.l.map((id,i)=>{const h=byId[id];return h&&h.cls===LU_CLS[i]?h.id:"";}),   // 없어진 영웅 · 병종이 안 맞는 id 는 빈 칸으로
+  w:x.w.map(v=>num(v,10)),r:x.r.map(v=>num(v,9999)),e:x.e.map(v=>num(v,9999)),
+  g:g==="99"||(/^\d+$/.test(g)&&+g>=1&&+g<=maxGen)?String(+g):"99",sk:x.sk?1:0,t:+x.t||0};   // String(+g) — "007" 같은 값이 select 에 없는 옵션으로 들어가 칸이 비지 않게
+}
+function luKey(s){return [s.m,s.l.join(","),s.r.map(v=>+v||0).join("/"),s.g].join("|");}
+function luState(){
+ const v=id=>document.getElementById(id).value;
+ return luClean({m:document.getElementById("mAtk").classList.contains("on")?"rally":"defender",
+  l:["hInf","hLan","hMar"].map(v),w:["wInf","wLan","wMar"].map(v),r:["r1","r2","r3"].map(v),e:["e1","e2","e3"].map(v),
+  g:v("gcap"),sk:document.getElementById("skHeavy").checked?1:0});
+}
+function luRead(){
+ let d=null;
+ try{d=JSON.parse(localStorage.getItem(COMP_LS)||"null");}catch(e){}
+ const o={cur:null,hist:[]},seen={};
+ if(d&&typeof d==="object"){
+  o.cur=luClean(d.cur);
+  if(Array.isArray(d.hist))o.hist=d.hist.map(luClean).filter(x=>{   // 리더가 하나도 없는 것 · 같은 편성이 두 번 든 것은 버린다
+    if(!x||!x.l.some(Boolean))return false;const k=luKey(x);if(seen[k])return false;seen[k]=1;return true;}).slice(0,HIST_MAX);
+ }
+ return o;
+}
+function luWrite(d){try{localStorage.setItem(COMP_LS,JSON.stringify({v:1,cur:d.cur,hist:d.hist}));}catch(e){}}
+function histPush(list,s){
+ const k=luKey(s);
+ return [Object.assign({},s,{t:Date.now()})].concat(list.filter(x=>luKey(x)!==k)).slice(0,HIST_MAX);
+}
+function setMode(m){
+ const d=m==="defender";
+ document.getElementById(d?"mDef":"mAtk").classList.add("on");document.getElementById(d?"mAtk":"mDef").classList.remove("on");
+ document.getElementById("eLab").innerHTML=d?S("lbEnD"):S("lbEnA");
+}
+function luApply(s){
+ const set=(ids,vals)=>ids.forEach((id,i)=>{document.getElementById(id).value=vals[i];});
+ setMode(s.m);
+ set(["gcap"],[s.g]);set(["hInf","hLan","hMar"],s.l);set(["wInf","wLan","wMar"],s.w);set(["r1","r2","r3"],s.r);set(["e1","e2","e3"],s.e);
+ document.getElementById("skHeavy").checked=!!s.sk;
+ PICKERS.forEach(p=>syncPicker(p[0],p[2],p[3]));
+}
+// 리더 픽커를 열어 둔 동안은 "머문" 게 아니다 — 다음 리더를 고르는 중이다. 리더 셋을 차례로 바꿀 때 격자를 훑는 몇 초가
+// 머문 시간으로 세어지면 중간 편성(새 보병 + 옛 창·궁)이 목록에 쌓인다. 읽기만 한다(아래 규칙 그대로 — 타이머는 화면을 안 바꾼다).
+function luBusy(){return PICKERS.some(p=>{const d=document.getElementById(p[1]);return !!(d&&d.open);});}
+function luArm(){
+ if(LU_TIMER!=null&&typeof clearTimeout==="function")clearTimeout(LU_TIMER);
+ LU_TIMER=null;
+ if(HIST_SETTLE_MS<=0||typeof setTimeout!=="function"){LU_SETTLED=true;return;}
+ LU_TIMER=setTimeout(()=>{LU_TIMER=null;if(luBusy())luArm();else LU_SETTLED=true;},HIST_SETTLE_MS);
+}
+// 사용자가 입력을 건드릴 때마다 부른다(초기 렌더 · 언어 전환에서는 안 부른다). loaded — 이전 편성 칩으로 불러온 것:
+// ① 떠나는 편성을 머문 시간과 무관하게 남긴다 ② 불러온 편성은 이미 조합했던 것이라 곧바로 머문 것으로 친다.
+function luTrack(loaded){
+ const s=luState(),d=luRead();
+ if(LU_PREV&&luKey(LU_PREV)!==luKey(s)){
+  if((LU_SETTLED||loaded)&&LU_PREV.l.some(Boolean))d.hist=histPush(d.hist,LU_PREV);
+  LU_SETTLED=false;
+ }
+ LU_PREV=s;d.cur=s;luWrite(d);
+ if(loaded){if(LU_TIMER!=null&&typeof clearTimeout==="function")clearTimeout(LU_TIMER);LU_TIMER=null;LU_SETTLED=true;}
+ else if(!LU_SETTLED)luArm();   // 아직 안 머문 편성 — 마지막으로 건드린 때부터 다시 잰다
+ histDraw();
+}
+function histDraw(){
+ const box=document.getElementById("hist");if(!box)return;
+ const cur=luKey(luState()),list=luRead().hist.filter(x=>luKey(x)!==cur);
+ const nm=id=>esc(HN(byId[id])).replace(/"/g,"&quot;");
+ const html=!list.length?"":'<div class="hhd"><b>🕘 '+L("이전 편성","Earlier lineups")+"</b>"+
+   L("눌러서 불러옵니다 · 이 브라우저에만 저장됩니다","Click one to load it · stored in this browser only")+'</div><div class="hrow">'+
+  list.map(x=>{
+   const ratio=x.r.map(v=>+v||0).join("/"),k=esc(luKey(x)).replace(/"/g,"&quot;");
+   const tip=x.l.filter(Boolean).map(nm).join(" · ")+" — "+(x.m==="defender"?L("수성","Garrison"):L("공성","Rally"))+" · "+ratio+" · "+
+    (x.g==="99"?L("세대 전체","all generations"):L("Gen "+x.g+" 이하","Gen "+x.g+" and below"))+
+    (x.e.some(v=>+v>0)?" · "+L("상대 ","enemy ")+x.e.map(v=>+v||0).join("/"):"");
+   // 초상은 hpic 을 안 쓴다 — 그림을 못 불러와도 alt(영웅 이름)가 그 자리에 남아야 누구의 편성인지 읽힌다
+   return '<span class="hchip"><button type="button" class="hgo" data-k="'+k+'" title="'+tip+'" aria-label="'+L("불러오기: ","Load: ")+tip+'">'+
+    "<i>"+(x.m==="defender"?"🛡️":"⚔️")+"</i>"+
+    x.l.map(id=>id?'<img class="hpic sm" loading="lazy" alt="'+nm(id)+'" src="img/heroes/'+encodeURIComponent(id)+'.webp">':'<i class="hnone">–</i>').join("")+
+    "<b>"+ratio+'</b><span class="cap">'+(x.g==="99"?L("전체","All"):"G"+x.g)+"</span></button>"+
+    '<button type="button" class="hx" data-k="'+k+'" title="'+L("이 편성 지우기","Remove this lineup")+'" aria-label="'+L("지우기: ","Remove: ")+tip+'">✕</button></span>';
+  }).join("")+"</div>";
+ if(html===HIST_HTML)return;   // 같으면 다시 안 그린다 — 전무 레벨만 고칠 때마다 칩을 갈아끼울 이유가 없다
+ HIST_HTML=html;box.innerHTML=html;
+}
+const showSums=()=>{showSum("rSum",["r1","r2","r3"]);showSum("eSum",["e1","e2","e3"]);};
+function histLoad(k){
+ const s=luRead().hist.filter(x=>luKey(x)===k)[0];
+ if(!s){histDraw();return;}   // 다른 탭에서 이미 지운 칩 — 죽은 칩을 남겨 두지 않고 목록을 지금 저장값으로 다시 그린다
+ luApply(s);showSums();calc();luTrack(true);
+}
+function histDel(k){
+ const d=luRead();d.hist=d.hist.filter(x=>luKey(x)!==k);luWrite(d);histDraw();
+}
+
 // ── 셀렉트 재구성 (언어 전환 시 재호출) ──
 function rebuildSelects(){
  const keep={hInf:0,hLan:0,hMar:0,gcap:0};
@@ -518,6 +634,7 @@ function rebuildSelects(){
  closeOnOutside();
  mountPresets("rPre",["r1","r2","r3"]); mountPresets("ePre",["e1","e2","e3"]);
  showSum("rSum",["r1","r2","r3"]); showSum("eSum",["e1","e2","e3"]);
+ histDraw();   // 칩의 영웅 이름·툴팁도 언어를 따른다
 }
 // ── init ──
 (function(){
@@ -526,23 +643,38 @@ function rebuildSelects(){
  document.getElementById("hInf").value="jeronimo";
  document.getElementById("hLan").value="mia";
  document.getElementById("hMar").value="alonso";
- PICKERS.forEach(p=>syncPicker(p[0],p[2],p[3]));
- const seg=(a,b)=>{document.getElementById(a).classList.add("on");document.getElementById(b).classList.remove("on");};
- const eLab=()=>{const d=document.getElementById("mDef").classList.contains("on");
-  document.getElementById("eLab").innerHTML=d?S("lbEnD"):S("lbEnA");};
- document.getElementById("mAtk").onclick=()=>{seg("mAtk","mDef");eLab();calc();};
- document.getElementById("mDef").onclick=()=>{seg("mDef","mAtk");eLab();calc();};
+ // 마지막 편성이 저장돼 있으면 기본값 대신 그것으로 연다
+ const saved=luRead().cur;
+ if(saved)luApply(saved); else PICKERS.forEach(p=>syncPicker(p[0],p[2],p[3]));
+ // 사용자가 입력을 건드린 뒤의 공통 처리 — 다시 계산하고, 편성을 저장·기록한다
+ const touched=()=>{showSums();calc();luTrack();};
+ document.getElementById("mAtk").onclick=()=>{setMode("rally");calc();luTrack();};
+ document.getElementById("mDef").onclick=()=>{setMode("defender");calc();luTrack();};
  document.getElementById("lgKo").onclick=()=>setLang("ko");
  document.getElementById("lgEn").onclick=()=>setLang("en");
- const sums=()=>{showSum("rSum",["r1","r2","r3"]);showSum("eSum",["e1","e2","e3"]);};
  // 📍 "이 병비로 보기" — 시트 카드가 안내한 행의 병비를 내 병비 칸에 넣는다. #out 은 calc 마다 통째로 갈리므로 위임으로 듣는다.
  document.getElementById("out").addEventListener("click",ev=>{
   const b=ev.target&&ev.target.closest?ev.target.closest("[data-r]"):null;if(!b)return;
   b.getAttribute("data-r").split(",").forEach((v,i)=>{document.getElementById("r"+(i+1)).value=v;});
-  sums();calc();});
+  touched();});
+ // 🕘 이전 편성 칩 — 목록은 통째로 갈리므로 위임으로 듣는다
+ document.getElementById("hist").addEventListener("click",ev=>{
+  const box=ev.currentTarget,b=ev.target&&ev.target.closest?ev.target.closest("button[data-k]"):null;if(!b)return;
+  const del=b.classList.contains("hx"),k=b.getAttribute("data-k");
+  // 불러오기는 더블클릭의 둘째 클릭을 버린다 — 첫 클릭에 목록이 한 칸 밀려서 같은 자리에 방금까지의 편성이 와 있다.
+  // ✕ 에는 안 건다: detail 은 이어 누르는 동안 계속 올라가서, 걸면 칩을 연달아 지울 때 첫 번째만 지워진다
+  if(!del&&ev.detail>1)return;
+  const had=ev.detail===0||box.contains(document.activeElement),i=[].indexOf.call(box.querySelectorAll(".hx"),b);
+  if(del)histDel(k);else histLoad(k);
+  // 눌린 칩은 사라진다 — 포커스가 body 로 빠져 키보드·스크린리더 사용자가 칩 줄을 잃지 않게 옮긴다.
+  // 지웠으면 그 자리에 온 칩의 ✕, 불러왔으면 맨 앞 칩(방금 떠난 편성 — 한 번 더 누르면 되돌아간다)
+  if(had){const list=box.querySelectorAll(del?".hx":".hgo"),t=list[del?Math.min(i,list.length-1):0];if(t)t.focus();}
+ });
  ["hInf","hLan","hMar","wInf","wLan","wMar","r1","r2","r3","e1","e2","e3","gcap","skHeavy"].forEach(id=>{
-  const el=document.getElementById(id);const f=()=>{sums();calc();};el.addEventListener("change",f);el.addEventListener("input",f);});
+  const el=document.getElementById(id);el.addEventListener("change",touched);el.addEventListener("input",touched);});
  applyStatic();
- sums();
+ showSums();
  calc();
+ // 지금 화면의 편성을 기준점으로 잡는다. 되살린 편성은 이미 조합했던 것이라 머문 것으로 치고, 처음 뜬 기본 편성은 사용자가 건드리기 전에는 기록하지 않는다
+ LU_PREV=luState();LU_SETTLED=!!saved;histDraw();
 })();
