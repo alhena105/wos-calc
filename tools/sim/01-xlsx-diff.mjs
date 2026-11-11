@@ -15,10 +15,11 @@ for (const r of rows) for (const cell of [...r.l, ...r.j, ...r.alt]) for (const 
 
 // ① 행 단위 대조 — (g, 리더 대안, 병비) 로 짝을 찾는다
 const kComp = c => c.g + "|" + c.l.map(x => x.join("/")).join("&") + "|" + c.rs.map(key3).join(",");
-const compMap = new Map(); SHEET_COMPS.forEach((c, i) => compMap.set(kComp(c), {c, i}));
+// 키가 같은 행(쌍둥이)은 **시트에 적힌 순서대로** 짝짓는다 — SHEET_COMPS 배열 순서가 시트 행 순서와 같다는 것까지 같이 본다
+const compMap = new Map(); SHEET_COMPS.forEach((c, i) => { const k = kComp(c); if (!compMap.has(k)) compMap.set(k, []); compMap.get(k).push({c, i}); });
 const used = new Set();
 for (const r of rows) {
-  const k = kComp(r); const hit = compMap.get(k);
+  const k = kComp(r); const hit = (compMap.get(k) || []).shift();
   out.generations[r.g] = (out.generations[r.g] || 0) + 1;
   if (r.altFree.length) out.altFreeRows.push({g: r.g, label: r.label, altFree: r.altFree, altKept: r.alt});
   if (!hit) { out.missingInComps.push({g: r.g, label: r.label, l: r.l, rs: r.rs, j: r.j, alt: r.alt}); continue; }
@@ -28,6 +29,11 @@ for (const r of rows) {
   if (!same(c.j, r.j)) d.j = {comps: c.j, xlsx: r.j};
   if (!same(c.alt || [], r.alt)) d.alt = {comps: c.alt || [], xlsx: r.alt};
   if ((c.meta ? 1 : 0) !== r.meta) d.meta = {comps: c.meta ? 1 : 0, xlsx: r.meta};
+  // 2026-11-11 시트 원문 필드 — 행 라벨(lb) · 대안 칸의 시트 순서(ao · 자유 문구 포함) · 비고(c)
+  if ((c.lb || "") !== r.label) d.lb = {comps: c.lb || "", xlsx: r.label};
+  const seq = (c.ao || (c.alt || []).map((_, i) => i)).map(x => typeof x === "number" ? c.alt[x] : x);
+  if (!same(seq, r.altSeq)) d.ao = {comps: seq, xlsx: r.altSeq};
+  if ((c.c || "") !== r.comment) d.c = {comps: c.c || "", xlsx: r.comment};
   if (Object.keys(d).length) out.compDiff.push({g: r.g, label: r.label, idx: hit.i, diff: d});
 }
 SHEET_COMPS.forEach((c, i) => { if (!used.has(i)) out.extraInComps.push({i, c}); });
@@ -46,7 +52,9 @@ const rowsKey = r => r.g + "|" + r.l.map(x => x[0]).join(",") + "|" + key3(r.rs[
 const seenK = new Set();
 for (const fr of fx.SHEET_ROWS) {
   const k = fr.gen + "|" + fr.lead.join(",") + "|" + key3(fr.r);
-  const m = rows.filter(r => rowsKey(r) === k);
+  // 병비는 그 행의 어느 병비든 가까우면(거리 ≤ 6 = COMP_TOL) 같은 행이다 — 범위 라벨(50/5-10/40-45) 행은 픽스처가 가운데 값(50/7/43)을 쓴다
+  const nearR = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) <= 6;
+  const m = rows.filter(r => rowsKey(r) === k).concat(rows.filter(r => r.g === fr.gen && r.l.map(x => x[0]).join(",") === fr.lead.join(",") && r.rs.some(v => nearR(v, fr.r))));
   if (!m.length) { out.sheetRowsDiff.push({k, issue: "xlsx 에 없음"}); continue; }
   const r = m[0];
   const pri = [...new Set(r.j.flat())], all = [...new Set([...r.j.flat(), ...r.alt.flat()])];

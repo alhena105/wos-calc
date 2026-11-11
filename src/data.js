@@ -415,90 +415,133 @@ const HEROES = [
 //    설명한다. 순서를 흐트러뜨리면 그 설명이 거짓이 된다. 실제로 g12 META 행을 복원할 때
 //    쌍둥이 바로 뒤에 끼워 넣었다가 시트 순서와 어긋나서 되돌렸다(2026-09-13).
 //
-// 쓰는 곳은 **하나**다: 입력한 리더·병비가 이 행과 맞으면, 조이너 넷을 고를 때
-// **애매한 차이는 시트 쪽으로 기울인다**(render.js 의 SHEET_EDGE).
-// 배율을 바꾸는 게 아니라 거의 같은 둘 중 어느 쪽을 집느냐만 정한다.
-// 맞는 행이 없으면 아무 일도 일어나지 않는다 — 그게 보통의 경우다.
-// `alt` = 시트의 **Alternative #1~#3 칸**(2026-09-13 추가 · 48/54 행 · 69칸).
-// "넷을 못 구하면 이것도" 목록이라 **판정에 일절 안 쓴다** — `matchComps` 도 `pick4` 도
-// 안 본다. 화면에만 「🔁 대체 조이너」로 그대로 띄운다. 시트가 그 안에서 순서를 매기지
-// 않았으므로 우리도 매기지 않는다.
-// ⚠️ **대체 칸 28개는 일부러 안 실었다** — `"20% ones"` 1칸(g2)과 `"or 25%"` **27칸**
-// (Gen 5·6·7·8·9·10·11 에 걸쳐 있다). 영웅 이름이 아니라 **스킬 계열**(25% 증가 계열 ·
-// 20% 감소 계열)을 가리키는 자유 문구라, 영웅 id 로 옮기면 시트에 없는 이름을 지어내는 셈이다.
-// 시트의 비어 있지 않은 Alternative 칸은 69+28 = **97칸**이고 그중 **29% 를 버렸다.**
-// ⚠️ 2026-09-13 에 여기 "2개" 라고 적었다가 다음 날 검증에서 28개로 정정됐다.
-// "2개" 로 적어 두면 다음 사람이 "거의 다 실었다" 로 읽는다 — 「노라 하나뿐」·「제로니모 7행」과
-// 같은 형태의 실수다. **규모는 세어 보고 적는다.**
-// 그래서 **대체 칸이 있었는데 화면이 침묵하는 행이 4개** 있다(전부 alt 가 "or 25%" 단독):
-// g6 48/4/48 · g7 40/0/60 · g8 40/0/60 · g8 48/4/48.
-// ⚠️ Comments 열에도 대체 조이너를 산문으로 적어 둔 행이 있다(예: g6 48/4/48 의
-// "Alternative joiners choice: Jessie, Seeyoon, 2xPatrick"). **그건 안 가져왔다** —
-// 구조가 있는 Alternative 칸만 옮겼다. 필요하면 그때 따로 파싱할 것.
+// 쓰는 곳 (2026-11-11 개편 뒤): ① 화면의 「📋 Ton 시트 조합」 카드가 걸리는 행을 **원문 그대로** 싣는다(render.js `sheetBlock`).
+// ② 동률 타이브레이크 `sheetUse` 가 근처 세대 행의 `j` 를 센다(이 입력에 걸리는 행은 빼고). 그게 전부다 —
+// **계산 추천(#rec · #recAll)은 걸리는 행의 칸을 보지 않는다.** 예전의 "시트 칸을 따라 채운다"(SHEET_EDGE · fillCells)는 없어졌다.
+//
+// 필드 — 전부 data.xlsx 에서 기계적으로 옮긴 것이고 `test/fixtures-sheet.mjs`(TSV 원문 사본)와 unit.mjs 가 한 행씩 대조한다:
+//   l   리더 3자리(칸마다 대안 포함)        rs  라벨에 적힌 병비 전부(보/창/궁)        lb  행 라벨 원문        c  Comments 열 원문
+//   j   Joiner #1~#4 — **칸 단위**다. 한 칸에 이름이 여럿이면(제시* = 제시·제셀·제로니모) 배열에 다 들어간다
+//   jx  {칸 인덱스: 시트 원문 표기} — 이름 하나가 여러 영웅으로 **펴진** 칸에만 단다. `Jessie*` · `Sergey**` 는 시트 범례대로 편 것이고,
+//       별표 없는 `Jessie`(4칸) · `Jessie**`(1칸) · `Jessies`(1칸)도 같은 칸으로 읽었다 — **이건 우리 해석이라 화면이 원문 표기를 같이 싣는다.**
+//       `Mia/Reina` · `Norah/Patrick` 처럼 시트가 이름을 직접 나열한 칸에는 안 단다(화면에 보이는 것이 곧 원문이다).
+//   alt Alternative #1~#3 중 **영웅 이름이 적힌 칸**        ax  {alt 인덱스: 시트 원문 표기} — jx 와 같은 규칙
+//   ao  Alternative 칸을 시트 순서 그대로 — 숫자는 alt 인덱스, 문자열은 `"or 25%"`(29칸) · `"20% ones"`(1칸) 같은 **자유 문구 원문**.
+//       자유 문구는 영웅 이름이 아니라 스킬 계열을 가리키므로 **영웅 id 로 옮기지 않는다**(옮기면 시트에 없는 이름을 지어내는 셈이다).
+//       자유 문구가 없는 행에는 ao 가 없다(alt 순서 그대로).
+//   meta 라벨이 META 로 시작하는 행
+// `alt` · `ao` · `c` 는 **판정에 일절 안 쓴다** — `matchComps` 도 계산 추천도 안 본다. 시트 카드가 보여 주기만 한다.
+// 시트가 대안 칸 안에서 순서를 매기지 않았으므로 우리도 매기지 않는다.
+// ⚠️ 규모를 기억으로 적지 말 것 — "대체 칸 2개만 뺐다"(실제 28) · "노라 하나뿐"(패트릭도) 같은 실수를 여러 번 했다. unit.mjs 가 센다.
 const SHEET_COMPS = [
- {g:1,l:[["jeronimo"],["molly"],["zinman"]],rs:[[60,40,0],[60,10,30],[50,20,30]],j:[["lingxue"],["patrick"],["patrick"],["lumak"]],alt:[["jessie","jasser","jeronimo"],["seoyoon"]]},
- {g:1,l:[["jeronimo"],["molly"],["zinman"]],rs:[[50,20,30],[30,20,50]],j:[["lingxue"],["patrick"],["patrick"],["lumak"]],alt:[["jessie","jasser","jeronimo"],["seoyoon"]]},
- {g:2,l:[["flint"],["philly"],["zinman"]],rs:[[60,40,0],[60,10,30],[50,20,30]],j:[["patrick"],["jessie","jasser","jeronimo"],["seoyoon"],["sergey","bahiti","lumak"]],alt:[["patrick"],["jessie","jasser","jeronimo"]]},
- {g:2,l:[["jeronimo"],["philly"],["alonso"]],rs:[[50,20,30],[30,20,50]],j:[["patrick"],["jessie","jasser","jeronimo"],["seoyoon"],["zinman"]],alt:[["patrick"]]},
- {g:3,l:[["logan"],["philly"],["zinman"]],rs:[[60,40,0],[60,30,10]],j:[["mia"],["patrick"],["jessie","jasser","jeronimo"],["seoyoon"]]},
- {g:3,l:[["jeronimo"],["mia"],["greg"]],rs:[[50,20,30],[30,20,50]],j:[["jessie","jasser","jeronimo"],["seoyoon"],["philly"],["patrick"]],alt:[["zinman"]]},
- {g:3,l:[["jeronimo"],["mia"],["greg","alonso"]],rs:[[60,40,0],[40,60,0]],j:[["jessie","jasser","jeronimo"],["seoyoon"],["philly"],["patrick"]],alt:[["zinman"]]},
- {g:3,l:[["logan"],["philly"],["greg"]],rs:[[50,20,30]],j:[["mia"],["patrick"],["jessie","jasser","jeronimo"],["seoyoon"]],alt:[["zinman"]]},
- {g:4,l:[["ahmose","logan"],["reina"],["lynn"]],rs:[[60,40,0],[60,30,10],[50,20,30]],j:[["mia"],["patrick"],["jessie","jasser","jeronimo"],["seoyoon"]],alt:[["zinman"],["philly"]]},
- {g:4,l:[["jeronimo"],["reina"],["greg"]],rs:[[50,20,30],[30,20,50]],j:[["mia"],["philly"],["patrick"],["zinman"]],alt:[["jessie","jasser","jeronimo"],["seoyoon"]]},
- {g:4,l:[["jeronimo"],["mia"],["greg","alonso"]],rs:[[48,4,48],[40,10,50]],j:[["patrick"],["philly"],["zinman"],["reina"]],alt:[["jessie","jasser","jeronimo"],["seoyoon"]]},
- {g:4,l:[["jeronimo"],["reina","mia"],["greg"]],rs:[[60,40,0],[40,60,0]],j:[["patrick"],["philly"],["zinman"],["mia","reina"]],alt:[["jessie","jasser","jeronimo"],["seoyoon"]]},
- {g:4,l:[["ahmose","logan"],["molly","philly"],["lynn"]],rs:[[50,2,48]],j:[["mia"],["patrick"],["jessie","jasser","jeronimo"],["seoyoon"]],alt:[["zinman"]]},
- {g:5,l:[["hector","logan"],["norah"],["zinman"]],rs:[[60,40,0]],j:[["mia"],["patrick"],["seoyoon"],["philly"]]},
- {g:5,l:[["jeronimo"],["reina"],["gwen"]],rs:[[50,20,30],[30,20,50]],j:[["mia"],["jessie","jasser","jeronimo"],["seoyoon"],["norah"]],alt:[["patrick"],["philly"]]},
- {g:5,l:[["jeronimo"],["mia"],["gwen"]],rs:[[48,4,48],[40,10,50]],j:[["norah"],["norah"],["norah"],["patrick"]],alt:[["philly"]]},
- {g:5,l:[["jeronimo"],["norah"],["greg"]],rs:[[60,40,0],[40,60,0]],j:[["mia"],["patrick"],["jessie","jasser","jeronimo"],["philly"]],alt:[["zinman"]]},
- {g:5,l:[["logan"],["norah"],["greg"]],rs:[[60,40,0]],j:[["mia"],["norah"],["jessie","jasser","jeronimo"],["philly"]],alt:[["norah"]]},
- {g:5,l:[["hector"],["norah"],["lynn"]],rs:[[50,20,30]],j:[["mia"],["patrick"],["philly"],["jessie","jasser","jeronimo"]],alt:[["norah"]]},
- {g:6,l:[["wuming"],["norah"],["zinman"]],rs:[[60,40,0]],j:[["renee"],["mia"],["patrick"],["jessie","jasser","jeronimo"]],alt:[["wuming"]]},
- {g:6,l:[["jeronimo"],["renee"],["gwen"]],rs:[[50,20,30],[30,20,50]],j:[["jessie","jasser","jeronimo"],["seoyoon"],["mia"],["norah"]],alt:[["patrick"],["wuming"]]},
- {g:6,l:[["jeronimo","hector"],["mia"],["wayne","gwen"]],rs:[[48,4,48],[40,10,50]],j:[["norah"],["norah"],["norah"],["norah","patrick"]]},
- {g:6,l:[["jeronimo"],["renee"],["greg"]],rs:[[60,40,0],[40,60,0]],j:[["mia"],["patrick"],["jessie","jasser","jeronimo"],["wuming"]],alt:[["wuming"]]},
- {g:6,l:[["logan"],["philly"],["wayne"]],rs:[[45,5,50],[40,0,60]],j:[["norah"],["norah"],["norah"],["norah","patrick"]],meta:1,alt:[["wuming"]]},
- {g:6,l:[["hector"],["norah"],["wayne"]],rs:[[45,15,40]],j:[["mia"],["patrick"],["philly"],["lynn"]],alt:[["wuming"]]},
- {g:6,l:[["hector"],["molly"],["wayne"]],rs:[[50,0,50]],j:[["mia"],["patrick"],["norah"],["norah"]],alt:[["norah"],["wuming"]]},
- {g:7,l:[["edith"],["gordon"],["bradley"]],rs:[[60,40,0]],j:[["renee"],["mia"],["reina"],["jessie","jasser","jeronimo"]],alt:[["wuming"]]},
- {g:7,l:[["edith"],["molly","philly"],["bradley","wayne"]],rs:[[40,0,60],[48,4,48]],j:[["mia"],["norah"],["norah"],["lynn"]]},
- {g:7,l:[["jeronimo","edith"],["mia"],["bradley"]],rs:[[48,4,48],[40,10,50]],j:[["norah"],["norah"],["norah"],["patrick"]],alt:[["philly"]]},
- {g:8,l:[["gatot"],["sonya"],["bradley"]],rs:[[60,40,0]],j:[["renee"],["patrick"],["mia"],["hendrik"]],alt:[["wuming"]]},
- {g:8,l:[["gatot"],["molly","philly"],["bradley"]],rs:[[40,0,60],[48,4,48]],j:[["mia"],["patrick"],["norah"],["lynn"]]},
- {g:8,l:[["edith","jeronimo"],["mia"],["hendrik"]],rs:[[48,4,48],[40,0,60]],j:[["norah"],["norah"],["jessie","jasser","jeronimo"],["seoyoon"]],alt:[["norah"],["wuming"]]},
- {g:8,l:[["edith","gatot"],["sonya"],["bradley"]],rs:[[60,40,0],[40,60,0]],j:[["renee"],["mia"],["hendrik"],["jessie","jasser","jeronimo"]],alt:[["wuming"]]},
- {g:8,l:[["jeronimo"],["gordon"],["bradley"]],rs:[[60,40,0],[40,60,0]],j:[["renee"],["mia"],["hendrik"],["patrick"]],alt:[["wuming"]]},
- {g:8,l:[["jeronimo"],["mia"],["bradley"]],rs:[[48,4,48]],j:[["norah"],["norah"],["norah"],["hendrik"]]},
- {g:9,l:[["magnus"],["sonya"],["bradley"]],rs:[[60,40,0]],j:[["renee"],["mia"],["patrick"],["hendrik"]],alt:[["wuming"],["gatot"]]},
- {g:9,l:[["magnus"],["molly","philly"],["bradley","xura"]],rs:[[40,0,60],[48,4,48]],j:[["mia"],["patrick"],["norah"],["lynn"]],alt:[["gatot"]]},
- {g:9,l:[["magnus"],["mia"],["hendrik"]],rs:[[48,4,48],[40,10,50],[40,0,60]],j:[["norah"],["norah"],["norah"],["patrick"]],alt:[["norah"],["gatot"]]},
- {g:9,l:[["magnus"],["fred"],["bradley"]],rs:[[60,40,0],[40,60,0]],j:[["renee"],["mia"],["patrick"],["hendrik"]],alt:[["wuming"],["gatot"]]},
- {g:10,l:[["gregory"],["freya"],["bradley"]],rs:[[60,40,0]],j:[["renee"],["mia"],["patrick"],["hendrik"]],alt:[["wuming"],["gatot"]]},
- {g:10,l:[["gregory"],["molly","philly"],["bradley","xura"]],rs:[[40,2,58],[48,4,48]],j:[["mia"],["norah"],["hendrik"],["patrick"]],alt:[["gatot"]]},
- {g:10,l:[["gregory"],["mia"],["blanchette"]],rs:[[48,4,48],[40,10,50]],j:[["norah"],["norah"],["hendrik"],["patrick"]],alt:[["norah"],["gatot"]]},
- {g:10,l:[["gregory"],["fred"],["bradley"]],rs:[[60,40,0]],j:[["renee"],["mia"],["hendrik"],["patrick"]],alt:[["wuming"],["gatot"]]},
- {g:11,l:[["eleonora"],["lloyd"],["bradley"]],rs:[[60,40,0]],j:[["renee"],["mia"],["hendrik"],["reina"]],alt:[["gatot"],["wuming"]]},
- {g:11,l:[["eleonora"],["molly","philly"],["xura"]],rs:[[40,2,58],[48,4,48]],j:[["mia"],["norah"],["hendrik"],["reina"]],alt:[["gatot"],["wuming"]]},
- {g:11,l:[["eleonora"],["mia"],["rufus"]],rs:[[48,4,48],[40,10,50]],j:[["norah"],["norah"],["hendrik"],["gatot"]],alt:[["wuming"]]},
- {g:11,l:[["eleonora"],["lloyd","fred"],["bradley"]],rs:[[60,40,0]],j:[["renee"],["mia"],["hendrik"],["reina"]],alt:[["gatot"],["wuming"]]},
- {g:12,l:[["herbjorg"],["lloyd"],["bradley"]],rs:[[60,40,0]],j:[["mia"],["renee"],["patrick"],["hendrik"]],alt:[["gatot"]]},
- {g:12,l:[["herbjorg"],["lloyd"],["ligeia"]],rs:[[60,20,20]],j:[["mia"],["patrick"],["norah"],["seoyoon"]],alt:[["gatot"],["norah"]]},
- {g:12,l:[["herbjorg"],["molly","philly"],["ligeia"]],rs:[[50,2,48]],j:[["mia"],["patrick"],["norah"],["gatot"]],alt:[["norah"]]},
- {g:12,l:[["herbjorg"],["lloyd"],["ligeia"]],rs:[[50,10,40]],j:[["mia"],["patrick"],["norah"],["gatot"]],alt:[["seoyoon"]]},
- {g:12,l:[["herbjorg"],["mia"],["rufus"]],rs:[[48,4,48]],j:[["patrick"],["hendrik"],["norah"],["gatot"]],alt:[["norah"]]},
- {g:12,l:[["herbjorg"],["karol"],["rufus"]],rs:[[50,10,40]],j:[["mia"],["patrick"],["hendrik"],["norah"]],meta:1,alt:[["norah"]]},
- {g:12,l:[["herbjorg"],["karol"],["bradley","greg"]],rs:[[60,40,0]],j:[["mia"],["renee"],["gatot"],["hendrik"]],alt:[["patrick"]]},
+ {g:1,l:[["jeronimo"],["molly"],["zinman"]],rs:[[60,40,0],[60,10,30],[50,20,30]],j:[["lingxue"],["patrick"],["patrick"],["lumak"]],alt:[["jessie","jasser","jeronimo"],["seoyoon"]],ax:{0:"Jessie*"},lb:"Defense - 60/40/0 or 60/10/30 or 50/20/30",c:"Jeronimo is Jessie + Seyoon already so stacking happens"},
+ {g:1,l:[["jeronimo"],["molly"],["zinman"]],rs:[[50,20,30],[30,20,50]],j:[["lingxue"],["patrick"],["patrick"],["lumak"]],alt:[["jessie","jasser","jeronimo"],["seoyoon"]],ax:{0:"Jessie*"},lb:"Offense - 50/20/30 or 30/20/50",c:"Jeronimo is Jessie + Seyoon already so stacking happens"},
+ {g:2,l:[["flint"],["philly"],["zinman"]],rs:[[60,40,0],[60,10,30],[50,20,30]],j:[["patrick"],["jessie","jasser","jeronimo"],["seoyoon"],["sergey","bahiti","lumak"]],jx:{1:"Jessie*",3:"Sergey**"},alt:[["patrick"],["jessie","jasser","jeronimo"]],ax:{1:"Jessie*"},lb:"Defense - 60/40/0 or 60/10/30 or 50/20/30"},
+ {g:2,l:[["jeronimo"],["philly"],["alonso"]],rs:[[50,20,30],[30,20,50]],j:[["patrick"],["jessie","jasser","jeronimo"],["seoyoon"],["zinman"]],jx:{1:"Jessie*"},alt:[["patrick"]],lb:"Offense - 50/20/30 or 30/20/50",ao:[0,"20% ones"],c:"Jeronimo is Jessie + Seyoon already so stacking happens"},
+ {g:3,l:[["logan"],["philly"],["zinman"]],rs:[[60,40,0],[60,30,10]],j:[["mia"],["patrick"],["jessie","jasser","jeronimo"],["seoyoon"]],jx:{2:"Jessie*"},lb:"Defense - 60/40 or 60/30/10"},
+ {g:3,l:[["jeronimo"],["mia"],["greg"]],rs:[[50,20,30],[30,20,50]],j:[["jessie","jasser","jeronimo"],["seoyoon"],["philly"],["patrick"]],jx:{0:"Jessie*"},alt:[["zinman"]],lb:"Offense - 50/20/30 or 30/20/50",c:"Jeronimo is Jessie + Seyoon already so stacking happens"},
+ {g:3,l:[["jeronimo"],["mia"],["greg","alonso"]],rs:[[60,40,0],[40,60,0]],j:[["jessie","jasser","jeronimo"],["seoyoon"],["philly"],["patrick"]],jx:{0:"Jessie*"},alt:[["zinman"]],lb:"Offense - 60/40/0 or 40/60/0",c:"Jeronimo is Jessie + Seyoon already so stacking happens"},
+ {g:3,l:[["logan"],["philly"],["greg"]],rs:[[50,20,30]],j:[["mia"],["patrick"],["jessie","jasser","jeronimo"],["seoyoon"]],jx:{2:"Jessie*"},alt:[["zinman"]],lb:"Defense - 50/20/30"},
+ {g:4,l:[["ahmose","logan"],["reina"],["lynn"]],rs:[[60,40,0],[60,30,10],[50,20,30]],j:[["mia"],["patrick"],["jessie","jasser","jeronimo"],["seoyoon"]],jx:{2:"Jessie*"},alt:[["zinman"],["philly"]],lb:"Defense - 60/40/0 or 60/30/10 or 50/20/30"},
+ {g:4,l:[["jeronimo"],["reina"],["greg"]],rs:[[50,20,30],[30,20,50]],j:[["mia"],["philly"],["patrick"],["zinman"]],alt:[["jessie","jasser","jeronimo"],["seoyoon"]],ax:{0:"Jessie*"},lb:"Offense - 50/20/30 or 30/20/50",c:"Jeronimo is Jessie + Seyoon already"},
+ {g:4,l:[["jeronimo"],["mia"],["greg","alonso"]],rs:[[48,4,48],[40,10,50]],j:[["patrick"],["philly"],["zinman"],["reina"]],alt:[["jessie","jasser","jeronimo"],["seoyoon"]],ax:{0:"Jessie*"},lb:"Offense - 48/4/48 or 40/10/50",c:"Jeronimo is Jessie + Seyoon already"},
+ {g:4,l:[["jeronimo"],["reina","mia"],["greg"]],rs:[[60,40,0],[40,60,0]],j:[["patrick"],["philly"],["zinman"],["mia","reina"]],alt:[["jessie","jasser","jeronimo"],["seoyoon"]],ax:{0:"Jessie*"},lb:"Offense - 60/40/0 or 40/60/0",c:"ONLY 1 Mia, do not stack here. Jeronimo is Jessie + Seyoon already"},
+ {g:4,l:[["ahmose","logan"],["molly","philly"],["lynn"]],rs:[[50,2,48]],j:[["mia"],["patrick"],["jessie","jasser","jeronimo"],["seoyoon"]],jx:{2:"Jessie*"},alt:[["zinman"]],lb:"Defense - 50/2/48"},
+ {g:5,l:[["hector","logan"],["norah"],["zinman"]],rs:[[60,40,0]],j:[["mia"],["patrick"],["seoyoon"],["philly"]],lb:"Defense - 60/40/0",ao:["or 25%"]},
+ {g:5,l:[["jeronimo"],["reina"],["gwen"]],rs:[[50,20,30],[30,20,50]],j:[["mia"],["jessie","jasser","jeronimo"],["seoyoon"],["norah"]],jx:{1:"Jessie*"},alt:[["patrick"],["philly"]],lb:"Offense - 50/20/30 or 30/20/50"},
+ {g:5,l:[["jeronimo"],["mia"],["gwen"]],rs:[[48,4,48],[40,10,50]],j:[["norah"],["norah"],["norah"],["patrick"]],alt:[["philly"]],lb:"Offense - 48/4/48 or 40/10/50",c:"Alternative joiners choice: Jessie, Seeyoon, 2xPatrick"},
+ {g:5,l:[["jeronimo"],["norah"],["greg"]],rs:[[60,40,0],[40,60,0]],j:[["mia"],["patrick"],["jessie","jasser","jeronimo"],["philly"]],jx:{2:"Jessie*"},alt:[["zinman"]],lb:"Offense - 60/40/0 or 40/60/0"},
+ {g:5,l:[["logan"],["norah"],["greg"]],rs:[[60,40,0]],j:[["mia"],["norah"],["jessie","jasser","jeronimo"],["philly"]],jx:{2:"Jessie*"},alt:[["norah"]],lb:"Defense - 60/40/0",ao:[0,"or 25%"],c:"Added 19h of July 2026, based on viewer's reports"},
+ {g:5,l:[["hector"],["norah"],["lynn"]],rs:[[50,20,30]],j:[["mia"],["patrick"],["philly"],["jessie","jasser","jeronimo"]],jx:{3:"Jessie"},alt:[["norah"]],lb:"Defense - 50/20/30",ao:[0,"or 25%"]},
+ {g:6,l:[["wuming"],["norah"],["zinman"]],rs:[[60,40,0]],j:[["renee"],["mia"],["patrick"],["jessie","jasser","jeronimo"]],jx:{3:"Jessie*"},alt:[["wuming"]],lb:"Defense - 60/40/0",c:"Wu Ming to counter his skills damages"},
+ {g:6,l:[["jeronimo"],["renee"],["gwen"]],rs:[[50,20,30],[30,20,50]],j:[["jessie","jasser","jeronimo"],["seoyoon"],["mia"],["norah"]],jx:{0:"Jessie*"},alt:[["patrick"],["wuming"]],lb:"Offense - 50/20/30 or 30/20/50",c:"Jeronimo is Jessie + Seyoon already so stacking happens. Wu Ming to counter his skills damages"},
+ {g:6,l:[["jeronimo","hector"],["mia"],["wayne","gwen"]],rs:[[48,4,48],[40,10,50]],j:[["norah"],["norah"],["norah"],["norah","patrick"]],lb:"Offense - 48/4/48 or 40/10/50",ao:["or 25%"],c:"Alternative joiners choice: Jessie, Seeyoon, 2xPatrick. Wu Ming to counter his skills damages"},
+ {g:6,l:[["jeronimo"],["renee"],["greg"]],rs:[[60,40,0],[40,60,0]],j:[["mia"],["patrick"],["jessie","jasser","jeronimo"],["wuming"]],jx:{2:"Jessie**"},alt:[["wuming"]],lb:"Offense - 60/40/0 or 40/60/0",ao:["or 25%",0],c:"Jeronimo is Jessie + Seyoon already so stacking happens. Wu Ming to counter his skills damages"},
+ {g:6,l:[["logan"],["philly"],["wayne"]],rs:[[45,5,50],[40,0,60]],j:[["norah"],["norah"],["norah"],["norah","patrick"]],meta:1,alt:[["wuming"]],lb:"META - Defense - 45/5/50 or 40/0/60",ao:["or 25%",0]},
+ {g:6,l:[["hector"],["norah"],["wayne"]],rs:[[45,15,40]],j:[["mia"],["patrick"],["philly"],["lynn"]],alt:[["wuming"]],lb:"NEW - Defense 45/15/40",ao:["or 25%",0]},
+ {g:6,l:[["hector"],["molly"],["wayne"]],rs:[[50,0,50]],j:[["mia"],["patrick"],["norah"],["norah"]],alt:[["norah"],["wuming"]],lb:"Defense - 50/0/50",ao:[0,"or 25%",1]},
+ {g:7,l:[["edith"],["gordon"],["bradley"]],rs:[[60,40,0]],j:[["renee"],["mia"],["reina"],["jessie","jasser","jeronimo"]],jx:{3:"Jessie"},alt:[["wuming"]],lb:"Defense - 60/40/0",ao:["or 25%",0],c:"Little skills damage, Reina is okay"},
+ {g:7,l:[["edith"],["molly","philly"],["bradley","wayne"]],rs:[[40,0,60],[48,4,48]],j:[["mia"],["norah"],["norah"],["lynn"]],lb:"Defense - 40/0/60 or 48/4/48",ao:["or 25%"]},
+ {g:7,l:[["jeronimo","edith"],["mia"],["bradley"]],rs:[[48,4,48],[40,10,50]],j:[["norah"],["norah"],["norah"],["patrick"]],alt:[["philly"]],lb:"Offense - 48/4/48 or 40/10/50",ao:[0,"or 25%"]},
+ {g:8,l:[["gatot"],["sonya"],["bradley"]],rs:[[60,40,0]],j:[["renee"],["patrick"],["mia"],["hendrik"]],alt:[["wuming"]],lb:"Defense - 60/40/0",ao:["or 25%",0],c:"Seo type of skills (attack up) have overlap with Bradley. Wu Ming against high skill damage can be considered"},
+ {g:8,l:[["gatot"],["molly","philly"],["bradley"]],rs:[[40,0,60],[48,4,48]],j:[["mia"],["patrick"],["norah"],["lynn"]],lb:"Defense - 40/0/60 or 48/4/48",ao:["or 25%"]},
+ {g:8,l:[["edith","jeronimo"],["mia"],["hendrik"]],rs:[[48,4,48],[40,0,60]],j:[["norah"],["norah"],["jessie","jasser","jeronimo"],["seoyoon"]],jx:{2:"Jessie"},alt:[["norah"],["wuming"]],lb:"Offense - 48/4/48 or 40/0/60",ao:["or 25%",0,1],c:"Wu Ming against high skill damage can be considered"},
+ {g:8,l:[["edith","gatot"],["sonya"],["bradley"]],rs:[[60,40,0],[40,60,0]],j:[["renee"],["mia"],["hendrik"],["jessie","jasser","jeronimo"]],jx:{3:"Jessie"},alt:[["wuming"]],lb:"Offense - 60/40/0 or 40/60/0",ao:["or 25%",0],c:"Wu Ming against high skill damage can be considered"},
+ {g:8,l:[["jeronimo"],["gordon"],["bradley"]],rs:[[60,40,0],[40,60,0]],j:[["renee"],["mia"],["hendrik"],["patrick"]],alt:[["wuming"]],lb:"Offense - 60/40/0 or 40/60/0",ao:["or 25%",0],c:"Wu Ming against high skill damage can be considered"},
+ {g:8,l:[["jeronimo"],["mia"],["bradley"]],rs:[[48,4,48]],j:[["norah"],["norah"],["norah"],["hendrik"]],lb:"Offense - 48/4/48",ao:["or 25%"],c:"For Dolphins on a budget built for 48/4/48."},
+ {g:9,l:[["magnus"],["sonya"],["bradley"]],rs:[[60,40,0]],j:[["renee"],["mia"],["patrick"],["hendrik"]],alt:[["wuming"],["gatot"]],lb:"Defense - 60/40/0",ao:["or 25%",0,1],c:"Seo type of skills (attack up) have overlap with Magnus & Bradley"},
+ {g:9,l:[["magnus"],["molly","philly"],["bradley","xura"]],rs:[[40,0,60],[48,4,48]],j:[["mia"],["patrick"],["norah"],["lynn"]],alt:[["gatot"]],lb:"Defense - 40/0/60 or 48/4/48",ao:["or 25%",0]},
+ {g:9,l:[["magnus"],["mia"],["hendrik"]],rs:[[48,4,48],[40,10,50],[40,0,60]],j:[["norah"],["norah"],["norah"],["patrick"]],alt:[["norah"],["gatot"]],lb:"Offense - 48/4/48 or 40/10/50 or 40/0/60",ao:[0,"or 25%",1]},
+ {g:9,l:[["magnus"],["fred"],["bradley"]],rs:[[60,40,0],[40,60,0]],j:[["renee"],["mia"],["patrick"],["hendrik"]],alt:[["wuming"],["gatot"]],lb:"Offense - 60/40/0 or 40/60/0",ao:["or 25%",0,1],c:"Wu Ming against high skill damage can be considered"},
+ {g:10,l:[["gregory"],["freya"],["bradley"]],rs:[[60,40,0]],j:[["renee"],["mia"],["patrick"],["hendrik"]],alt:[["wuming"],["gatot"]],lb:"Defense - 60/40/0",ao:["or 25%",0,1],c:"Bradley, Gregory has Seeyoon kind of skills so to avoid Attack up skills"},
+ {g:10,l:[["gregory"],["molly","philly"],["bradley","xura"]],rs:[[40,2,58],[48,4,48]],j:[["mia"],["norah"],["hendrik"],["patrick"]],alt:[["gatot"]],lb:"Defense - 40/2/58 or 48/4/48",ao:["or 25%",0]},
+ {g:10,l:[["gregory"],["mia"],["blanchette"]],rs:[[48,4,48],[40,10,50]],j:[["norah"],["norah"],["hendrik"],["patrick"]],alt:[["norah"],["gatot"]],lb:"Offense - 48/4/48 or 40/10/50",ao:[0,"or 25%",1]},
+ {g:10,l:[["gregory"],["fred"],["bradley"]],rs:[[60,40,0]],j:[["renee"],["mia"],["hendrik"],["patrick"]],alt:[["wuming"],["gatot"]],lb:"Offense - 60/40/0",ao:["or 25%",0,1],c:"Wu Ming against high skill damage can be considered"},
+ {g:11,l:[["eleonora"],["lloyd"],["bradley"]],rs:[[60,40,0]],j:[["renee"],["mia"],["hendrik"],["reina"]],alt:[["gatot"],["wuming"]],lb:"Defense - 60/40/0",ao:[0,"or 25%",1],c:"No Patrick as Eleonora has Health already. Wu Ming decent against Rufus"},
+ {g:11,l:[["eleonora"],["molly","philly"],["xura"]],rs:[[40,2,58],[48,4,48]],j:[["mia"],["norah"],["hendrik"],["reina"]],alt:[["gatot"],["wuming"]],lb:"Defense - 40/2/58 or 48/4/48",ao:[0,"or 25%",1],c:"No Patrick as Eleonora has Health already. *Reina is no Rufus but Xura"},
+ {g:11,l:[["eleonora"],["mia"],["rufus"]],rs:[[48,4,48],[40,10,50]],j:[["norah"],["norah"],["hendrik"],["gatot"]],alt:[["wuming"]],lb:"Offense - 48/4/48 or 40/10/50",ao:[0,"or 25%"],c:"No Patrick as Eleonora has Health already. Wu Ming decent against Rufus"},
+ {g:11,l:[["eleonora"],["lloyd","fred"],["bradley"]],rs:[[60,40,0]],j:[["renee"],["mia"],["hendrik"],["reina"]],alt:[["gatot"],["wuming"]],lb:"Offense & Defense - 60/40/0",ao:[0,"or 25%",1],c:"No Patrick as Eleonora has Health already. Wu Ming decent against Rufus"},
+ {g:12,l:[["herbjorg"],["lloyd"],["bradley"]],rs:[[60,40,0]],j:[["mia"],["renee"],["patrick"],["hendrik"]],alt:[["gatot"]],lb:"Lancers Defense - 60/40/0",c:"To test: Wu Ming (double effect with Hervor to counter Ligeia)"},
+ {g:12,l:[["herbjorg"],["lloyd"],["ligeia"]],rs:[[60,20,20]],j:[["mia"],["patrick"],["norah"],["seoyoon"]],alt:[["gatot"],["norah"]],lb:"Mix Defense - 60/20/20",c:"To test: Wu Ming (double effect with Hervor to counter Ligeia)"},
+ {g:12,l:[["herbjorg"],["molly","philly"],["ligeia"]],rs:[[50,2,48]],j:[["mia"],["patrick"],["norah"],["gatot"]],alt:[["norah"]],lb:"Marksmen Defense - 50/2/48",c:"To test: Wu Ming (double effect with Hervor to counter Ligeia)"},
+ {g:12,l:[["herbjorg"],["lloyd"],["ligeia"]],rs:[[50,10,40]],j:[["mia"],["patrick"],["norah"],["gatot"]],alt:[["seoyoon"]],lb:"Mix Defense - 50/10/40",c:"To test: Wu Ming (double effect with Hervor to counter Ligeia)"},
+ {g:12,l:[["herbjorg"],["mia"],["rufus"]],rs:[[48,4,48]],j:[["patrick"],["hendrik"],["norah"],["gatot"]],alt:[["norah"]],lb:"Marksmen Offense - 48/4/48",c:"To test: Wu Ming (double effect with Hervor to counter Ligeia)"},
+ {g:12,l:[["herbjorg"],["karol"],["rufus"]],rs:[[50,10,40]],j:[["mia"],["patrick"],["hendrik"],["norah"]],meta:1,alt:[["norah"]],lb:"META - Mix Offense - 50/10/40",c:"To test: Wu Ming (double effect with Hervor to counter Ligeia)"},
+ {g:12,l:[["herbjorg"],["karol"],["bradley","greg"]],rs:[[60,40,0]],j:[["mia"],["renee"],["gatot"],["hendrik"]],alt:[["patrick"]],lb:"Lancers Offense - 60/40/0",c:"To test: Wu Ming (double effect with Hervor to counter Ligeia)"},
  // 시트 Gen 12 의 **마지막 행** "META - Mix Defense - 60/20/20". 위 60/20/20 행과 리더·병비가
  // 같고 조이너만 다르다 — 2026-09-12 수집 때 중복으로 오분류해서 빠져 있었다(2026-09-13 발견).
- {g:12,l:[["herbjorg"],["lloyd"],["ligeia"]],rs:[[60,20,20]],j:[["mia"],["gatot"],["patrick"],["seoyoon"]],meta:1,alt:[["norah"]]},
+ {g:12,l:[["herbjorg"],["lloyd"],["ligeia"]],rs:[[60,20,20]],j:[["mia"],["gatot"],["patrick"],["seoyoon"]],meta:1,alt:[["norah"]],lb:"META - Mix Defense - 60/20/20",c:"To test: Wu Ming (double effect with Hervor to counter Ligeia)"},
  // ── Gen 13 (2026-11-10 시트 신설 · Ton 작업 중이라 빈칸이 있다) ──
- // 시트가 비워 둔 조이너 칸은 **싣지 않는다**(칸이 넷보다 적다) — 남는 자리는 pick4 의 탐욕이 메운다.
+ // 시트가 비워 둔 조이너 칸은 **싣지 않는다**(칸이 넷보다 적다) — 시트 카드는 그 자리를 "시트 빈칸" 으로 보여 주고 지어내지 않는다.
  // "50/5-10/40-45" 는 양 끝을 둘 다 rs 에 넣었다(중간값 50/7.5/42.5 도 COMP_TOL 안이다).
- {g:13,l:[["gisela"],["flora"],["vulcanus"]],rs:[[60,40,0]],j:[["hendrik"],["patrick"],["renee"]]},
- {g:13,l:[["gisela"],["karol"],["vulcanus"]],rs:[[50,10,40]],j:[["mia"],["hendrik"],["patrick"]],meta:1,alt:[["wuming"],["norah"]]},
- {g:13,l:[["gisela"],["mia"],["vulcanus"]],rs:[[48,4,48],[40,10,50]],j:[["hendrik"],["patrick"]],alt:[["wuming"],["norah"]]},
- {g:13,l:[["gisela"],["karol"],["greg","bradley"]],rs:[[60,40,0]],j:[["mia"],["hendrik"],["patrick"],["renee"]]},
- {g:13,l:[["gisela"],["flora"],["ligeia"]],rs:[[50,5,45],[50,10,40]],j:[["patrick"],["seoyoon"],["jessie","jasser","jeronimo"]],meta:1,alt:[["wuming"],["norah"]]},
+ {g:13,l:[["gisela"],["flora"],["vulcanus"]],rs:[[60,40,0]],j:[["hendrik"],["patrick"],["renee"]],lb:"Defense - 60/40/0"},
+ {g:13,l:[["gisela"],["karol"],["vulcanus"]],rs:[[50,10,40]],j:[["mia"],["hendrik"],["patrick"]],meta:1,alt:[["wuming"],["norah"]],lb:"META - Mix Offense - 50/10/40"},
+ {g:13,l:[["gisela"],["mia"],["vulcanus"]],rs:[[48,4,48],[40,10,50]],j:[["hendrik"],["patrick"]],alt:[["wuming"],["norah"]],lb:"Offense - 48/4/48 or 40/10/50"},
+ {g:13,l:[["gisela"],["karol"],["greg","bradley"]],rs:[[60,40,0]],j:[["mia"],["hendrik"],["patrick"],["renee"]],lb:"Offense - 60/40/0",c:"No Patrick if Greg"},
+ {g:13,l:[["gisela"],["flora"],["ligeia"]],rs:[[50,5,45],[50,10,40]],j:[["patrick"],["seoyoon"],["jessie","jasser","jeronimo"]],jx:{2:"Jessies"},meta:1,alt:[["wuming"],["norah"]],lb:"META - Mix Defense - 50/5-10/40-45"},
+];
+
+// ── 시트 원문 필드 (2026-11-11) ──
+// SHEET_COMPS 각 행의 lb(행 라벨) · ao(Alternative #1~#3 을 시트 순서 그대로 — 숫자는 alt 의 인덱스, 문자열은 "or 25%" 같은 자유 문구) ·
+// c(Comments 열)는 data.xlsx 에서 기계적으로 옮긴 **원문 그대로**다. 판정에는 쓰지 않는다 — 화면의 「📋 Ton 시트」 카드가 보여 주기만 한다.
+// 아래는 그 비고의 한국어 옮김이다. 키는 시트 원문 문자열 전체. 뜻이 갈릴 수 있는 문장이 있어 화면은 원문을 항상 같이 싣는다.
+// ⚠️ 원문이 밝히지 않은 것을 옮김이 단정하지 않는다 — "his skills damages" 의 his 가 누구인지, "Little skills damage" 가 누구 쪽 얘기인지
+//    시트는 적지 않았다. 옮김도 거기서 멈춘다(2026-11-11 리뷰).
+const SHEET_NOTE_KO = {
+ "Jeronimo is Jessie + Seyoon already so stacking happens":"제로니모가 이미 제시 + 서윤 효과를 갖고 있어 겹칩니다(스택 발생).",
+ "Jeronimo is Jessie + Seyoon already":"제로니모가 이미 제시 + 서윤 효과를 갖고 있습니다.",
+ "ONLY 1 Mia, do not stack here. Jeronimo is Jessie + Seyoon already":"미아는 1명만 — 여기서는 겹쳐 넣지 마세요. 제로니모가 이미 제시 + 서윤 효과를 갖고 있습니다.",
+ "Alternative joiners choice: Jessie, Seeyoon, 2xPatrick":"대안 조이너 구성: 제시, 서윤, 패트릭 2명.",
+ "Added 19h of July 2026, based on viewer's reports":"2026년 7월 19일 추가 — 시청자 제보 기반.",
+ "Wu Ming to counter his skills damages":"무명은 스킬 데미지를 카운터하는 용도입니다.",
+ "Jeronimo is Jessie + Seyoon already so stacking happens. Wu Ming to counter his skills damages":"제로니모가 이미 제시 + 서윤 효과를 갖고 있어 겹칩니다(스택 발생). 무명은 스킬 데미지를 카운터하는 용도입니다.",
+ "Alternative joiners choice: Jessie, Seeyoon, 2xPatrick. Wu Ming to counter his skills damages":"대안 조이너 구성: 제시, 서윤, 패트릭 2명. 무명은 스킬 데미지를 카운터하는 용도입니다.",
+ "Little skills damage, Reina is okay":"스킬 데미지 적음, 레이나도 괜찮음.",   // 원문이 쉼표로만 이었다 — "적어서" 로 이으면 인과를 지어낸다
+ "Seo type of skills (attack up) have overlap with Bradley. Wu Ming against high skill damage can be considered":"서윤류 스킬(공격력↑)은 브레들리와 겹칩니다. 상대 스킬 데미지가 높으면 무명을 고려할 수 있습니다.",
+ "Wu Ming against high skill damage can be considered":"상대 스킬 데미지가 높으면 무명을 고려할 수 있습니다.",
+ "For Dolphins on a budget built for 48/4/48.":"48/4/48 로 맞춘 저예산 중과금(돌고래) 유저용.",
+ "Seo type of skills (attack up) have overlap with Magnus & Bradley":"서윤류 스킬(공격력↑)은 마그누스·브레들리와 겹칩니다.",
+ "Bradley, Gregory has Seeyoon kind of skills so to avoid Attack up skills":"브레들리·그레고리가 서윤류 스킬을 갖고 있으니 공격력↑ 스킬은 피하세요.",
+ "No Patrick as Eleonora has Health already. Wu Ming decent against Rufus":"엘레오노라가 이미 체력을 갖고 있어 패트릭은 넣지 않습니다. 무명은 루퍼스 상대로 쓸 만합니다.",
+ "No Patrick as Eleonora has Health already. *Reina is no Rufus but Xura":"엘레오노라가 이미 체력을 갖고 있어 패트릭은 넣지 않습니다. 별표(*)가 붙은 둘째 문장(레이나 · 루퍼스 · 쇠라)은 뜻이 분명하지 않아 옮기지 않았습니다 — 원문을 보세요.",   // "일 때" 같은 조건을 지어내지 않는다
+ "To test: Wu Ming (double effect with Hervor to counter Ligeia)":"테스트 필요: 무명 (헤르보르와 이중 효과로 리지아 카운터).",
+ "No Patrick if Greg":"그렉을 쓰면 패트릭은 넣지 않습니다."
+};
+// 시트 두 탭(Gen 1~9 · Gen 10+) 머리의 지침과 범례 — **원문 한 줄 = 항목 하나** + 한국어 옮김. 화면 「📜 시트 머리말」 접기에 싣는다.
+// 원문은 test/fixtures-sheet.mjs 의 SHEET_HEAD 에 있는 줄 그대로여야 한다(unit.mjs 가 대조한다 — 오타 "This joiners" · "ENNEMIE'S" 도 그대로다).
+const SHEET_TIPS = [
+ ["This joiners are GENERIC suggestions.","이 조이너들은 일반적인 제안입니다."],
+ ["Here are some pointers to pick the right joiners beyond these suggestions","이 제안을 넘어 알맞은 조이너를 고르는 지침은 다음과 같습니다."],
+ ["1) The right joiners are adjusted based on your OWN rally (Heroes & Troop ratio)","1) 알맞은 조이너는 내 랠리(영웅·병비)에 따라 달라집니다."],
+ ["2) The right joiners are adjusted based on your ENNEMIE'S rally (Heroes & Troop ratio, & their joiners)","2) 알맞은 조이너는 상대 랠리(영웅·병비·상대 조이너)에 따라서도 달라집니다."],
+ ["3) Different joiners can be selected if you are WEAKER or STRONGER than your opponent (ie: % based joiners to try to get lucky if you are weaker)","3) 상대보다 약한지 강한지에 따라 다른 조이너를 고를 수 있습니다(예: 약할 때는 확률형 조이너로 운을 노린다)."],
+ ["4) The intensity of the combat can also impact the joiners you choose (less variety, more stacking of the us if no time to properly swap)","4) 전투의 긴박함도 선택에 영향을 줍니다(제대로 바꿀 시간이 없으면 다양성이 줄고 같은 영웅을 더 겹치게 됩니다)."],
+ ["5) Mixing 4 different joiners is often FAR better than stacking the same one 4 times","5) 서로 다른 조이너 4명을 섞는 것이 같은 영웅을 4번 겹치는 것보다 대개 훨씬 낫습니다."],
+ ["6) 20% skill joiners, are often NOT the best choices, but can be still be effective against ennemies stacking 4 times the same heroes","6) 20% 스킬 조이너는 대개 최선이 아니지만, 같은 영웅을 4번 겹치는 상대에게는 여전히 효과적일 수 있습니다."],
+ ["7) A LOT more variations are possible, let's use the YouTube comments to update these tables based on real working strategies","7) 훨씬 많은 변형이 가능합니다 — 실제로 통하는 전략을 유튜브 댓글로 모아 이 표를 갱신합니다."],
+ ["8) In some alliances, for more casual players, 4 different joiners might be a lot. You can do 2 times the same ones, like 2xJessie and 2xSeeyoon to make it easier","8) 캐주얼한 연맹에서는 서로 다른 조이너 4명이 부담일 수 있습니다. 제시 2 + 서윤 2 처럼 같은 영웅을 두 번씩 써서 쉽게 할 수 있습니다."],
+ ["9) This is for RALLIES (Offense) and GARRISON (Defense). It is NOT for BEAR!","9) 이 표는 랠리(공격)와 개리슨(수비)용입니다. 곰 사냥용이 아닙니다!"],
+ ["T12 CHANGES for Gen 10 and Beyond: ALWAYS have at least 1 lancers on up to 8 players in your Marksmen ratios to trigger Lancers T12 skills","Gen 10 이상의 T12 변경: 궁병 위주 병비에서도 창병 T12 스킬이 발동하도록, 최대 8명의 참여자가 반드시 창병을 1 이상씩 넣게 하세요."],
+ ["*Jessie = Jessie, Jasser or Jeronimo","범례 — *제시 = 제시, 제셀 또는 제로니모"],
+ ["**Sergey = Bahiti, Lumak Bokan","범례 — **세르게이 = 바히티, 룸 보겐"]
 ];

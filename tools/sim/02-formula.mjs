@@ -26,14 +26,20 @@ console.log("① Rally Joiners 16행 일치", out.rallyJoiners.filter(x => x.ok)
 
 // ② ③ ④ — 54행
 const stackable = new Set(HEROES.filter(h => h.stack).map(h => h.id));
-let maxRec = 0, maxAll = 0, maxSingle = 0, singles = 0;
+let maxRec = 0, maxAll = 0, maxSheet = 0, maxSingle = 0, singles = 0;
 for (const c of SHEET_COMPS) {
   const lead = c.l.map(x => x[0]); const ratio = c.rs[0]; const g = c.g;
-  const v0 = renderRow(lead, ratio, g, 0);
-  const v1 = renderRow(lead, ratio, g, 1);
-  const rec0 = v0.rec, all0 = v0.recAll || v0.rec, rec1 = v1.rec;
-  const sRec0 = sim.combo(lead, rec0.ids, ratio), sAll0 = sim.combo(lead, all0.ids, ratio), sRec1 = sim.combo(lead, rec1.ids, ratio);
-  maxRec = Math.max(maxRec, Math.abs(sRec0 - rec0.mul), Math.abs(sRec1 - rec1.mul)); maxAll = Math.max(maxAll, Math.abs(sAll0 - all0.mul));
+  const v0 = renderRow(lead, ratio, g);
+  const rec0 = v0.rec, all0 = v0.recAll || v0.rec;
+  const sRec0 = sim.combo(lead, rec0.ids, ratio), sAll0 = sim.combo(lead, all0.ids, ratio);
+  // 시트 조합(시트 카드) — 칸에 이름이 여럿이면 화면은 그중 한 명으로 잰다. 후보 조합을 전부 독립 공식에 넣어 화면 값과 가장 가까운 것을 짝으로 삼는다.
+  const sh = v0.sheet; let sSheet = null, sheetIds = null;
+  if (sh && sh.mul) {
+    let sets = [[]]; sh.cells.forEach(cell => { const n = []; sets.forEach(s => cell.forEach(id => n.push(s.concat([id])))); sets = n; });
+    for (const ids of sets) { const v = sim.combo(lead, ids, ratio); if (sSheet === null || Math.abs(v - sh.mul) < Math.abs(sSheet - sh.mul)) { sSheet = v; sheetIds = ids; } }
+    maxSheet = Math.max(maxSheet, Math.abs(sSheet - sh.mul));
+  }
+  maxRec = Math.max(maxRec, Math.abs(sRec0 - rec0.mul)); maxAll = Math.max(maxAll, Math.abs(sAll0 - all0.mul));
   // ⑤ 단독 배율 14행
   const singleDiff = v0.rank.map(x => ({id: x.id, engine: x.mul, sim: sim.single(lead, x.id, ratio)}));
   singleDiff.forEach(x => { maxSingle = Math.max(maxSingle, Math.abs(x.engine - x.sim)); singles++; });
@@ -42,17 +48,18 @@ for (const c of SHEET_COMPS) {
   const poolAll = HEROES.filter(h => h.gen <= g && sim.single(lead, h.id, ratio) > 1.001).map(h => h.id);
   const bestS = bruteBest(sim, lead, poolS, ratio, stackable);
   const bestAll = bruteBest(sim, lead, poolAll, ratio, stackable);
-  // 시트 칸 자체의 값(칸 안 후보는 최선으로) — 엔진 edge=1 결과가 그것이다
   out.rows.push({g, lead, ratio, label: c.rs.map(v => v.join("/")).join(" · "),
-    rec0: {ids: rec0.ids, engine: rec0.mul, sim: sRec0}, all0: {ids: all0.ids, engine: all0.mul, sim: sAll0}, rec1: {ids: rec1.ids, engine: rec1.mul, sim: sRec1},
+    rec0: {ids: rec0.ids, engine: rec0.mul, sim: sRec0}, all0: {ids: all0.ids, engine: all0.mul, sim: sAll0}, sheet: sh ? {ids: sheetIds, engine: sh.mul, sim: sSheet} : null,
     bestS, bestAll, poolS: poolS.length, poolAll: poolAll.length,
-    gapGreedyS: (bestS.mul / sRec0 - 1) * 100, gapGreedyAll: (bestAll.mul / sAll0 - 1) * 100, lossSheet: (1 - sRec1 / bestS.mul) * 100,
+    gapGreedyS: (bestS.mul / sRec0 - 1) * 100, gapGreedyAll: (bestAll.mul / sAll0 - 1) * 100, lossSheet: sSheet === null ? null : (1 - sSheet / bestS.mul) * 100,
     singleDiff});
-  console.log(`g${g} ${lead.join("+")} ${ratio.join("/")}  rec0 ${rec0.mul} sim ${sRec0.toFixed(3)} | recAll ${all0.mul} sim ${sAll0.toFixed(3)} | 최적S ${bestS.mul.toFixed(3)} (${bestS.ids}) gap ${((bestS.mul / sRec0 - 1) * 100).toFixed(2)}% | 최적All ${bestAll.mul.toFixed(3)} gap ${((bestAll.mul / sAll0 - 1) * 100).toFixed(2)}% | 시트따름 ${rec1.mul} 손실 ${((1 - sRec1 / bestS.mul) * 100).toFixed(1)}%`);
+  console.log(`g${g} ${lead.join("+")} ${ratio.join("/")}  rec0 ${rec0.mul} sim ${sRec0.toFixed(3)} | recAll ${all0.mul} sim ${sAll0.toFixed(3)} | 최적S ${bestS.mul.toFixed(3)} (${bestS.ids}) gap ${((bestS.mul / sRec0 - 1) * 100).toFixed(2)}% | 최적All ${bestAll.mul.toFixed(3)} gap ${((bestAll.mul / sAll0 - 1) * 100).toFixed(2)}% | 시트 조합 ${sh && sh.mul ? sh.mul + " (최적 대비 −" + ((1 - sSheet / bestS.mul) * 100).toFixed(1) + "%)" : "—"}`);
 }
-out.summary = {maxRecDiff: maxRec, maxAllDiff: maxAll, maxSingleDiff: maxSingle, singles,
+const lossRows = out.rows.filter(x => x.lossSheet !== null);
+out.summary = {maxRecDiff: maxRec, maxAllDiff: maxAll, maxSheetDiff: maxSheet, maxSingleDiff: maxSingle, singles,
   greedyGapS: out.rows.filter(x => x.gapGreedyS > 1e-6).length, greedyGapAll: out.rows.filter(x => x.gapGreedyAll > 1e-6).length,
   maxGapS: Math.max(...out.rows.map(x => x.gapGreedyS)), maxGapAll: Math.max(...out.rows.map(x => x.gapGreedyAll)),
-  meanLoss: out.rows.reduce((a, x) => a + x.lossSheet, 0) / out.rows.length, maxLoss: Math.max(...out.rows.map(x => x.lossSheet))};
+  // 시트 조합이 시트 등재 풀 최적보다 얼마나 낮은가(우리 공식 기준). 레니·무명·빈칸이 든 행은 그만큼 과장된다 — 화면이 "그대로 비교할 수 없다"고 적는 행이다.
+  sheetRows: lossRows.length, meanLoss: lossRows.reduce((a, x) => a + x.lossSheet, 0) / lossRows.length, maxLoss: Math.max(...lossRows.map(x => x.lossSheet))};
 console.log(JSON.stringify(out.summary, null, 1));
 writeFileSync(SCRATCH + "/out/out-02.json", JSON.stringify(out, null, 1));

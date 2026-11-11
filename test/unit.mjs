@@ -10,6 +10,8 @@ import {dirname, join} from "node:path";
 import vm from "node:vm";
 import {SHEET_POINTS, QUIET_POINTS, GARRISON_POINTS, GARRISON_QUIET, EXPECTED_COUNTS,
         JOINER_POINTS, JOINER_DUP_POINTS, SHEET_JOINERS, X_BUCKETED, SHEET_ROWS} from "./fixtures.mjs";
+// 시트 원문 사본(자동 생성 — tools/sim/04-sheet-fixture.mjs). SHEET_COMPS 를 화면과만 대조하면 같은 출처끼리의 비교라 데이터가 틀려도 통과한다.
+import {SHEET_RAW, SHEET_HEAD, SHEET_TOKENS, SHEET_RATIOS} from "./fixtures-sheet.mjs";
 import {PARTS, bundle} from "../build.mjs";
 import {boot} from "./dom.mjs";
 import {existsSync, readdirSync, statSync} from "node:fs";
@@ -45,7 +47,7 @@ function note(t) { console.log("   " + t); }
 
 // ── 로더 ───────────────────────────────────────────────────────────────
 const EXPORTS = "LANG,L,HN,CN,STR,HEROES,SLOTS,ORDER,byId,wpct,norm,tgtRatio,DW,dmgShare," +
-  "NA_SHARE,twoStat,anVal,atoms,scoreAtoms,chanceEV,bestJoiners,joinerRules,sheetOverlap,sig,EXCL,ATK_B,DEF_B,W_DEF,GWEN_EFF,MIA_TYPE_MIN,tgtName,tgtStat,COUNTERS,BAND_TOL,ROW_TOL,MECH,dist,sheetVerdict,garrisonVerdict,eVal,eK,eAdd,xShare,nCls,matchComp,matchComps,compRivals,nearComps,SHEET_COMPS";
+  "NA_SHARE,twoStat,anVal,atoms,scoreAtoms,chanceEV,bestJoiners,joinerRules,sig,EXCL,ATK_B,DEF_B,W_DEF,GWEN_EFF,MIA_TYPE_MIN,tgtName,tgtStat,COUNTERS,BAND_TOL,ROW_TOL,MECH,dist,sheetVerdict,garrisonVerdict,eVal,eK,eAdd,xShare,nCls,matchComp,matchComps,compRivals,nearComps,SHEET_COMPS";
 function load(lang) {
   const code = src("i18n.js") + src("data.js") + src("engine.js") +
     "\n;globalThis.__api={" + EXPORTS + "};\n";
@@ -302,9 +304,29 @@ section("렌더");
   const rally = boot("ko").mine([40, 20, 40]).enemy([60, 40, 0]);
   const html = rally.render();
   ok(html.length > 500, "랠리 렌더 결과가 비어 있지 않다", html.length + "자");
-  const heads = (html.match(/<h2>[^<]*/g) || []).map(h => h.slice(4, 5));
-  ok(["①", "②", "③", "⑤", "⑥"].every(n => heads.includes(n)),
-     "섹션 ①②③⑤⑥ 이 모두 렌더된다", heads.join(","));
+  // 2026-11-11: 조이너 안내가 맨 위다(사용자 결정). 번호는 화면에 나오는 순서대로 다시 매기므로 제목으로 순서를 본다.
+  const heads = (html.match(/<h2>[^<]*/g) || []).map(h => h.slice(4).trim());
+  const hAt = ["조이너 안내", "카운터", "리더 구성", "SkillMod 칸 진단", "위젯"].map(t => heads.findIndex(h => h.includes(t)));
+  ok(hAt.every((x, i) => x >= 0 && (i === 0 || x > hAt[i - 1])),
+     "섹션 순서: 조이너 안내 → 카운터 → 리더 구성 → 칸 진단 → 위젯", heads.join(" | "));
+  ok(heads.length >= 5 && heads.every((h, i) => h.startsWith("①②③④⑤⑥⑦"[i])),
+     "섹션 번호가 화면 순서대로 빠짐없이 매겨진다", heads.join(" | "));
+  ok(!/\{\{n\}\}/.test(html), "번호 자리표시({{n}})가 화면에 새지 않는다");
+
+  // 리더를 다 비웠다가 **같은 리더를 다시 고르면** 결과가 돌아와야 한다 (2026-11-11 리뷰 · 높음).
+  // "같은 HTML 이면 다시 안 그린다"(LAST_OUT)를 넣으면서, 리더 0명 안내문이 #out 을 직접 써서 그 기억이 안 지워졌다 —
+  // 다시 고른 결과가 "직전에 그린 것과 같다" 로 오판돼 안내문이 그대로 남았다.
+  {
+    const a = boot("ko").leaders("jeronimo", "", "").mine([60, 40, 0]);
+    const h1 = a.render(), h0 = a.leaders("", "", "").render(), h2 = a.leaders("jeronimo", "", "").render();
+    ok(/리더를 한 명 이상 선택하세요/.test(h0) && !/조이너 안내/.test(h0), "리더를 다 비우면 안내문만 뜬다", h0.slice(0, 80));
+    ok(/조이너 안내/.test(h1) && h2 === h1, "리더를 다 비웠다가 같은 리더를 다시 고르면 결과가 돌아온다", h2.replace(/<[^>]+>/g, " ").slice(0, 60));
+    const h3 = a.leaders("", "", "").render();
+    ok(h3 === h0, "다시 비우면 다시 안내문이다");
+    const code = p => src(p).replace(/\/\/[^\n]*/g, "");
+    ok(!/\bout\.innerHTML\s*=/.test(code("engine.js")) && (code("render.js").match(/\bout\.innerHTML\s*=/g) || []).length === 1,
+       "#out 은 setOut 한 곳에서만 갈아끼운다 (직접 쓰면 LAST_OUT 이 안 따라간다)");
+  }
 
   // 4상태가 화면 문구까지 도달하는가
   const say = (mine, en) => boot("ko").mine(mine).enemy(en).text();
@@ -687,7 +709,7 @@ section("병종별 독립 시행 (pc)");
   for (const [ratio, mul] of want) {
     const a = boot("ko").leaders("jeronimo", "", "greg").mine(ratio);
     a.el("gcap").value = "17";
-    const h = a.render();
+    const h0 = a.render(), h = h0.slice(h0.indexOf('id="single"'));   // 단일 순위표에서 읽는다 — 초상은 위쪽 카드에도 나온다
     const m = h.match(/heroes\/mia\.webp[\s\S]{0,1400}?class="big">×([\d.]+)/);
     ok(m && Math.abs(+m[1] - +mul.toFixed(3)) < 5e-4,
        "미야 조이너 배율 @" + ratio.join("/") + " = ×" + mul.toFixed(3),
@@ -793,7 +815,6 @@ section("An 칸 — 리더·조이너 같은 잣대 (2026-09-14)");
   // 추천 패널 배율도 칸 규칙으로 — 레이나 리더 60/40 에서 #rec 의 넷을 칸에 다 넣고 다시 잰 값과 같다
   {
     const a = boot("ko").leaders("ahmose", "reina", "lynn").mine([60, 40, 0]).gcap(4);
-    a.js("SHEET_EDGE=0");
     const html = a.render();
     const st = html.indexOf('id="rec"');
     const ids = [...html.slice(st, html.indexOf("</b>", st)).matchAll(/img\/heroes\/([a-z-]+)\.webp/g)].map(m => m[1]);
@@ -874,7 +895,6 @@ section("전투 배율 — bk 겹침 · pc 기대값");
   // 이 조합(로건·필리·웨인 45/5/50)은 추천이 미아·노라·제시·제셀 로 나와 둘을 한꺼번에 밟는다.
   const a = boot("ko").leaders("logan", "philly", "wayne").mine([45, 5, 50]);
   a.el("gcap").value = "6";
-  a.js("SHEET_EDGE=0");   // 이 절은 comboAll 자체를 보는 자리다 — 시트 우선을 끄고 순수 모델로 잰다
   const html = a.render();
   const st = html.indexOf('id="rec"');
   const ids = [...html.slice(st, html.indexOf("</b>", st)).matchAll(/img\/heroes\/([a-z-]+)\.webp/g)].map(m => m[1]);
@@ -999,7 +1019,7 @@ section("리더 중복 — 막지 않는다");
     const a = boot("ko").leaders("logan", "philly", "zinman").mine([60, 40, 0]);
     a.el("gcap").value = "3";
     const html = a.render();
-    const tb = /⑤[\s\S]*?<tbody>([\s\S]*?)<\/tbody>/.exec(html)[1];
+    const tb = /id="single"[\s\S]*?<tbody>([\s\S]*?)<\/tbody>/.exec(html)[1];
     const phil = tb.split("<tr").find(x => /heroes\/philly\.webp/.test(x));
     ok(phil && !/dead/.test(phil), "리더인 필리가 순위표에 정상 배율로 남아 있다");
     ok(phil && +(/×([\d.]+)<div/.exec(phil) || [0, 0])[1] > 1.001,
@@ -1051,13 +1071,11 @@ section("시트 행 대조 (조이너 순위)");
   // 실제 추천은 그걸 빼고 고르는데 검사가 안 빼서 2026-09-12 까지 재현율이 낮게 찍혔다
   // (49행 기준 73.5% 로 나왔는데 추천 패널로 재면 같은 엔진이 81.5% 였다).
   // 화면에서 사람이 읽는 것도 추천 패널이므로 거기를 본다.
-  // ⚠️ 여기서는 **시트 우선(SHEET_EDGE)을 꺼야 한다.** 켜 두면 "시트를 보고 시트에 맞췄더니
-  // 시트와 맞더라" 가 되어 검증이 아니라 순환논이다. 이 절은 **순수 모델**의 재현율만 잰다.
-  // 시트 우선의 효과와 대가는 바로 아래 절에서 따로 잰다.
+  // 2026-11-11: 계산 카드(#rec)는 시트 **행**을 아예 안 본다 — 예전의 "시트 우선" 스위치(SHEET_EDGE)는 없어졌다.
+  // 그래서 여기서 재는 값이 곧 화면의 값이다. 시트 원문은 시트 카드(#sheet)가 따로 싣는다(아래 절).
   const recOf = row => {
     const a = boot("ko").leaders(row.lead[0] || "", row.lead[1] || "", row.lead[2] || "").mine(row.r);
     a.el("gcap").value = String(row.gen);
-    a.js("SHEET_EDGE=0");
     const html = a.render();
     const after = html.slice(html.indexOf('id="rec"'));
     const b = /<p><b>([\s\S]*?)<\/b><\/p>/.exec(after);
@@ -1099,6 +1117,13 @@ section("시트 행 대조 (조이너 순위)");
        "추천 패널 캡션의 재현율이 실측과 같다 (묵은 숫자가 아니다)",
        fp.toFixed(1) + "% / " + pp.toFixed(1) + "% · 캡션: " +
        (/#1 재현 [\d.]+% · 겹침 [\d.]+%/.exec(cap) || ["없음"])[0]);
+    // 같은 문단의 나머지 두 숫자 — 대조한 행 수와 "레니 행을 빼면 N%". 2026-11-11 리뷰에서 97.9 를 바꿔도 통과하는 게 드러났다.
+    ok(cap.includes("시트 " + SHEET_ROWS.length + "행과 대조") && cap.includes("그 행을 빼면 " + fpx.toFixed(1) + "% 입니다"),
+       "같은 문단의 행 수와 '레니 행을 빼면 N%' 도 실측과 같다",
+       SHEET_ROWS.length + "행 · " + fpx.toFixed(1) + "% · 캡션: " + (/시트 \d+행과 대조/.exec(cap) || ["없음"])[0] + " / " + (/그 행을 빼면 [\d.]+% 입니다/.exec(cap) || ["없음"])[0]);
+    const capE = boot("en").leaders(r0.lead[0], r0.lead[1], r0.lead[2]).mine(r0.r).render();
+    ok(capE.includes("all " + SHEET_ROWS.length + " sheet rows") && capE.includes("<b>" + fp.toFixed(1) + "%</b>") && capE.includes("<b>" + pp.toFixed(1) + "%</b>") &&
+       capE.includes("Without those rows it is " + fpx.toFixed(1) + "%"), "영어 캡션의 숫자도 실측과 같다");
   }
 
   // 캡션은 **쌍**으로 적혀 있다 — "등재만 92.3%/59.2% vs 계산순위 84.6%/50.4%".
@@ -1109,7 +1134,6 @@ section("시트 행 대조 (조이너 순위)");
     const both = row => {
       const a = boot("ko").leaders(row.lead[0] || "", row.lead[1] || "", row.lead[2] || "").mine(row.r);
       a.el("gcap").value = String(row.gen);
-      a.js("SHEET_EDGE=0");
       const html = a.render();
       const at = id => {
         const i = html.indexOf('id="' + id + '"');
@@ -1152,7 +1176,6 @@ section("시트 행 대조 (조이너 순위)");
   for (const row of SHEET_ROWS) {
     const a = boot("ko").leaders(row.lead[0] || "", row.lead[1] || "", row.lead[2] || "").mine(row.r);
     a.el("gcap").value = String(row.gen);
-    a.js("SHEET_EDGE=0");   // 시트 우선은 일부러 배율을 낮추므로 여기서는 끈다
     const html = a.render();
     const after = html.slice(html.indexOf('id="rec"'));
     const shown = +(/전투 배율 ×([\d.]+)/.exec(after) || [0, 0])[1];
@@ -1201,46 +1224,181 @@ section("시트 행 대조 (조이너 순위)");
   ok(gWin >= 15, "자르기보다 실제로 높아지는 행이 충분히 많다", String(gWin));
 }
 
-// ── N+8. 애매하면 시트를 따른다 (SHEET_COMPS · SHEET_EDGE) ──────────────
-section("애매하면 시트 우선");
+// ── N+8. 시트 원문 카드 · 계산 카드 (2026-11-11 개편) ─────────────────────
+section("시트 원문 카드 · 계산 카드");
 {
-  // ⚠️ 이 절의 "시트 재현율"은 **검증이 아니다.** 시트를 보고 시트 쪽으로 기울였으니
-  // 올라가는 게 당연하다. 여기서 지켜야 하는 것은 두 가지다:
-  //   ① 시트 행과 안 맞는 입력에서는 **아무 일도 일어나지 않는다**
-  //   ② 시트를 따르느라 잃는 배율이 여유폭(2%) 안에 머문다
-  const pick = (row, edge) => {
-    const a = boot("ko").leaders(row.lead[0] || "", row.lead[1] || "", row.lead[2] || "").mine(row.r);
-    a.el("gcap").value = String(row.gen);
-    a.js("SHEET_EDGE=" + edge);
-    const html = a.render();
-    const after = html.slice(html.indexOf('id="rec"'));
-    const b = /<p><b>([\s\S]*?)<\/b><\/p>/.exec(after);
-    const ia = html.indexOf('id="recAll"');
-    const ba = ia < 0 ? null : /<p><b>([\s\S]*?)<\/b><\/p>/.exec(html.slice(ia));
-    const ids = b ? [...b[1].matchAll(/heroes\/([a-z-]+)\.webp/g)].map(m => m[1]) : [];
-    return {
-      ids,
-      // #recAll 은 SHEET_EDGE 와 무관하게 시트를 안 본다. 없으면 #rec 과 같다는 뜻이다.
-      all: ba ? [...ba[1].matchAll(/heroes\/([a-z-]+)\.webp/g)].map(m => m[1]) : ids,
-      v: +(/전투 배율 ×([\d.]+)/.exec(after) || [0, 0])[1],
-    };
+  // 사용자 결정(2026-11-11): 시트 원문과 계산을 **섞지 않는다.**
+  //   📋 #sheet  — Ton 시트 행 그대로(기본 4칸 · Alternative · 비고). 답이 둘이면 둘 다.
+  //   🧮 #rec    — 시트 조이너 명단(s:1) 안에서의 계산.   🧮 #recAll — 전체 영웅 계산.
+  // 예전의 "시트 칸 우선 + 셋째 장부터 교체" 혼합 추천(SHEET_EDGE · 🔀 · 📐)은 없다. 여기서 지키는 것은
+  //   ① 시트 카드가 시트 행을 한 칸도 안 바꾸고 싣는가        ② 계산 카드가 시트 **행**의 영향을 전혀 안 받는가
+  //   ③ 계산이 시트 칸에 얼마나 떨어지는가(하한선 · 진짜 일치) ④ 시트에 없는 편성에서 시트 카드가 그렇게 말하는가
+  const ids = s => [...s.matchAll(/heroes\/([a-z-]+)\.webp/g)].map(m => m[1]);
+  const strip = s => s.replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
+  const page = (lead, r, g, lang) => {
+    const a = boot(lang || "ko").leaders(lead[0] || "", lead[1] || "", lead[2] || "").mine(r);
+    a.el("gcap").value = String(g);
+    return a;
   };
-  // 모든 시트 행이 실제로 매칭되어야 한다 — 안 되면 SHEET_COMPS 가 픽스처와 어긋난 것이다
-  let matched = 0;
-  for (const row of SHEET_ROWS) {
-    const a = boot("ko").leaders(row.lead[0] || "", row.lead[1] || "", row.lead[2] || "").mine(row.r);
-    if (a.js("!!matchComp(" + JSON.stringify(row.lead) + ",norm(" + row.r.join(",") + ")," + row.gen + ")")) matched++;
-  }
-  ok(matched === SHEET_ROWS.length,
-     "SHEET_ROWS 52행이 전부 SHEET_COMPS 에서 찾아진다 (두 표가 어긋나지 않았다)",
-     matched + "/" + SHEET_ROWS.length);
+  const view = html => {
+    const cut = id => { const i = html.indexOf('id="' + id + '"'); return i < 0 ? null : html.slice(i); };
+    const four = s => { const b = /<p><b>([\s\S]*?)<\/b><\/p>/.exec(s); return b ? ids(b[1]) : []; };
+    const mult = s => +(/전투 배율 ×([\d.]+)/.exec(s) || [0, 0])[1];
+    const sheet = (cut("sheet") || "").split('class="jcol"')[0];
+    // 시트 카드의 행 블록 — 칩 단위로 읽는다(칸 하나 = 칩 하나)
+    const blocks = sheet.split('<div class="srow">').slice(1).map(b => {
+      // sx — 그 칩 끝에 작은 글씨로 실린 시트 원문 표기(Jessie* 등). 없으면 null. text 는 그 표기를 뺀 본문이다.
+      const chips = k => { const m = new RegExp('data-k="' + k + '">([\\s\\S]*?)</div>').exec(b); if (!m) return null;
+        return m[1].split('<span class="hc').slice(1).map(c => ({ids: ids(c), sx: (/<i class="raw">([^<]*)<\/i>/.exec(c) || [0, null])[1],
+          text: strip(c.replace(/^[^>]*>/, "").replace(/<i class="raw">[^<]*<\/i>/, ""))})); };
+      return {main: (chips("main") || []).filter(c => c.ids.length), alt: chips("alt"), v: mult(b), raw: b, text: strip(b)};
+    });
+    const rec = cut("rec"), all = cut("recAll");
+    // cmpRows — 🔍 비교는 걸린 시트 행마다 한 덩어리다(답이 둘이면 둘)
+    return {html, sheet, sheetText: strip(sheet), blocks, rec: four(rec), recV: mult(rec),
+            all: all ? four(all) : null, allV: all ? mult(all) : 0, cmp: cut("cmp") ? strip(cut("cmp").split("</div>")[0]) : null,
+            cmpRows: cut("cmp") ? cut("cmp").split('<div class="cmprow">').slice(1).map(s => strip(s.split("</div>")[0])) : []};
+  };
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const comps = JSON.parse(run(CTX_KO, "JSON.stringify(SHEET_COMPS)"));
+  const HNko = id => E.byId[id].kr;
 
-  // 시트 행이면 **시트 칸을 그대로 채운다**(2026-09-13, 사용자 결정: 상한 없음).
-  // 그래서 여기서 재는 것은 "얼마나 맞췄나"가 아니라 **얼마를 포기했나**다.
-  let changed = 0, loss = 0, worst = 0, first0 = 0, first1 = 0, hit0 = 0, hit1 = 0, tot = 0;
-  let cellHit = 0, cellHit0 = 0, cellHitAll = 0, cellTot = 0;
-  // 픽 4명을 칸 4개에 **최대로** 배정한다. 앞에서부터 그리디로 채우면 순수 계산 쪽이
-  // 순서 때문에 억울하게 낮게 잡힌다 — 두 모드를 같은 잣대로 재야 비교가 성립한다.
+  // ── 데이터: 시트 원문 필드 ──
+  ok(comps.length === 60, "SHEET_COMPS 는 시트 편성 행 60개다", String(comps.length));
+  ok(comps.every(c => typeof c.lb === "string" && /\d+\/\d+/.test(c.lb)), "60행 전부 시트 행 라벨(lb)을 갖고 있다");
+  ok(comps.every(c => (c.meta ? 1 : 0) === (/META/.test(c.lb) ? 1 : 0)), "meta:1 == 라벨에 META 가 적힌 행");
+  ok(comps.filter(c => c.meta).length === 5, "시트 라벨이 META 인 행은 5개다", String(comps.filter(c => c.meta).length));
+  {
+    const bad = comps.filter(c => c.ao && !(same(c.ao.filter(a => typeof a === "number"), (c.alt || []).map((_, i) => i)) &&
+      c.ao.every(a => typeof a === "number" || (typeof a === "string" && a.length > 0))));
+    ok(bad.length === 0, "ao(대안 칸의 시트 순서)가 alt 인덱스를 빠짐없이 순서대로 싣는다", bad.map(c => c.lb).join(" | "));
+    const free = comps.flatMap(c => (c.ao || []).filter(a => typeof a === "string"));
+    note("자유 문구 대안 칸 " + free.length + "개: " + [...new Set(free)].join(" · ") + " · 비고가 있는 행 " + comps.filter(c => c.c).length);
+    ok(free.length === 30, "시트의 자유 문구 대안 칸(or 25% · 20% ones) 30개를 원문 그대로 실었다", String(free.length));
+    const noKo = comps.filter(c => c.c && !run(CTX_KO, "SHEET_NOTE_KO[" + JSON.stringify(c.c) + "]"));
+    ok(noKo.length === 0, "비고(c)마다 한국어 옮김이 있다", noKo.map(c => c.c).join(" | "));
+    const withAlt = comps.filter(c => c.alt && c.alt.length);
+    ok(withAlt.length >= 45, "시트의 Alternative 칸이 실려 있다", withAlt.length + "행");
+    const badId = [];
+    comps.forEach(c => (c.alt || []).forEach(cell => cell.forEach(id => { if (!E.byId[id]) badId.push(c.g + ":" + id); })));
+    ok(badId.length === 0 && comps.every(c => !c.alt || c.alt.every(cell => cell.length > 0)), "alt 의 영웅 id 가 전부 실재하고 빈 칸이 없다", badId.join(", "));
+  }
+
+  // ── 데이터 == 시트 원문 (2026-11-11 리뷰) ──
+  // 위 검사들은 SHEET_COMPS 가 **자기 자신과** 맞는지만 본다. 아래 ① 도 화면을 SHEET_COMPS 와 대조하므로, 데이터가 시트와 다르면
+  // 둘 다 통과한다. 여기가 **시트 원문과** 맞는지 보는 자리다 — 정답지는 data.xlsx 의 TSV 사본에서 자동 생성한 fixtures-sheet.mjs.
+  // (예전에는 이 대조가 tools/sim/01-xlsx-diff.mjs 에만 있어서 커밋 전 검사 밖이었다.)
+  const FREE = /^or 25%|^20% ones/i;                                                          // 영웅 이름이 아닌 자유 문구
+  const LEGEND = ["Jessie*", "Sergey**"];                                                     // 시트 범례가 정의한 표기
+  const spread = raw => /\*/.test(raw) || raw.split("/").length !== SHEET_TOKENS[raw].length;   // 이름 하나가 여러 영웅으로 펴진 칸
+  {
+    ok(SHEET_RAW.length === comps.length, "시트 원문 정답지도 60행이다", SHEET_RAW.length + " vs " + comps.length);
+    ok(SHEET_RAW.every(r => r.j.every(Boolean) && r.alt.every(Boolean)), "시트의 빈칸은 행 끝에만 있다 (가운데가 비면 칸 번호가 밀린다)");
+    const bad = [];
+    SHEET_RAW.forEach((raw, k) => {
+      const c = comps[k], tag = "G" + raw.g + " " + raw.lb, miss = [];
+      if (!c) { bad.push(tag + " → 행 없음"); return; }
+      if (c.g !== raw.g) miss.push("g");
+      if (c.lb !== raw.lb) miss.push("lb");
+      if ((c.c || "") !== raw.c) miss.push("c");
+      if (!same(c.rs, SHEET_RATIOS[raw.lb])) miss.push("rs");
+      if (!same(c.l, raw.l.split(/[&,]/).map(s => SHEET_TOKENS[s.trim()]))) miss.push("l");
+      if (!same(c.j, raw.j.map(s => SHEET_TOKENS[s]))) miss.push("j");
+      const jx = {}; raw.j.forEach((s, i) => { if (s && spread(s)) jx[i] = s; });
+      if (!same(c.jx || {}, jx)) miss.push("jx");
+      // 대안 칸 — 영웅 칸은 alt, 자유 문구는 ao 에 원문 그대로, 순서는 시트 순서
+      if (!same(c.alt || [], raw.alt.filter(s => !FREE.test(s)).map(s => SHEET_TOKENS[s]))) miss.push("alt");
+      let ai = 0; const seq = raw.alt.map(s => FREE.test(s) ? s : ai++);
+      if (!same(c.ao || (c.alt || []).map((_, i) => i), seq)) miss.push("ao");
+      if (!!c.ao !== raw.alt.some(s => FREE.test(s))) miss.push("ao 유무");
+      const ax = {}; ai = 0; raw.alt.forEach(s => { if (!s || FREE.test(s)) return; if (spread(s)) ax[ai] = s; ai++; });
+      if (!same(c.ax || {}, ax)) miss.push("ax");
+      if (miss.length) bad.push(tag + " → " + miss.join(","));
+    });
+    ok(bad.length === 0, "SHEET_COMPS 60행이 시트 원문과 한 행씩 같다 (라벨 · 리더 · 병비 · 조이너 칸 · 원문 표기 · 대안 순서 · 비고)", bad.slice(0, 5).join(" | "));
+    const cnt = {}; comps.forEach(c => [c.jx, c.ax].forEach(o => Object.values(o || {}).forEach(s => { cnt[s] = (cnt[s] || 0) + 1; })));
+    note("이름을 펴서 실은 칸의 시트 원문 표기: " + Object.keys(cnt).sort().map(k => k + " ×" + cnt[k]).join(" · "));
+    ok(Object.keys(cnt).filter(k => !LEGEND.includes(k)).sort().join() === "Jessie,Jessie**,Jessies",
+       "범례에 없는 표기는 아는 셋(별표 없는 Jessie · Jessie** · Jessies)뿐이다 — 새 표기가 생기면 어떻게 읽을지부터 정할 것", Object.keys(cnt).join(" · "));
+
+    // 시트 머리말 — SHEET_TIPS 의 원문은 시트에 실제로 있는 줄이어야 하고, 지침·범례를 빠뜨리지 않아야 한다
+    const tips = JSON.parse(run(CTX_KO, "JSON.stringify(SHEET_TIPS)"));
+    const notHead = tips.filter(t => !SHEET_HEAD.includes(t[0])).map(t => t[0].slice(0, 50));
+    ok(notHead.length === 0, "SHEET_TIPS 의 원문이 전부 시트 머리말에 실제로 있는 줄이다 (합치거나 고쳐 쓰지 않았다)", notHead.join(" | "));
+    // 머리말에 있는데 안 실은 줄은 아는 셋뿐이어야 한다: 링크 화살표("<") · 제목("Legend") · 같은 범례의 짧은 표기(표 아래 것이 더 완전하다)
+    const SKIP = ["<", "Legend", "*Jessie = Jasser or Jeronimo"];
+    const left = SHEET_HEAD.filter(h => !tips.some(t => t[0] === h) && !SKIP.includes(h));
+    ok(left.length === 0 && tips.length === SHEET_HEAD.length - SKIP.length, "시트 머리말의 지침·범례를 빠짐없이 실었다", tips.length + "항목 · 빠진 줄: " + left.join(" | "));
+    ok(tips.every(t => t[1] && /[가-힣]/.test(t[1])), "머리말 항목마다 한국어 옮김이 있다");
+    ok(/8명/.test((tips.find(t => /^T12/.test(t[0])) || [0, ""])[1]), "T12 지침 옮김이 '최대 8명' 조건을 빠뜨리지 않는다");
+    // 비고 옮김 — 원문이 밝히지 않은 것을 단정하지 않는다
+    const ko = k => run(CTX_KO, "SHEET_NOTE_KO[" + JSON.stringify(k) + "]") || "";
+    ok(!/무명의 스킬|상대의 스킬/.test(ko("Wu Ming to counter his skills damages")) && !/편성/.test(ko("Little skills damage, Reina is okay")),
+       "비고 옮김이 'his' 가 누구인지 · 누구의 스킬 데미지가 적은지를 지어내지 않는다");
+    // 원문이 쉼표로만 이은 두 구를 인과로 잇지 않고, 뜻이 불분명한 문장에 조건("~일 때")을 지어내지 않는다 (2026-11-11 독립 검증)
+    ok(!/적어|때문|이라서|므로/.test(ko("Little skills damage, Reina is okay")), "'Little skills damage, Reina is okay' 를 인과로 옮기지 않는다", ko("Little skills damage, Reina is okay"));
+    { const k = "No Patrick as Eleonora has Health already. *Reina is no Rufus but Xura";
+      ok(!/일 때|이면|경우/.test(ko(k)) && /원문/.test(ko(k)), "'*Reina is no Rufus but Xura' 에 조건을 지어내지 않고 원문을 보라고 적는다", ko(k)); }
+  }
+
+  // ── ① 시트 카드는 시트 행을 한 칸도 안 바꾼다 — 60행 전수(행마다 첫 리더·첫 병비) ──
+  // 칸 순서 · 칸 안의 이름 · 대안 칸의 순서(자유 문구 포함) · 비고가 SHEET_COMPS 와 같아야 한다.
+  // 쌍둥이 행(칸이 같은 두 행)은 블록 하나로 접히므로 "어느 블록이든 이 행과 같다" 로 본다.
+  {
+    const bad = [], badV = [], badRaw = [], badName = [];
+    let multi = 0;
+    for (const c of comps) {
+      const lead = c.l.map(x => x[0] || "");
+      const a = page(lead, c.rs[0], c.g);
+      a.js("globalThis.__r0=render;render=function(d){globalThis.__d=d;return __r0(d);}");
+      const v = view(a.render());
+      const seq = c.ao || (c.alt || []).map((_, i) => i);
+      const hit = v.blocks.find(b => same(b.main.map(x => x.ids), c.j) &&
+        same((b.alt || []).map(x => x.ids.length ? x.ids : x.text), seq.map(x => typeof x === "number" ? c.alt[x] : x)) &&
+        (!c.c || b.text.includes(run(CTX_KO, "SHEET_NOTE_KO[" + JSON.stringify(c.c) + "]")) && b.text.includes(c.c)));
+      if (!hit) { bad.push("G" + c.g + " " + c.lb); continue; }
+      // 그 블록의 배율 = 그 칸들을 우리 공식(scoreAtoms)에 넣은 값. 칸에 이름이 여럿이면 그중 어느 조합의 값이어야 한다.
+      const cand = JSON.parse(a.js("(function(){const d=__d,z=id=>d.rank.find(q=>q.h.id===id);" +
+        "const f=l=>scoreAtoms(d.base.concat.apply(d.base,l.map(id=>z(id).at))).s/d.s0;" +
+        "let sets=[[]];" + JSON.stringify(c.j) + ".forEach(cell=>{const n=[];sets.forEach(s=>cell.forEach(id=>n.push(s.concat([id]))));sets=n;});" +
+        "return JSON.stringify(sets.map(f));})()"));
+      if (!cand.some(x => x.toFixed(3) === hit.v.toFixed(3))) badV.push("G" + c.g + " " + c.lb + " 화면 ×" + hit.v + " vs " + cand.map(x => x.toFixed(3)).join("/"));
+      // 이름을 펴서 실은 칸에는 **시트 원문 표기**가 같이 실려야 한다 — 칸 자리도 글자도 jx · ax 그대로.
+      const tag = "G" + c.g + " " + c.lb;
+      const wantJ = c.j.map((_, i) => (c.jx || {})[i] || null), wantA = seq.map(x => typeof x === "number" ? (c.ax || {})[x] || null : null);
+      if (!same(hit.main.map(x => x.sx), wantJ) || !same((hit.alt || []).map(x => x.sx), wantA)) badRaw.push(tag + " 칩 표기");
+      const all = wantJ.concat(wantA).filter(Boolean), ours = all.filter(s => !LEGEND.includes(s));
+      const rn = strip((/data-k="raw">([\s\S]*?)<\/p>/.exec(hit.raw) || [0, ""])[1]);
+      // 표기가 있으면 설명 문단이 있고, 범례에 없는 표기(별표 없는 Jessie 등)는 "우리 해석" 이라고 밝힌다. 범례 표기뿐이면 그 말을 붙이지 않는다.
+      if (!!all.length !== !!rn || (all.length && !all.every(s => rn.includes(s))) || (ours.length > 0) !== /우리 해석/.test(rn)) badRaw.push(tag + " 설명 문단");
+      // 이름이 여럿인 칸 — "배율은 X 기준" 의 X 가 실제로 그 칸의 이름이고, X 로 잰 값이 화면 배율이어야 한다
+      if (c.j.some(cell => cell.length > 1)) {
+        multi++;
+        const named = ((/배율은 <b>([^<]*)<\/b> 기준/.exec(hit.raw) || [0, ""])[1]).split("·").filter(Boolean);
+        const picked = c.j.map(cell => cell.length === 1 ? cell[0] : cell.find(id => named.includes(HNko(id))));
+        if (picked.some(x => !x)) badName.push(tag + " 안내 이름 [" + named.join(",") + "]");
+        else {
+          const val = a.js("(function(){const d=__d,z=id=>d.rank.find(q=>q.h.id===id);return scoreAtoms(d.base.concat.apply(d.base," + JSON.stringify(picked) + ".map(id=>z(id).at))).s/d.s0;})()");
+          if (val.toFixed(3) !== hit.v.toFixed(3)) badName.push(tag + " [" + named.join(",") + "] 로 재면 ×" + val.toFixed(3) + " ≠ 화면 ×" + hit.v);
+        }
+      }
+    }
+    ok(bad.length === 0, "시트 카드가 60행 전부를 칸·대안·비고 그대로 싣는다", bad.slice(0, 4).join(" | "));
+    ok(badV.length === 0, "시트 카드의 전투 배율이 그 칸들을 공식에 넣은 값과 같다 (" + multi + "행은 이름이 여럿인 칸)", badV.slice(0, 3).join(" | "));
+    ok(badRaw.length === 0, "이름을 펴서 실은 칸마다 시트 원문 표기가 같이 실리고, 범례에 없는 표기는 우리 해석이라고 밝힌다", badRaw.slice(0, 4).join(" | "));
+    ok(badName.length === 0, "'배율은 X 기준' 의 X 가 그 칸의 이름이고, X 로 잰 값이 화면 배율과 같다", badName.slice(0, 3).join(" | "));
+  }
+
+  // 모든 SHEET_ROWS 가 SHEET_COMPS 에서 찾아져야 한다 — 안 되면 두 표가 어긋난 것이다
+  {
+    let matched = 0;
+    for (const row of SHEET_ROWS)
+      if (page(row.lead, row.r, row.gen).js("!!matchComp(" + JSON.stringify(row.lead) + ",norm(" + row.r.join(",") + ")," + row.gen + ")")) matched++;
+    ok(matched === SHEET_ROWS.length, "SHEET_ROWS 가 전부 SHEET_COMPS 에서 찾아진다 (두 표가 어긋나지 않았다)", matched + "/" + SHEET_ROWS.length);
+  }
+
+  // ── ②③ 계산 카드 — 시트 행을 안 보는가 · 시트 칸에 얼마나 떨어지는가 ──
+  // 픽 4명을 칸 4개에 **최대로** 배정한다(한 명은 한 칸만).
   const maxFill = (picks, cells) => {
     let best = 0;
     const go = (used, i, n) => {
@@ -1253,363 +1411,61 @@ section("애매하면 시트 우선");
     go(cells.map(() => 0), 0, 0);
     return best;
   };
-  for (const row of SHEET_ROWS) {
-    const off = pick(row, 0), on = pick(row, 1);
-    if (off.ids.join() !== on.ids.join()) changed++;
-    const d = (off.v - on.v) / off.v * 100;
-    loss += d; if (d > worst) worst = d;
-    if (row.top.some(x => off.ids.includes(x))) first0++;
-    if (row.top.some(x => on.ids.includes(x))) first1++;
-    for (const j2 of row.pri) { tot++; if (off.ids.includes(j2)) hit0++; if (on.ids.includes(j2)) hit1++; }
-    // 시트 「칸」 기준 — 이게 이 기능이 실제로 하는 일이다
-    const a = boot("ko").leaders(row.lead[0] || "", row.lead[1] || "", row.lead[2] || "").mine(row.r);
-    // 화면과 같은 행을 봐야 한다 — gcap 을 빼면 다른 세대 행이 잡힌다(2026-09-13 버그)
-    const c = JSON.parse(a.js("JSON.stringify(matchComp(" + JSON.stringify(row.lead) +
-      ",norm(" + row.r.join(",") + ")," + row.gen + "))"));
-    if (c) {
-      cellHit += maxFill(on.ids, c.j);      // 시트 우선 ON — 베낀 것이므로 100% 가 당연하다
-      cellHit0 += maxFill(off.ids, c.j);    // 시트 우선 OFF (시트 등재 풀 안에서)
-      cellHitAll += maxFill(off.all, c.j);  // 전체 풀 — 시트를 어느 쪽으로도 안 본다
-      cellTot += c.j.length;
-    }
-  }
-  note("명단이 바뀐 행 " + changed + "/" + SHEET_ROWS.length +
-       " · 배율 손실 평균 " + (loss / SHEET_ROWS.length).toFixed(2) + "% · 최대 " + worst.toFixed(1) + "%");
-  // ⚠️ 이 두 줄을 붙여 읽지 말 것 — 같은 칸을 재지만 **묻는 게 다르다.**
-  //   위: 시트를 베끼도록 만들어 놓고 베꼈는지 본다 → 100% 가 나오는 게 당연하다(순환논).
-  //   아래: 시트를 전혀 안 보고 계산만으로 골랐을 때 시트 칸에 얼마나 떨어지는가 → 이게 일치율이다.
-  // 예전에는 위 줄만 "시트 칸 적중 100.0%" 로 찍혀서 로그만 보면 "다 맞았다" 로 읽혔다(2026-09-13).
-  note("시트 칸 복사 확인 (SHEET_EDGE=1) " + cellHit + "/" + cellTot +
-       " (" + (cellHit / cellTot * 100).toFixed(1) + "%) — 순환논 · 검증 아님");
-  // ⚠️ "순수 계산" 이라고만 쓰면 과장이다 — 칸 내용은 안 베끼지만 **후보 풀이 시트 파생**이다
-  // (poolS = s:1 = 시트 조이너 명단 · stack:1 = 시트가 두 칸 이상 적은 영웅).
-  // 필터를 떼면 64.9% → 54.8% 로 내려간다. 그래서 두 줄로 나눠 찍는다(2026-09-14 검증 지적).
-  note("진짜 일치   (SHEET_EDGE=0 · 시트 등재 풀 안에서) " + cellHit0 + "/" + cellTot +
-       " (" + (cellHit0 / cellTot * 100).toFixed(1) + "%)");
-  note("진짜 일치   (전체 풀 #recAll · 시트를 아예 안 봄) " + cellHitAll + "/" + cellTot +
-       " (" + (cellHitAll / cellTot * 100).toFixed(1) + "%)");
-  note("(참고 · 검증 아님) 시트 #1 재현 " + (first0 / SHEET_ROWS.length * 100).toFixed(1) + "% → " +
-       (first1 / SHEET_ROWS.length * 100).toFixed(1) + "% · 겹침 " +
-       (hit0 / tot * 100).toFixed(1) + "% → " + (hit1 / tot * 100).toFixed(1) + "%");
-  // 시트 칸은 거의 다 채워야 한다. 못 채우는 칸은 리더 중복처럼 **넣을 수 없는** 자리뿐이다.
-  // 이건 회귀 검사다 — matchComp 이나 pick4 의 시트 따라가기가 깨지면 여기서 잡힌다.
-  // **모델이 시트와 맞는지 보는 검사가 아니다.** 그건 바로 아래 줄이다.
-  // 2026-11-10: 97 → 90. 앞서 넣은 조이너와 같은 영웅·같은 버킷인 칸은 그대로 베끼지 않고 따져 본다(사용자 결정) —
-  // 실측 92.5%(17칸이 바뀐다). 안 겹치는 칸은 여전히 전부 베껴야 하므로 이 하한이 그 회귀를 잡는다.
-  ok(cellHit / cellTot >= 0.90, "시트 따라가기가 시트 칸을 90% 이상 베낀다 (복사 확인 · 검증 아님 · 겹치는 칸은 따져 본다)",
-     (cellHit / cellTot * 100).toFixed(1) + "%");
-  // 진짜 하한선. 순수 모델이 시트에서 멀어지면 여기가 먼저 내려간다.
-  // 실측에서 여유를 두고 잡았다 — 올라가면 하한선도 같이 올린다.
-  // ⚠️ 0.60 은 너무 느슨했다 — 회귀 6종을 심어 보니 1종만 걸렸다(2026-09-14 검증).
-  // 0.63 이면 「탐욕 대신 상위4 자르기」·「투자 문턱 뒤집기」까지 잡히고 여유가 4칸 남는다.
-  // 2026-10-10 두 칸 합산 + NA_SHARE 0.6 으로 65.9 → 70.7% 가 되어 0.68 로 올렸다(여유 5칸).
-  ok(cellHit0 / cellTot >= 0.68, "시트 등재 풀 안의 순수 계산이 시트 칸의 68% 이상에 떨어진다",
-     (cellHit0 / cellTot * 100).toFixed(1) + "%");
-  // ⚠️ 위 지표는 `#rec` 을 읽으므로 **bk·AH 계열 회귀를 구조적으로 못 잡는다** — 플린트 같은
-  // 시트 미등재 영웅이 밀려들어도 `poolS` 밖이라 안 보이기 때문이다. 그래서 전체 풀도 같이 잰다.
-  ok(cellHitAll / cellTot >= 0.50, "전체 풀 순수 계산도 시트 칸의 50% 이상에 떨어진다",
-     (cellHitAll / cellTot * 100).toFixed(1) + "%");
-  // 대가에는 상한을 안 걸기로 했다(사용자 결정). 다만 **터무니없어지면** 알아야 하므로
-  // 감시선만 남긴다. 실측 37.6% — 가장 큰 자리는 G6 60/40/0 제로니모·레니·그렉 이고,
-  // 레니의 Nightmare Trace(X 추가딜, v=1.0, 포화 없음)가 ×1.690 이라 순수 계산이 크게 앞선다.
-  // **리더 중복을 허용하면서 드러난 자리다** — 예전에는 자기 행에서 레니를 못 뽑아 가려져 있었다.
-  ok(worst <= 45, "시트를 따르는 대가가 45% 를 넘는 행은 없다", worst.toFixed(1) + "%");
-  ok(changed >= 10, "시트 행에서 실제로 판단이 바뀐다", String(changed));
-  ok(hit1 > hit0 && first1 >= first0, "따르게 했으니 시트와 더 가까워진다", hit1 + " vs " + hit0);
-
-  // ① 시트에 없는 편성에서는 아무 일도 일어나지 않아야 한다
-  const odd = {lead: ["flint", "mia", "bradley"], r: [33, 34, 33], gen: 17};
   {
-    const a = boot("ko").leaders(odd.lead[0], odd.lead[1], odd.lead[2]).mine(odd.r);
-    ok(!a.js("!!matchComp(" + JSON.stringify(odd.lead) + ",norm(" + odd.r.join(",") + ")," + odd.gen + ")"),
-       "시트에 없는 조합은 매칭되지 않는다");
-    ok(pick(odd, 0).ids.join() === pick(odd, 0.02).ids.join(),
-       "매칭이 없으면 시트 우선이 결과를 바꾸지 않는다", pick(odd, 0.02).ids.join());
-  }
-  // ①b 같은 리더·병비를 쓰는 행이 두 세대에 있으면 **세대가 맞는 쪽**을 잡아야 한다.
-  // 예전에는 gcap 을 안 봐서 먼저 나온 Gen 7 행이 이겼고, 시트가 Gen 8 에 적어 둔 헨드릭 대신
-  // Gen 7 의 패트릭이 나왔다. gcap 을 넘는 행은 아예 안 쓰고, 남은 것 중 세대가 가장 높은 행을 쓴다.
-  {
-    const lead = ["jeronimo", "mia", "bradley"], rr = [48, 4, 48];
-    const at = g => {
-      const a = boot("ko").leaders(lead[0], lead[1], lead[2]).mine(rr);
-      return JSON.parse(a.js("JSON.stringify(matchComp(" + JSON.stringify(lead) +
-        ",norm(" + rr.join(",") + ")," + g + "))"));
-    };
-    ok(at(7) && at(7).g === 7, "Gen 7 로 놓으면 Gen 7 행이 잡힌다", at(7) && String(at(7).g));
-    ok(at(8) && at(8).g === 8, "Gen 8 로 놓으면 Gen 8 행이 잡힌다 (예전엔 Gen 7 이 이겼다)",
-       at(8) && String(at(8).g));
-    ok(!at(6), "Gen 6 로 놓으면 (그 리더 조합의 행이 Gen 7 부터라) 안 잡힌다");
-    // 그 결과가 실제 추천에 나타난다 — 시트 Gen 8 행의 4번 칸은 헨드릭이다
-    const a = boot("ko").leaders(lead[0], lead[1], lead[2]).mine(rr);
-    a.el("gcap").value = "8";
-    const html = a.render(), af = html.slice(html.indexOf('id="rec"'));
-    const ids = [...(/<p><b>([\s\S]*?)<\/b><\/p>/.exec(af) || ["", ""])[1]
-      .matchAll(/heroes\/([a-z-]+)\.webp/g)].map(m => m[1]);
-    ok(ids.includes("hendrik"),
-       "Gen 8 제로니모·미아·브레들리 48/4/48 에서 헨드릭이 들어간다 (시트 Gen 8 행의 칸)", ids.join(","));
-  }
-  // ② 리더는 맞는데 병비가 멀면 매칭되지 않는다 (허용 오차 6)
-  {
-    const a = boot("ko").leaders("logan", "philly", "zinman").mine([10, 10, 80]);
-    ok(!a.js('!!matchComp(["logan","philly","zinman"],norm(10,10,80),3)'),
-       "리더가 같아도 병비가 멀면 매칭되지 않는다");
-  }
-  const HNko = id => E.byId[id].kr;
-  // ②a-3 겹쳐 넣은 영웅의 장당 한계 배율을 **이 편성의 실제 값**으로 찍는가 (2026-09-13)
-  //      예전에는 문단이 "둘째 장도 자기끼리 포화한다" 고 주장만 하고, 숫자는 일반론이거나
-  //      다른 편성 예시였다. 노라 3장을 받은 사람이 자기 2·3장째를 화면에서 못 봤다.
-  {
-    const a = boot("ko").leaders("jeronimo", "mia", "gwen").mine([48, 4, 48]);
-    a.el("gcap").value = "7";
-    const html = a.render();
-    const line = a.paras().filter(x => x.includes("↘"))[0] || "";
-    ok(line.includes("노라"), "겹쳐 넣은 영웅의 장당 값 문단이 뜬다", line.slice(0, 80));
-    const mg = [...line.matchAll(/×([\d.]+)/g)].map(m => +m[1]);
-    // 2026-11-10: 시트는 노라 3장이지만 겹치는 칸은 따져 본다 — (2026-11-11: 셋째 장부터만 따진다) 3장째 ×1.205 가 필리 ×1.232 에 밀린다.
-    ok(mg.length === 2, "노라는 2장만 남는다 — 값이 둘 찍힌다", mg.join(","));
-    const sw = /id="swaps">([\s\S]*?)<\/p>/.exec(html);
-    ok(!!sw && /노라<\/b> ×1.205 → <b>필리<\/b> ×1\.232/.test(sw[1]), "바꾼 칸과 두 값이 화면에 찍힌다 (노라 ×1.205 → 필리 ×1.232)", sw ? sw[1].replace(/<[^>]+>/g, "").slice(0, 120) : "없음");
-    ok(mg.every((v, i) => i === 0 || v < mg[i - 1]),
-       "장마다 값이 줄어든다 (포화가 실제로 반영돼 있다)", mg.join(" → "));
-    // 핵심 교차검증 — 첫 장의 값은 ⑤ 순위표의 그 영웅 배율과 같아야 한다.
-    // 다르면 둘 중 하나가 다른 것을 재고 있다는 뜻이다(영웅의 스킬을 전부 먹여서
-    // 재면 여기가 어긋난다 — 실제로 그렇게 잘못 재어 본 적이 있다).
-    // ⚠️ 초상은 리더 표에도 나온다. **× 가 들어 있는 행만** 봐야 한다 — 그냥 첫 <tr> 를
-    // 잡으면 그 영웅이 리더인 케이스에서 엉뚱한 행을 읽는다(2026-09-14 지적).
-    let cells = [];
-    for (const part of html.split("<tr").filter(x => x.includes("norah.webp"))) {
-      const m = [...("<tr" + part).split("</tr>")[0].matchAll(/×([\d.]+)/g)].map(x => +x[1]);
-      if (m.length) { cells = m; break; }
-    }
-    ok(cells.length > 0 && Math.abs(cells[cells.length - 1] - mg[0]) < 1e-9,
-       "첫 장의 값이 ⑤ 순위표의 그 영웅 배율과 같다 (S1 하나만 센다)",
-       "표 " + cells[cells.length - 1] + " vs 문단 " + mg[0]);
-    // 겹치지 않는 편성에서는 문단 자체가 없어야 한다
-    const b = boot("ko").leaders("logan", "philly", "zinman").mine([60, 40, 0]);
-    b.el("gcap").value = "3";
-    ok(b.paras().filter(x => x.includes("↘")).length === 0,
-       "겹치는 영웅이 없으면 그 문단이 안 뜬다");
-    // 영어
-    const e = boot("en").leaders("jeronimo", "mia", "gwen").mine([48, 4, 48]);
-    e.el("gcap").value = "7";
-    const el = e.paras().filter(x => x.includes("↘"))[0] || "";
-    ok(el.includes("Norah") && !/[가-힣]/.test(el),
-       "영어 화면에도 뜨고 한글이 새지 않는다", el.slice(0, 80));
-  }
-
-  // ②a-2 시트의 Alternative 칸 — 실어는 두되 판정에는 절대 안 들어간다 (2026-09-13)
-  //     예전에는 이 정보가 데이터에 아예 없어서, 시트가 "넷을 못 구하면 이것도" 라고
-  //     적어 준 69칸이 통째로 버려져 있었다. 화면에만 띄우고 순위에는 안 쓴다.
-  {
-    const rows = E.SHEET_COMPS;
-    const withAlt = rows.filter(c => c.alt && c.alt.length);
-    note("Alternative 칸을 실은 행 " + withAlt.length + "/" + rows.length +
-         " · 칸 " + withAlt.reduce((a, c) => a + c.alt.length, 0) + "개");
-    ok(withAlt.length >= 45, "시트의 Alternative 칸이 실려 있다", withAlt.length + "행");
-    // 영웅 id 가 실재하는가 — 오타 하나면 화면에 undefined 가 찍힌다
-    const badId = [];
-    rows.forEach(c => (c.alt || []).forEach(cell => cell.forEach(id => {
-      if (!E.byId[id]) badId.push(c.g + ":" + id);
-    })));
-    ok(badId.length === 0, "alt 의 영웅 id 가 전부 실재한다", badId.join(", "));
-    // 빈 칸을 실어 두면 화면에 빈 볼드가 찍힌다
-    ok(rows.every(c => !c.alt || c.alt.every(cell => cell.length > 0)),
-       "alt 에 빈 칸이 없다");
-
-    // ⚠️ 핵심: alt 는 판정에 일절 안 들어간다.
-    //    alt 에만 있고 j 에는 없는 영웅이 추천에 뽑히면, 그건 alt 때문이 아니라
-    //    계산이 원래 고른 것이어야 한다 — alt 를 지워도 결과가 같아야 한다는 뜻이다.
-    const row = rows.find(c => c.alt && c.alt.length &&
-      c.alt.some(cell => cell.some(id => !c.j.flat().includes(id))));
-    ok(!!row, "alt 에만 있는 영웅이 있는 행이 존재한다 (검사가 헛돌지 않는다)");
-    if (row) {
-      const pick = strip => {
-        const a = boot("ko").leaders(row.l[0][0] || "", row.l[1][0] || "", row.l[2][0] || "").mine(row.rs[0]);
-        a.el("gcap").value = String(row.g);
-        if (strip) a.js("SHEET_COMPS.forEach(c=>{delete c.alt;})");
-        const html = a.render();
-        const i = html.indexOf('id="rec"');
-        const b = /<p><b>([\s\S]*?)<\/b><\/p>/.exec(html.slice(i));
-        return b ? [...b[1].matchAll(/heroes\/([a-z-]+)\.webp/g)].map(m => m[1]).join(",") : "";
-      };
-      ok(pick(false) === pick(true),
-         "alt 를 통째로 지워도 추천이 그대로다 (판정에 안 들어간다)",
-         pick(false) + " vs " + pick(true));
-    }
-
-    // 화면 — 있는 행에는 뜨고, 없는 행에는 안 뜬다. 한/영 양쪽.
-    const seeK = (lang, lead, r, g) => {
-      const a = boot(lang).leaders(lead[0], lead[1], lead[2]).mine(r);
-      a.el("gcap").value = String(g);
-      return a.paras().filter(x => x.includes("🔁"));
-    };
-    const p1 = seeK("ko", ["jeronimo", "molly", "zinman"], [60, 40, 0], 1);
-    ok(p1.length === 1 && p1[0].includes("제시") && p1[0].includes("서윤"),
-       "대체 조이너 문단이 한국어로 뜬다", p1[0] || "없음");
-    const p2 = seeK("en", ["jeronimo", "molly", "zinman"], [60, 40, 0], 1);
-    ok(p2.length === 1 && p2[0].includes("Jessie") && p2[0].includes("Seo-yoon"),
-       "대체 조이너 문단이 영어로 뜬다 (한글이 새지 않는다)", p2[0] || "없음");
-    ok(!/[가-힣]/.test(p2[0] || ""), "영어 화면의 대체 조이너 문단에 한글이 없다", p2[0] || "");
-    // 대체 칸이 없는 행(g3 로건·필리·진먼)에서는 문단 자체가 없어야 한다
-    ok(seeK("ko", ["logan", "philly", "zinman"], [60, 40, 0], 3).length === 0,
-       "대체 칸이 없는 행에는 그 문단이 안 뜬다");
-    // 순위에 안 들어간다는 문구를 지우면 안 된다 — 이게 이 문단의 요점이다
-    ok((p1[0] || "").includes("순위 계산에는 넣지 않았습니다"),
-       "'순위에 안 넣는다' 는 단서가 문단에 남아 있다");
-
-    // ⚠️ 시트가 답을 둘 적어 둔 자리에서 **대표 행의 alt 만** 뜨던 결함 (2026-09-14 검증에서 발견).
-    // ⚖️ 문단은 나머지 행의 j 를 그대로 보여 주는데 alt 는 조용히 사라지고 있었다 —
-    // g12 60/20/20 은 대표(#53 META)의 alt 가 노라뿐이라 #47 의 "가토" 가 화면에서 증발했다.
-    // "우리가 몰래 고르지 않습니다" 라고 적어 둔 문단 옆에서 alt 만 몰래 고르던 셈이다.
-    {
-      const rows2 = rows.filter(c => c.g === 12 && c.rs.some(v => v.join("/") === "60/20/20"));
-      const union = [...new Set(rows2.flatMap(c => (c.alt || []).flat()))];
-      ok(rows2.length === 2 && union.length >= 2,
-         "g12 60/20/20 은 답이 둘이고 두 행의 alt 가 서로 다르다 (검사가 헛돌지 않는다)",
-         rows2.length + "행 · alt " + union.join(","));
-      const q = boot("ko").leaders("herbjorg", "lloyd", "ligeia").mine([60, 20, 20]);
-      q.el("gcap").value = "12";
-      const seen2 = q.paras().filter(x => x.includes("🔁"))[0] || "";
-      const missing = union.filter(id => !seen2.includes(HNko(id)));
-      ok(missing.length === 0,
-         "답이 둘인 자리에서 두 행의 대체 조이너가 **모두** 뜬다",
-         "빠진 것: " + missing.map(HNko).join(",") + " · 문단: " + seen2.slice(0, 90));
-    }
-  }
-
-  // ②b 시트가 한 입력에 답을 둘 적어 둔 자리 — 감추지 않고 드러내는가 (2026-09-13)
-  //     발견 경위: 시트 CSV 를 다시 파싱해 SHEET_COMPS 와 대조하다 나왔다.
-  //     matchComp 이 하나만 돌려주던 시절엔 배열에서 먼저 나온 행이 조용히 이겼다.
-  {
-    const comps = JSON.parse(run(CTX_KO, "JSON.stringify(SHEET_COMPS)"));
-    // 2026-11-10 시트 재수집: Gen 5 헥터·노라·린 +1 · Gen 13 +5 → 60
-    ok(comps.length === 60, "SHEET_COMPS 는 시트 편성 행 60개다", String(comps.length));
-    const metas = comps.filter(c => c.meta);
-    ok(metas.length === 5, "시트 라벨이 META 인 행 5개에 meta:1 이 붙어 있다 (Gen 13 둘 추가)", String(metas.length));
-
-    // g12 60/20/20 은 시트에 두 줄이고, META 쪽 칸(가토)이 채워져야 한다.
-    // 2026-09-12 수집 때 이 행을 중복으로 오분류해서 통째로 빠뜨렸다.
-    {
-      const a = boot("ko").leaders("herbjorg", "lloyd", "ligeia").mine([60, 20, 20]);
-      a.el("gcap").value = "12";
-      const n = a.js('matchComps(["herbjorg","lloyd","ligeia"],norm(60,20,20),12).length');
-      ok(n === 2, "g12 60/20/20 에 시트 행이 둘 걸린다", String(n));
-      ok(a.js('matchComp(["herbjorg","lloyd","ligeia"],norm(60,20,20),12).meta===1'),
-         "동률이면 시트가 META 라고 적은 행을 쓴다");
-      const html = a.render(), after = html.slice(html.indexOf('id="rec"'));
-      const b = /<p><b>([\s\S]*?)<\/b><\/p>/.exec(after);
-      const ids = [...b[1].matchAll(/heroes\/([a-z-]+)\.webp/g)].map(m => m[1]);
-      ok(ids.includes("gatot"), "그래서 META 행의 가토가 추천에 들어간다", ids.join(","));
-      ok(/시트가 이 편성에 답을 2개 적어 뒀습니다/.test(after), "다른 답이 있다고 화면이 알린다");
-      ok(/노라/.test((/⚖️[\s\S]{0,300}/.exec(after.replace(/<[^>]+>/g, "")) || [""])[0]),
-         "알림에 나머지 답(노라 쪽)이 실제로 적힌다");
-    }
-    // g8 60/40/0 — 가토로 고르면 시트의 Defense 행과 Offense 행에 둘 다 걸린다.
-    // 공/수 라벨로는 못 가른다(전무는 영웅에 붙어 있어 같은 3인조는 같은 side 다) →
-    // 우리가 고르지 않고 드러낸다. 대안 리더로만 드러나는 자리라 53행 스윕이 못 잡았다.
-    {
-      const a = boot("ko").leaders("gatot", "sonya", "bradley").mine([60, 40, 0]);
-      a.el("gcap").value = "8";
-      const n = a.js('matchComps(["gatot","sonya","bradley"],norm(60,40,0),8).length');
-      ok(n === 2, "g8 60/40/0 가토에 시트 행이 둘 걸린다", String(n));
-      ok(/시트가 이 편성에 답을 2개 적어 뒀습니다/.test(a.render()), "그 사실을 화면이 알린다");
-      // 에디스로 고르면 Offense 행 하나만 걸리므로 알림이 없어야 한다
-      const e = boot("ko").leaders("edith", "sonya", "bradley").mine([60, 40, 0]);
-      e.el("gcap").value = "8";
-      ok(!/답을 \d+개 적어 뒀습니다/.test(e.render()), "한 행만 걸리면 알림이 안 뜬다");
-    }
-    // 병비가 맞는 행이 없으면 **리더가 같은 행**을 안내한다 (2026-10-10, 사용자 요청).
-    // 아모세·필리·린 60/40 — 시트는 그 셋을 50/2/48 에만 적어 뒀는데 화면이 침묵해서 "왜 시트랑 달라?" 가 나왔다.
-    {
-      const a = boot("ko").leaders("ahmose", "philly", "lynn").mine([60, 40, 0]);
-      a.el("gcap").value = "4";
-      const html = a.render();
-      ok(a.js('matchComps(["ahmose","philly","lynn"],norm(60,40,0),4).length') === 0, "아모세·필리·린 60/40 은 시트 행이 없다");
-      const near = JSON.parse(a.js('JSON.stringify(nearComps(["ahmose","philly","lynn"],4).map(c=>c.rs))'));
-      ok(near.length === 1 && near[0][0].join("/") === "50/2/48", "리더가 같은 행은 Gen 4 50/2/48 하나다", JSON.stringify(near));
-      const hint = /📍[\s\S]*?<\/p>/.exec(html);
-      ok(!!hint && /50\/2\/48/.test(hint[0]) && /미야 · 패트릭 · 제시\/제셀\/제로니모 · 서윤/.test(hint[0]) && /대체 진먼/.test(hint[0]),
-         "📍 안내가 그 행의 병비·조이너·대체 칸을 적는다", hint ? hint[0].replace(/<[^>]+>/g, "").slice(0, 160) : "없음");
-      // 안내는 판정이 아니다 — #rec 은 여전히 순수 계산이어야 한다(시트 칸 미아·패트릭·제시·서윤을 베끼지 않는다)
-      const st = html.indexOf('id="rec"');
-      const ids = [...html.slice(st, html.indexOf("</b>", st)).matchAll(/heroes\/([a-z-]+)\.webp/g)].map(m => m[1]);
-      ok(ids.join() !== "mia,patrick,jessie,seoyoon", "안내만 하고 칸을 베끼지는 않는다", ids.join(","));
-      ok(!/📋 이 편성은/.test(html), "시트 행 문단(📋)은 안 뜬다");
-      // 병비를 그 값으로 두면 안내 대신 시트 행이 잡힌다
-      const b = boot("ko").leaders("ahmose", "philly", "lynn").mine([50, 2, 48]);
-      b.el("gcap").value = "4";
-      const hb = b.render();
-      ok(!/📍/.test(hb) && /📋 이 편성은/.test(hb), "50/2/48 로 두면 안내가 사라지고 시트 행이 잡힌다");
-      // 세대 상한을 넘는 행은 안내하지 않는다 (matchComps 와 같은 기준)
-      const c = boot("ko").leaders("ahmose", "philly", "lynn").mine([60, 40, 0]);
-      c.el("gcap").value = "3";
-      ok(!/📍/.test(c.render()), "gcap 3 이면 Gen 4 행을 안내하지 않는다");
-      // 시트에 아예 없는 리더 조합에는 안내할 것이 없다
-      const d = boot("ko").leaders("flint", "philly", "lynn").mine([60, 40, 0]);
-      d.el("gcap").value = "12";
-      ok(!/📍/.test(d.render()), "시트에 없는 리더 조합이면 안내가 없다");
-      // 영어 화면에도 한글이 남지 않는다
-      const e2 = boot("en").leaders("ahmose", "philly", "lynn").mine([60, 40, 0]);
-      e2.el("gcap").value = "4";
-      const he = /📍[\s\S]*?<\/p>/.exec(e2.render());
-      ok(!!he && !/[가-힣]/.test(he[0]) && /50\/2\/48/.test(he[0]), "영어 안내에 한글이 없다");
-    }
-    // 칸이 똑같은 행이 둘 걸리는 경우는 알릴 것이 없다 (g1 · g11)
-    {
-      const a = boot("ko").leaders("jeronimo", "molly", "zinman").mine([50, 20, 30]);
-      a.el("gcap").value = "1";
-      ok(a.js('matchComps(["jeronimo","molly","zinman"],norm(50,20,30),1).length') === 2,
-         "g1 50/20/30 도 두 행에 걸리지만");
-      ok(!/답을 \d+개 적어 뒀습니다/.test(a.render()), "칸이 같으면 알리지 않는다");
-    }
-    // 전수 조사 — 같은 입력에 칸이 다른 행이 걸리는 자리를 기계적으로 훑는다.
-    // 이 검사가 있어야 새 세대를 추가하다 같은 충돌을 또 만들어도 바로 드러난다.
-    //
-    // ⚠️ 이 자리를 오래 못 본 이유는 **스윕의 종류**였지 대안 여부가 아니었다(2026-09-13 정정).
-    // 53행 스윕은 "각 행을 그 행의 리더로 돌려 칸이 채워지는가"만 봤다. 그러면 대표로 잡히는
-    // 행이 자기 자신이거나(51/53), 다른 행이더라도 그 행의 칸이 같아서(2/53) **칸 적중이 언제나
-    // 만점**이 된다 — 채움 지표에는 신호가 뜰 자리가 없다. 실제로 그 스윕을 돌린 입력에서
-    // 이미 행이 둘 걸려 있었다. 부족했던 것은 데이터가 아니라 **질문**이고, 필요한 건 아래처럼
-    // "한 입력에 행이 둘 이상 걸리는가"를 묻는 스윕이다.
-    // (대안까지 밟는 것은 그와 별개로 더 튼튼한 것뿐이다 — g8 가토는 Defense 행의 첫 후보라
-    //  첫 후보만 밟아도 잡힌다. 대안 루프는 앞으로 대안으로만 드러날 충돌을 위한 보험이다.)
-    {
-      const found = [];
-      for (const c of comps) for (const rs of c.rs) {
-        // 리더 자리마다 **대안까지 전부** 밟는다
-        const alt = c.l.map(cell => cell.length ? cell : [""]);
-        for (const a0 of alt[0]) for (const a1 of alt[1]) for (const a2 of alt[2]) {
-          const q = JSON.stringify([a0, a1, a2]);
-          const hit = JSON.parse(run(CTX_KO,
-            "JSON.stringify(compRivals(matchComps(" + q + ",norm(" + rs.join(",") + ")," + c.g + ")).length)"));
-          if (hit > 0) found.push("g" + c.g + " " + rs.join("/") + " " + [a0, a1, a2].filter(Boolean).join("+"));
-        }
-      }
-      const uniq = [...new Set(found)];
-      note("시트가 답을 둘 이상 적어 둔 입력 " + uniq.length + "가지: " + uniq.join(" · "));
-      // 지금 아는 것은 g8 가토 계열과 g12 60/20/20 뿐이다. 늘어나면 알아야 한다.
-      // 리더까지 박는다 — 같은 세대·병비에 **다른 리더 조합**으로 새 충돌이 생기면 걸려야 한다
-      const KNOWN = ["g8 60/40/0 gatot+sonya+bradley", "g12 60/20/20 herbjorg+lloyd+ligeia"];
-      ok(uniq.every(s => KNOWN.indexOf(s) >= 0) && uniq.length === KNOWN.length,
-         "칸이 갈리는 자리는 아는 둘(g8 가토 · g12 60/20/20)뿐이다", uniq.join(" · "));
-      // 그리고 그 자리마다 화면이 실제로 알리는지 확인 (조용히 하나를 고르면 안 된다)
-      for (const s of uniq) {
-        const m = /^g(\d+) (\S+) (.+)$/.exec(s), ids = m[3].split("+");
-        const a = boot("ko").leaders(ids[0] || "", ids[1] || "", ids[2] || "")
-          .mine(m[2].split("/").map(Number));
-        a.el("gcap").value = m[1];
-        ok(/답을 \d+개 적어 뒀습니다/.test(a.render()), "화면이 알린다 — " + s);
+    let cellHit0 = 0, cellHitAll = 0, cellTot = 0, leak = [], badStack = [], nor2 = 0, nor3 = 0, lower = [], allLower = [], cmpBad = [];
+    let fairN = 0, fairSum = 0, fairMax = 0, unfair = 0;
+    for (const row of SHEET_ROWS) {
+      const tag = "G" + row.gen + " " + row.r.join("/") + " " + row.lead.join("+");
+      const a = page(row.lead, row.r, row.gen), v = view(a.render());
+      const c = JSON.parse(a.js("JSON.stringify(matchComp(" + JSON.stringify(row.lead) + ",norm(" + row.r.join(",") + ")," + row.gen + "))"));
+      // ② 걸리는 시트 행의 조이너 칸·대안을 엉뚱한 값으로 바꿔도 계산 카드는 그대로여야 한다.
+      //    (동률 타이브레이크의 근처 세대 빈도는 걸리는 행을 빼고 세므로, 이 행들만 바꾸면 계산에는 영향이 없어야 한다)
+      const b = page(row.lead, row.r, row.gen);
+      b.js("matchComps(" + JSON.stringify(row.lead) + ",norm(" + row.r.join(",") + ")," + row.gen + ").forEach(c=>{c.j=[['sergey'],['sergey'],['sergey'],['sergey']];c.alt=[['bahiti']];delete c.ao;})");
+      const w = view(b.render());
+      if (!same(v.rec, w.rec) || !same(v.all, w.all)) leak.push(tag);
+      ok(v.rec.length === 4, "계산 추천이 네 명이다 — " + tag, v.rec.join(","));
+      const all = v.all || v.rec;
+      if (c) { cellHit0 += maxFill(v.rec, c.j); cellHitAll += maxFill(all, c.j); cellTot += c.j.length; }
+      // 중복은 stack:1 영웅만
+      for (const list of [v.rec, all]) { const cnt = {}; list.forEach(i => { cnt[i] = (cnt[i] || 0) + 1; });
+        for (const id of Object.keys(cnt)) if (cnt[id] >= 2 && !E.byId[id].stack) badStack.push(tag + " " + id + "×" + cnt[id]); }
+      const nn = v.rec.filter(x => x === "norah").length; if (nn >= 2) nor2++; if (nn >= 3) nor3++;
+      // 전체 풀은 시트 등재 풀을 포함한다 → 배율이 낮을 수 없다
+      if (v.all && v.allV < v.recV - 5e-4) allLower.push(tag + " " + v.allV + "<" + v.recV);
+      // 시트 조합 vs 계산 추천 — 시트 조합은 계산이 고를 수 있는 범위 안에 있다(시트 등재 영웅 · 중복은 시트가 겹쳐 쓴 영웅뿐)
+      const sv = v.blocks[0] ? v.blocks[0].v : 0, got = v.blocks[0] ? v.blocks[0].main.length : 0;
+      const unsc = v.blocks[0] && /data-k="unscored"/.test(v.blocks[0].raw);
+      if (sv && got === 4 && !unsc) { const d = (v.recV / sv - 1) * 100; fairN++; fairSum += d; if (d > fairMax) fairMax = d; if (v.recV < sv - 5e-4) lower.push(tag + " 계산 ×" + v.recV + " < 시트 ×" + sv); }
+      else unfair++;
+      // 🔍 비교 문단의 숫자가 두 카드와 같아야 한다
+      if (c) {
+        const m = /(\d)칸 중 (\d)칸/.exec(v.cmp || "");
+        if (!m || +m[1] !== c.j.length || +m[2] !== maxFill(v.rec, c.j) || !v.cmp.includes("×" + sv.toFixed(3)) || !v.cmp.includes("×" + v.recV.toFixed(3)) ||
+            (/그대로 비교할 수 없습니다/.test(v.cmp) !== !(got === 4 && !unsc)) || v.cmpRows.length !== v.blocks.length) cmpBad.push(tag);
       }
     }
+    ok(leak.length === 0, "걸리는 시트 행의 칸을 바꿔도 계산 카드(#rec · #recAll)는 그대로다 — 시트 행을 안 본다", leak.slice(0, 3).join(" | "));
+    note("계산이 시트 칸에 떨어지는 비율 — 시트 등재 풀 " + cellHit0 + "/" + cellTot + " (" + (cellHit0 / cellTot * 100).toFixed(1) + "%) · 전체 풀 " +
+         cellHitAll + "/" + cellTot + " (" + (cellHitAll / cellTot * 100).toFixed(1) + "%)");
+    // 진짜 하한선. 순수 모델이 시트에서 멀어지면 여기가 먼저 내려간다. 실측에서 여유를 두고 잡았다.
+    // ⚠️ 0.60 은 너무 느슨했다 — 회귀 6종을 심어 보니 1종만 걸렸다(2026-09-14 검증). 2026-10-10 에 0.68 로 올렸다.
+    ok(cellHit0 / cellTot >= 0.68, "시트 등재 풀 안의 계산이 시트 칸의 68% 이상에 떨어진다", (cellHit0 / cellTot * 100).toFixed(1) + "%");
+    // ⚠️ 위 지표는 `#rec` 을 읽으므로 **bk 계열 회귀를 구조적으로 못 잡는다** — 플린트 같은 시트 미등재 영웅이 밀려들어도
+    // `poolS` 밖이라 안 보이기 때문이다. 그래서 전체 풀도 같이 잰다.
+    ok(cellHitAll / cellTot >= 0.50, "전체 풀 계산도 시트 칸의 50% 이상에 떨어진다", (cellHitAll / cellTot * 100).toFixed(1) + "%");
+    ok(badStack.length === 0, "stack:1 이 없는 영웅은 계산에서 중복으로 뽑히지 않는다", badStack.slice(0, 3).join(", "));
+    note("계산 추천에 노라 2장 이상 " + nor2 + "행 · 3장 이상 " + nor3 + "행");
+    ok(nor2 >= 3, "노라 둘째 장이 계산에서도 실제로 뽑히는 행이 있다 (stack 허용이 죽어 있지 않다)", String(nor2));
+    ok(allLower.length === 0, "전체 영웅 계산이 시트 등재만보다 낮은 행이 없다", allLower.slice(0, 3).join(" | "));
+    note("비교 가능한 " + fairN + "행(시트 4칸이 다 채워지고 전부 점수에 드는 행)에서 계산 추천이 시트 조합보다 평균 +" +
+         (fairSum / fairN).toFixed(2) + "% · 최대 +" + fairMax.toFixed(1) + "% · 비교 불가 " + unfair + "행(레니·무명 · 빈칸)");
+    ok(lower.length === 0, "우리 공식으로 재면 계산 추천이 시트 조합보다 낮은 행이 없다 (같은 풀 · 같은 공식)", lower.slice(0, 3).join(" | "));
+    ok(cmpBad.length === 0, "🔍 비교 문단의 칸 수·배율이 두 카드와 같고, 비교 불가인 행은 그렇게 적는다", cmpBad.slice(0, 4).join(" | "));
   }
-
-  // ③ 중복은 stack:1 인 영웅(노라)에게만 허용된다
+  // 시트가 겹쳐 쓰는 영웅 == stack:1 — 명단을 기억으로 박지 않고 SHEET_COMPS 에서 기계적으로 센다.
+  // 2026-09-13 까지 "노라 하나뿐"이라고 적어 뒀는데 Gen 1 두 행의 패트릭을 놓치고 있었다(사용자가 잡았다).
   {
-    // ⚠️ 명단을 기억으로 박지 않는다 — **SHEET_COMPS 에서 기계적으로 센다.**
-    // 2026-09-13 까지 "노라 하나뿐"이라고 적어 뒀는데 Gen 1 두 행의 패트릭을 놓치고 있었다.
-    // 사용자가 잡았다. 이 검사가 있으면 그런 누락이 다시 안 생긴다.
-    const comps = JSON.parse(run(CTX_KO, "JSON.stringify(SHEET_COMPS)"));
     const repeated = new Set();
     for (const c of comps) {
       const seen = {};
@@ -1617,68 +1473,220 @@ section("애매하면 시트 우선");
       for (const k of Object.keys(seen)) if (seen[k] >= 2 && k.indexOf("/") < 0) repeated.add(k);
     }
     const flagged = new Set(E.HEROES.filter(h => h.stack).map(h => h.id));
-    const missing = [...repeated].filter(x => !flagged.has(x));
-    const extra = [...flagged].filter(x => !repeated.has(x));
-    ok(missing.length === 0 && extra.length === 0,
-       "stack:1 이 붙은 영웅 == 시트가 한 행에서 겹쳐 쓴 영웅",
+    const missing = [...repeated].filter(x => !flagged.has(x)), extra = [...flagged].filter(x => !repeated.has(x));
+    ok(missing.length === 0 && extra.length === 0, "stack:1 이 붙은 영웅 == 시트가 한 행에서 겹쳐 쓴 영웅",
        (missing.length ? "빠짐: " + missing.join(",") : "") + (extra.length ? " 잉여: " + extra.join(",") : ""));
     note("시트가 겹쳐 쓰는 영웅: " + [...repeated].map(x => E.byId[x].kr).join(" · "));
-    let dupRows = 0;
-    const bad = [];
-    for (const row of SHEET_ROWS) for (const edge of [0, 1]) {
-      const ids = pick(row, edge).ids;
-      const cnt = {};
-      ids.forEach(i => { cnt[i] = (cnt[i] || 0) + 1; });
-      for (const id of Object.keys(cnt)) {
-        if (cnt[id] < 2) continue;
-        if (!E.byId[id].stack) bad.push("G" + row.gen + " " + row.r.join("/") + " " + id + "×" + cnt[id]);
-        else if (edge === 1 && id === "norah") dupRows++;
+  }
+
+  // ── ④ 시트에 없는 편성 · 세대 · 병비 ──
+  {
+    const odd = page(["flint", "mia", "bradley"], [33, 34, 33], 17), v = view(odd.render());
+    ok(!odd.js('!!matchComp(["flint","mia","bradley"],norm(33,34,33),17)'), "시트에 없는 조합은 매칭되지 않는다");
+    ok(v.blocks.length === 0 && /data-k="none"/.test(v.sheet) && /이 리더 조합은 시트에 없습니다/.test(v.sheetText) && v.cmp === null,
+       "시트에 없으면 시트 카드가 그렇게 말하고 비교 문단은 없다", v.sheetText.slice(0, 80));
+    ok(v.rec.length === 4, "그래도 계산 추천은 나온다", v.rec.join(","));
+    const one = view(page(["flint", "", ""], [60, 40, 0], 17).render());
+    ok(/리더를 둘 이상 고르면/.test(one.sheetText), "리더가 하나뿐이면 둘 이상 고르라고 안내한다");
+  }
+  // 같은 리더·병비를 쓰는 행이 두 세대에 있으면 **세대가 맞는 쪽**을 잡아야 한다(2026-09-13 버그).
+  // gcap 을 넘는 행은 아예 안 쓰고, 남은 것 중 세대가 가장 높은 행을 쓴다.
+  {
+    const lead = ["jeronimo", "mia", "bradley"], rr = [48, 4, 48];
+    const at = g => JSON.parse(page(lead, rr, g).js("JSON.stringify(matchComp(" + JSON.stringify(lead) + ",norm(" + rr.join(",") + ")," + g + "))"));
+    ok(at(7) && at(7).g === 7, "Gen 7 로 놓으면 Gen 7 행이 잡힌다", at(7) && String(at(7).g));
+    ok(at(8) && at(8).g === 8, "Gen 8 로 놓으면 Gen 8 행이 잡힌다 (예전엔 Gen 7 이 이겼다)", at(8) && String(at(8).g));
+    ok(!at(6), "Gen 6 로 놓으면 (그 리더 조합의 행이 Gen 7 부터라) 안 잡힌다");
+    const m8 = view(page(lead, rr, 8).render()).blocks[0].main.map(x => x.ids.join("/"));
+    const m7 = view(page(lead, rr, 7).render()).blocks[0].main.map(x => x.ids.join("/"));
+    ok(m8[3] === "hendrik" && m7[3] === "patrick", "시트 카드도 세대를 따라간다 — Gen 8 은 4번 칸이 헨드릭, Gen 7 은 패트릭", m8.join(",") + " / " + m7.join(","));
+    ok(!page(["logan", "philly", "zinman"], [10, 10, 80], 3).js('!!matchComp(["logan","philly","zinman"],norm(10,10,80),3)'),
+       "리더가 같아도 병비가 멀면 매칭되지 않는다");
+  }
+
+  // ── 겹친 영웅의 장당 값(↘) — 이 편성의 실제 값으로 찍는가 (2026-09-13) ──
+  {
+    const a = page(["jeronimo", "mia", "gwen"], [48, 4, 48], 7), html = a.render(), v = view(html);
+    const sline = (/data-k="stack">([\s\S]*?)<\/p>/.exec(v.blocks[0].raw) || [0, ""])[1];
+    const mg = [...strip(sline).matchAll(/×(\d+\.\d+)/g)].map(m => +m[1]);
+    ok(strip(sline).includes("노라") && mg.length === 3, "시트 카드: 노라 3칸이 그대로 실리고 장당 값이 셋 찍힌다", strip(sline).slice(0, 90));
+    ok(mg.every((x, i) => i === 0 || x < mg[i - 1]), "장마다 값이 줄어든다 (포화가 실제로 반영돼 있다)", mg.join(" → "));
+    // 핵심 교차검증 — 첫 장의 값은 단일 순위표의 그 영웅 배율과 같아야 한다(S1 하나만 센다).
+    // ⚠️ 초상은 리더 표에도 나온다. **× 가 들어 있는 행만** 본다.
+    let cells = [];
+    for (const part of html.slice(html.indexOf('id="single"')).split("<tr").slice(1).filter(x => x.includes("norah.webp"))) {
+      const m = [...("<tr" + part).split("</tr>")[0].matchAll(/×(\d+\.\d+)/g)].map(x => +x[1]);
+      if (m.length) { cells = m; break; }
+    }
+    ok(cells.length > 0 && Math.abs(cells[cells.length - 1] - mg[0]) < 1e-9, "첫 장의 값이 단일 순위표의 그 영웅 배율과 같다 (S1 하나만 센다)",
+       "표 " + cells[cells.length - 1] + " vs 문단 " + mg[0]);
+    // 계산 카드는 셋째 노라를 안 집는다 — 셋째 장 값(mg[2])보다 나은 영웅이 있어서다
+    const rn = v.rec.filter(x => x === "norah").length;
+    ok(rn <= 2, "계산 카드는 같은 편성에서 노라를 3장 쌓지 않는다", v.rec.join(","));
+    ok(page(["logan", "philly", "zinman"], [60, 40, 0], 3).paras().filter(x => x.includes("↘")).length === 0, "겹치는 영웅이 없으면 그 문단이 안 뜬다");
+    const el = page(["jeronimo", "mia", "gwen"], [48, 4, 48], 7, "en").paras().filter(x => x.includes("↘"))[0] || "";
+    ok(el.includes("Norah") && !/[가-힣]/.test(el), "영어 화면에도 뜨고 한글이 새지 않는다", el.slice(0, 80));
+  }
+
+  // ── 대안 칸 — 화면 ──
+  {
+    const g1 = view(page(["jeronimo", "molly", "zinman"], [60, 40, 0], 1).render());
+    ok(g1.blocks[0].alt && same(g1.blocks[0].alt.map(x => x.ids), [["jessie", "jasser", "jeronimo"], ["seoyoon"]]) && /제시/.test(g1.blocks[0].text) && /서윤/.test(g1.blocks[0].text),
+       "대안 칸이 한국어 이름으로 뜬다 (G1 — 제시*/서윤)", g1.blocks[0].alt && g1.blocks[0].alt.map(x => x.text).join(" | "));
+    const g1e = view(page(["jeronimo", "molly", "zinman"], [60, 40, 0], 1, "en").render());
+    ok(/Jessie/.test(g1e.sheetText) && /Seo-yoon/.test(g1e.sheetText) && !/[가-힣]/.test(g1e.sheetText), "영어 시트 카드에 한글이 없다",
+       (g1e.sheetText.match(/[가-힣][가-힣 ·]*/g) || []).slice(0, 3).join(" | "));
+    const g3 = view(page(["logan", "philly", "zinman"], [60, 40, 0], 3).render());
+    ok(g3.blocks[0].alt === null && /data-k="noalt"/.test(g3.blocks[0].raw), "대안 칸이 없는 행은 없다고 적는다");
+    ok(/계산 추천에는 넣지 않았습니다/.test(g1.sheetText), "'대안은 계산에 안 넣는다' 는 단서가 시트 카드에 있다");
+    // 자유 문구 — 원문 그대로, 시트 순서 그대로
+    const g2 = view(page(["jeronimo", "philly", "alonso"], [50, 20, 30], 2).render());
+    ok(same(g2.blocks[0].alt.map(x => x.ids.length ? x.ids.join("/") : x.text), ["patrick", "20% ones"]), "자유 문구 대안(20% ones)이 시트 순서 그대로 뜬다",
+       g2.blocks[0].alt.map(x => x.text).join(" | "));
+    ok(/우리 해석/.test(g2.blocks[0].text), "자유 문구를 어떻게 읽었는지는 우리 해석이라고 밝힌다");
+    // 이름이 여럿인 칸 — 칸은 하나고 그 안에 이름이 전부 보인다
+    ok(same(g3.blocks[0].main.map(x => x.ids), [["mia"], ["patrick"], ["jessie", "jasser", "jeronimo"], ["seoyoon"]]) && /이름이 여럿인 칸은 그중 한 명/.test(g3.blocks[0].text),
+       "제시* 칸은 한 칸에 세 이름이 다 보이고, 그중 한 명이라는 설명이 붙는다");
+    // 비고 — 한국어 옮김과 원문이 같이
+    const g13 = view(page(["gisela", "karol", "greg"], [60, 40, 0], 13).render());
+    ok(/그렉을 쓰면 패트릭은 넣지 않습니다/.test(g13.blocks[0].text) && /No Patrick if Greg/.test(g13.blocks[0].text), "비고가 한국어 옮김 + 원문으로 뜬다");
+    ok(/data-k="unscored"/.test(g13.blocks[0].raw) && /레니/.test(g13.blocks[0].text) && /그대로 비교할 수 없습니다/.test(g13.cmp),
+       "레니가 든 시트 조합은 배율에 못 넣었다고 밝히고 비교 불가로 적는다");
+    // 빈칸 — Gen 13 은 시트가 조이너 칸을 다 안 채웠다
+    const g13b = view(page(["gisela", "mia", "vulcanus"], [48, 4, 48], 13).render());
+    ok(g13b.blocks[0].main.length === 2 && /시트 빈칸/.test(g13b.blocks[0].text) && /조이너 2명만/.test(g13b.blocks[0].text), "시트가 비워 둔 칸은 빈칸으로 싣고 지어내지 않는다",
+       g13b.blocks[0].text.slice(0, 120));
+    // 비교가 안 되는 **이유를 있는 그대로** 적는다 — 빈칸 때문인지, 배율에 못 넣은 영웅 때문인지, 둘 다인지 (2026-11-11 리뷰:
+    // 예전에는 레니뿐인 행에도 "레니·무명" 이라고, 빈칸뿐인 행에도 "못 넣은 영웅이 있다" 고 적었다)
+    const g13c = view(page(["gisela", "flora", "vulcanus"], [60, 40, 0], 13).render());
+    ok(/배율에 넣지 못한 영웅\( 레니 \)이 있습니다/.test(g13.cmp) && !/무명/.test(g13.cmp) && !/칸만 채웠/.test(g13.cmp), "레니만 문제인 행 — 레니만 적는다 (무명·빈칸 얘기 없음)", g13.cmp.slice(-90));
+    ok(/조이너 칸을 2칸만 채웠습니다/.test(g13b.cmp) && !/넣지 못한 영웅/.test(g13b.cmp), "빈칸만 문제인 행 — 빈칸만 적는다", g13b.cmp.slice(-70));
+    ok(/조이너 칸을 3칸만 채웠고, 배율에 넣지 못한 영웅\( 레니 \)도 있습니다/.test(g13c.cmp), "둘 다인 행 — 둘 다 적는다", g13c.cmp.slice(-90));
+  }
+
+  // ── 시트가 한 입력에 답을 둘 적어 둔 자리 — 감추지 않고 둘 다 싣는다 (2026-09-13) ──
+  {
+    {
+      const a = page(["herbjorg", "lloyd", "ligeia"], [60, 20, 20], 12), v = view(a.render());
+      ok(a.js('matchComps(["herbjorg","lloyd","ligeia"],norm(60,20,20),12).length') === 2, "g12 60/20/20 에 시트 행이 둘 걸린다");
+      ok(a.js('matchComp(["herbjorg","lloyd","ligeia"],norm(60,20,20),12).meta===1'), "동률이면 시트가 META 라고 적은 행이 대표다");
+      ok(v.blocks.length === 2 && /META/.test(v.blocks[0].text) && v.blocks[0].main.some(x => x.ids[0] === "gatot") && v.blocks[1].main.some(x => x.ids[0] === "norah"),
+         "두 행이 각각 블록으로 뜬다 (META 행의 가토 · 다른 행의 노라)", v.blocks.map(b => b.main.map(x => x.ids.join("/")).join(",")).join(" | "));
+      ok(/시트가 이 편성에 답을 2개 적어 뒀습니다/.test(v.sheetText) && /우리도 고르지 않고/.test(v.sheetText), "답이 둘이라고 알리고 고르지 않는다고 적는다");
+      const union = [...new Set(comps.filter(c => c.g === 12 && c.rs.some(x => x.join("/") === "60/20/20")).flatMap(c => (c.alt || []).flat()))];
+      const shown = [...new Set(v.blocks.flatMap(b => (b.alt || []).flatMap(x => x.ids)))];
+      ok(union.length >= 2 && union.every(id => shown.includes(id)), "답이 둘인 자리에서 두 행의 대안이 모두 뜬다", "빠진 것: " + union.filter(id => !shown.includes(id)).map(HNko).join(","));
+      ok(v.blocks.every(b => b.v > 0), "두 블록 모두 배율이 붙는다", v.blocks.map(b => b.v).join(" / "));
+      // 🔍 비교도 **행마다** 한다 — 대표 행 하나만 비교하면 위의 "고르지 않는다" 와 어긋난다 (2026-11-11 리뷰)
+      ok(v.cmpRows.length === 2 && v.cmpRows.every((t, i) => /\d칸 중 \d칸/.test(t) && t.includes("시트 조합 ×" + v.blocks[i].v.toFixed(3)) && t.includes("계산 추천 ×" + v.recV.toFixed(3))),
+         "비교 문단이 행마다 있고 각자 그 행의 배율을 쓴다", v.cmpRows.map(t => t.slice(0, 60)).join(" | "));
+      ok(/META/.test(v.cmpRows[0]) && /60\/20\/20/.test(v.cmpRows[0]) && !/META/.test(v.cmpRows[1]) && v.blocks[0].v !== v.blocks[1].v, "비교 문단마다 어느 행인지 라벨이 붙는다 (두 행의 배율이 실제로 다르다)");
+      // 규칙 칩도 두 행의 조합을 모두 본다 — 대표 행(가토)과 다른 행(노라)이 둘 다 넘어가야 한다
+      const b = page(["herbjorg", "lloyd", "ligeia"], [60, 20, 20], 12);
+      b.js("globalThis.__j0=joinerRules;joinerRules=function(){globalThis.__ja=[].slice.call(arguments);return __j0.apply(null,arguments);}"); b.render();
+      const seen = JSON.parse(b.js("JSON.stringify(__ja[6])")), rows = b.js("__ja[7].rows.length");
+      ok(seen.includes("gatot") && seen.includes("norah") && rows === 2, "규칙 칩이 보는 시트 조합은 걸린 행 전부의 합집합이다", seen.join(","));
+    }
+    {
+      const v = view(page(["gatot", "sonya", "bradley"], [60, 40, 0], 8).render());
+      ok(v.blocks.length === 2 && /답을 2개 적어 뒀습니다/.test(v.sheetText), "g8 60/40/0 가토에도 시트 행이 둘 걸리고 둘 다 뜬다");
+      const e = view(page(["edith", "sonya", "bradley"], [60, 40, 0], 8).render());
+      ok(e.blocks.length === 1 && !/답을 \d+개 적어 뒀습니다/.test(e.sheetText), "한 행만 걸리면 알림이 안 뜬다");
+    }
+    {
+      const a = page(["jeronimo", "molly", "zinman"], [50, 20, 30], 1), v = view(a.render());
+      ok(a.js('matchComps(["jeronimo","molly","zinman"],norm(50,20,30),1).length') === 2, "g1 50/20/30 도 두 행에 걸리지만");
+      ok(v.blocks.length === 1 && !/답을 \d+개 적어 뒀습니다/.test(v.sheetText), "칸이 같으면 블록 하나로 접고 알리지 않는다");
+      // 접더라도 시트가 그 편성을 다른 라벨로도 적었다는 사실은 남긴다 (2026-11-11 리뷰 — 접힌 행의 라벨이 화면에서 사라졌다)
+      const tw = strip((/data-k="twin">([\s\S]*?)<\/p>/.exec(v.blocks[0].raw) || [0, ""])[1]);
+      ok(v.blocks[0].text.includes("Defense - 60/40/0 or 60/10/30 or 50/20/30") && tw.includes("Offense - 50/20/30 or 30/20/50") && v.cmpRows.length === 1,
+         "접힌 쌍둥이 행의 라벨을 같이 보여 준다 (G1 — Defense 행 + Offense 행)", tw);
+      const g11 = view(page(["eleonora", "lloyd", "bradley"], [60, 40, 0], 11).render());
+      ok(g11.blocks.length === 1 && strip((/data-k="twin">([\s\S]*?)<\/p>/.exec(g11.blocks[0].raw) || [0, ""])[1]).includes("Offense & Defense - 60/40/0"),
+         "G11 엘레오노라·로이드·브레들리 60/40 — 'Offense & Defense' 행 라벨도 보인다");
+      ok(!/data-k="twin"/.test(view(page(["logan", "philly", "zinman"], [60, 40, 0], 3).render()).sheet), "쌍둥이가 없으면 그 문단이 없다");
+      const e = view(page(["jeronimo", "molly", "zinman"], [50, 20, 30], 1, "en").render());
+      ok(/data-k="twin"/.test(e.sheet) && !/[가-힣]/.test(e.sheetText), "영어 화면에도 뜨고 한글이 새지 않는다");
+    }
+    // 전수 조사 — 같은 입력에 칸이 다른 행이 걸리는 자리를 **리더 대안 × 병비 전부** 밟아 기계적으로 훑는다.
+    // ⚠️ 이 자리를 오래 못 본 이유는 스윕의 종류였다: "각 행을 그 행의 리더로 돌려 칸이 채워지는가" 만 보면 신호가 뜰 자리가 없다.
+    // 필요한 건 "한 입력에 행이 둘 이상 걸리는가" 를 묻는 스윕이다(2026-09-13).
+    {
+      const found = [], lost = [], twinSet = new Set();
+      for (const c of comps) for (const rs of c.rs) {
+        const alt = c.l.map(cell => cell.length ? cell : [""]);
+        for (const a0 of alt[0]) for (const a1 of alt[1]) for (const a2 of alt[2]) {
+          const q = "matchComps(" + JSON.stringify([a0, a1, a2]) + ",norm(" + rs.join(",") + ")," + c.g + ")";
+          // [칸이 다른 행 수, 걸린 행 수, 화면에 실리는 행 수(대표 + 다른 행 + 그 쌍둥이들)]
+          const [hit, n, shown] = JSON.parse(run(CTX_KO, "(function(){const all=" + q + ",rv=compRivals(all),rows=all.length?[all[0]].concat(rv):[];" +
+            "return JSON.stringify([rv.length,all.length,rows.reduce((s,c)=>s+1+compTwins(all,c).length,0)]);})()"));
+          const tag = "g" + c.g + " " + rs.join("/") + " " + [a0, a1, a2].filter(Boolean).join("+");
+          if (hit > 0) found.push(tag);
+          if (n > 1 && hit === 0) twinSet.add(tag);
+          if (shown !== n) lost.push(tag + " (" + shown + "/" + n + ")");
+        }
+      }
+      // 걸린 행은 블록으로든 쌍둥이 라벨로든 **전부** 화면에 나와야 한다 — 조용히 사라지는 행이 없어야 한다
+      ok(lost.length === 0, "걸린 시트 행이 하나도 빠짐없이 화면에 실린다 (블록 또는 쌍둥이 라벨)", lost.slice(0, 4).join(" | "));
+      note("칸·대안·비고가 완전히 같아 접히는 입력(쌍둥이) " + twinSet.size + "가지: " + [...twinSet].join(" · "));
+      const uniq = [...new Set(found)];
+      note("시트가 답을 둘 이상 적어 둔 입력 " + uniq.length + "가지: " + uniq.join(" · "));
+      const KNOWN = ["g8 60/40/0 gatot+sonya+bradley", "g12 60/20/20 herbjorg+lloyd+ligeia"];
+      ok(uniq.every(s => KNOWN.indexOf(s) >= 0) && uniq.length === KNOWN.length, "칸이 갈리는 자리는 아는 둘(g8 가토 · g12 60/20/20)뿐이다", uniq.join(" · "));
+      for (const s of uniq) {
+        const m = /^g(\d+) (\S+) (.+)$/.exec(s), l = m[3].split("+");
+        const v = view(page(l, m[2].split("/").map(Number), +m[1]).render());
+        ok(/답을 \d+개 적어 뒀습니다/.test(v.sheetText) && v.blocks.length >= 2, "화면이 알리고 전부 싣는다 — " + s);
       }
     }
-    ok(bad.length === 0, "stack:1 이 없는 영웅은 중복으로 뽑히지 않는다", bad.slice(0, 3).join(", "));
-    ok(dupRows >= 3, "노라 중복이 실제로 쓰이는 행이 있다 (예외가 죽어 있지 않다)", String(dupRows));
-    let three = 0;
-    for (const row of SHEET_ROWS) {
-      const ids = pick(row, 1).ids;
-      if (ids.filter(x => x === "norah").length >= 3) three++;
-    }
-    // 2026-11-10: 예전엔 "3장을 그대로 따른다(≥3행)" 였다. 지금은 겹치는 칸을 따져 보므로 셋째 노라(계산상 손해)는 안 남는다.
-    ok(three === 0, "시트가 노라를 3칸 적어도 셋째 장은 따져 보고 바꾼다 (3장 행 0)", String(three));
-    note("시트 우선 상태에서 노라 2장 이상 " + dupRows + "행 · 3장 이상 " + three + "행");
   }
-  // ③b 보조 패널(#recAll)은 **시트를 전혀 안 본** 순수 계산이어야 한다.
-  // 그래야 "시트를 따르느라 얼마를 포기했는지"가 화면에 보인다. 노라 3장 행은 그 차이가 8% 다.
+
+  // ── 병비가 맞는 행이 없으면 리더가 같은 행을 안내한다 (2026-10-10, 사용자 요청) ──
+  // 아모세·필리·린 60/40 — 시트는 그 셋을 50/2/48 에만 적어 뒀는데 화면이 침묵해서 "왜 시트랑 달라?" 가 나왔다.
   {
-    // 2026-11-10: 노라 3장 행(magnus+mia+hendrik)은 이제 겹침 판단으로 순수 계산과 같아져 보조 패널이 안 뜬다.
-    // 시트를 따르느라 포기하는 자리는 **레니 칸**(버킷 미확정 · 배율 1)이 남는다 → 그 행으로 본다.
-    const row = {lead: ["magnus", "sonya", "bradley"], r: [60, 40, 0], gen: 9};
-    const a = boot("ko").leaders(row.lead[0], row.lead[1], row.lead[2]).mine(row.r);
-    a.el("gcap").value = String(row.gen);
-    const html = a.render();
-    const i = html.indexOf('id="recAll"');
-    ok(i > 0, "시트가 레니를 적은 행에서는 보조 패널이 뜬다 (추천과 다르니까)");
-    const alt = [...html.slice(i, html.indexOf("</b>", i)).matchAll(/heroes\/([a-z-]+)\.webp/g)].map(m => m[1]);
-    // 둘째 노라는 순수 계산에서도 이득이면 뽑힌다(stack:1 · CLAUDE.md 「중복은 stack 인 영웅에게만」).
-    // 2026-09-14 미아 Lucky Charm 이 A→B 로 옮겨가 A칸이 낮아지자 이 행도 그렇게 됐다. 막는 것은 **3장**이다.
-    ok(alt.filter(x => x === "norah").length <= 2,
-       "보조 패널은 시트를 안 보므로 노라를 3장 쌓지 않는다", alt.join(","));
-    const pureV = +(/전투 배율 ×([\d.]+)/.exec(html.slice(i)) || [0, 0])[1];
-    const recV = +(/전투 배율 ×([\d.]+)/.exec(html.slice(html.indexOf('id="rec"'))) || [0, 0])[1];
-    ok(pureV > recV, "그 행에서 순수 계산이 추천보다 높다 — 포기한 양이 화면에 보인다",
-       "순수 " + pureV + " vs 추천 " + recV);
-    note("레니 칸 행의 대가: 추천 ×" + recV + " vs 순수 계산 ×" + pureV +
-         " (" + ((1 - recV / pureV) * 100).toFixed(1) + "% 포기)");
+    const a = page(["ahmose", "philly", "lynn"], [60, 40, 0], 4), v = view(a.render());
+    ok(a.js('matchComps(["ahmose","philly","lynn"],norm(60,40,0),4).length') === 0, "아모세·필리·린 60/40 은 시트 행이 없다");
+    const near = JSON.parse(a.js('JSON.stringify(nearComps(["ahmose","philly","lynn"],4).map(c=>c.rs))'));
+    ok(near.length === 1 && near[0][0].join("/") === "50/2/48", "리더가 같은 행은 Gen 4 50/2/48 하나다", JSON.stringify(near));
+    ok(/data-k="near"/.test(v.sheet) && v.blocks.length === 1 && /50\/2\/48/.test(v.blocks[0].text) &&
+       same(v.blocks[0].main.map(x => x.ids), [["mia"], ["patrick"], ["jessie", "jasser", "jeronimo"], ["seoyoon"]]) && same(v.blocks[0].alt.map(x => x.ids), [["zinman"]]),
+       "📍 안내가 그 행의 병비·조이너·대안을 그대로 싣는다", v.blocks[0] ? v.blocks[0].text.slice(0, 140) : "없음");
+    ok(v.blocks[0].v === 0 && v.cmp === null, "병비가 다른 행에는 배율도 비교 문단도 붙이지 않는다");
+    ok(/data-r="50,2,48"/.test(v.sheet), "그 병비로 바로 옮겨 가는 버튼이 있다");
+    const b = view(page(["ahmose", "philly", "lynn"], [50, 2, 48], 4).render());
+    ok(!/data-k="near"/.test(b.sheet) && b.blocks.length === 1 && b.blocks[0].v > 0 && b.cmp !== null, "50/2/48 로 두면 안내가 사라지고 시트 행이 잡힌다");
+    ok(/data-k="none"/.test(view(page(["ahmose", "philly", "lynn"], [60, 40, 0], 3).render()).sheet), "gcap 3 이면 Gen 4 행을 안내하지 않는다");
+    ok(/data-k="none"/.test(view(page(["flint", "philly", "lynn"], [60, 40, 0], 12).render()).sheet), "시트에 없는 리더 조합이면 안내가 없다");
+    const e2 = view(page(["ahmose", "philly", "lynn"], [60, 40, 0], 4, "en").render());
+    ok(/data-k="near"/.test(e2.sheet) && !/[가-힣]/.test(e2.sheetText) && /50\/2\/48/.test(e2.sheetText), "영어 안내에 한글이 없다");
   }
-  // ④ 사용자가 잡은 자리: 로건·필리·진먼 60/40/0 Gen 3 → 시트는 미아·패트릭·제시*·서윤
+
+  // ── 걷어낸 것이 되살아나지 않았는가 ──
   {
-    const row = {lead: ["logan", "philly", "zinman"], r: [60, 40, 0], gen: 3};
-    const on = pick(row, 1);
-    ok(on.ids.includes("patrick") && on.ids.includes("mia") &&
-       on.ids.includes("seoyoon") && on.ids.some(x => ["jessie", "jasser", "jeronimo"].includes(x)),
-       "로건·필리·진먼 60/40 에서 시트의 네 칸을 그대로 채운다", on.ids.join(","));
-    // 제시 칸을 두 명이 먹지 않는다
-    ok(on.ids.filter(x => ["jessie", "jasser", "jeronimo"].includes(x)).length === 1,
-       "제시* 칸은 한 명만 채운다 (평평하게 펴면 둘이 들어가던 자리)", on.ids.join(","));
+    const h = page(["jeronimo", "mia", "gwen"], [48, 4, 48], 5).render();
+    ok(!/id="swaps"|id="recEff"|id="recEffSame"/.test(h) && !/SHEET_EDGE|fillCells/.test(src("render.js").replace(/\/\/[^\n]*/g, "")),
+       "혼합 추천(시트 칸 우선 + 셋째 장 교체 · SHEET_EDGE)의 흔적이 화면·코드에 없다");
+    const iS = h.indexOf('id="sheet"'), iR = h.indexOf('id="rec"'), iC = h.indexOf('id="cmp"'), iT = h.indexOf('id="single"');
+    ok(iS > 0 && iS < iR && iR < iC && iC < iT, "순서: 시트 카드 → 계산 카드 → 비교 → 단일 순위표", [iS, iR, iC, iT].join(","));
+    ok(/시트 머리말/.test(h) && /Mixing 4 different joiners/.test(h), "시트 머리말 지침(원문)이 실려 있다");
+    const nTips = run(CTX_KO, "SHEET_TIPS.length"), tipsHtml = h.slice(h.indexOf('id="tips"'));
+    ok((tipsHtml.match(/<li>/g) || []).length === nTips && /This joiners are GENERIC suggestions\./.test(tipsHtml) && /최대 8명/.test(tipsHtml),
+       "시트 머리말 접기에 항목이 전부(" + nTips + "개) 실린다", String((tipsHtml.match(/<li>/g) || []).length));
+    // 계산 카드가 시트에서 무엇을 가져오고 무엇을 안 보는지 — 뭉뚱그려 "시트를 안 본다" 고 적지 않는다 (2026-11-11 리뷰)
+    const scope = strip((/data-k="scope">([\s\S]*?)<\/p>/.exec(h) || [0, ""])[1]);
+    ok(/이 편성에 걸리는 시트 행\(시트 카드의 조합\)은 보지 않습니다/.test(scope) && /조이너 명단/.test(scope) && /완전히 같은 후보끼리의 순서/.test(scope) && /등장 빈도/.test(scope),
+       "계산 카드가 '걸리는 행은 안 보고, 명단과 동률 순서의 빈도만 시트에서 온다' 고 정확히 적는다", scope.slice(0, 120));
+    ok(!/시트의 행\(시트 카드\)은 보지 않습니다|시트 명단도 보지 않고/.test(h), "'시트를 전혀 안 본다' 로 읽히는 옛 문구가 없다");
+    // 시트에서 오는 것은 셋이다 — 명단 · 중복 허용(stack) · 동률 순서. "명단과 빈도뿐" 이라고 적으면 stack 을 빠뜨린다 (2026-11-11 독립 검증).
+    // 이름은 데이터에서 읽는다: stack 이 붙은 영웅이 바뀌면 문구도 따라 바뀌어야 한다.
+    const stackKr = JSON.parse(run(CTX_KO, "JSON.stringify(HEROES.filter(h=>h.stack).map(h=>h.kr))"));
+    ok(stackKr.length >= 1 && /시트에서 가져오는 것은 셋/.test(scope) && stackKr.every(n => scope.includes(n)) && !/빈도뿐/.test(scope),
+       "계산 카드가 중복 허용 영웅(" + stackKr.join("·") + ")도 시트에서 온다고 적는다 — '명단과 빈도뿐' 이 아니다", scope.slice(100, 260));
+    // 전체 영웅 카드는 두 추천이 다를 때만 뜬다 — 반드시 뜨는 편성으로 본다(안 뜨면 그것부터 실패). 플린트·미아·브레들리 48/4/48 gcap 17.
+    const hAll = boot("ko").mode("rally").leaders("flint", "mia", "bradley").gear(10).gcap(17).mine([48, 4, 48]).render();
+    const allCard = (/id="recAll"[\s\S]*?(?=id="(?:cmp|rules|combos)")/.exec(hAll) || [""])[0];   // 카드 안에 표(div)가 있어 첫 닫는 div 로 자르면 안 된다
+    ok(allCard.length > 0 && /두 장 이상 넣을 수 있는 영웅과 완전 동률일 때의 순서는 위와 같은 기준/.test(strip(allCard)),
+       "전체 영웅 카드도 중복 허용·동률 기준이 같다고 적는다", allCard ? strip(allCard).slice(-160) : "#recAll 이 안 떴다");
   }
 }
 
@@ -1756,45 +1764,41 @@ section("버킷 이론 (2026-11-10)");
   ok(best >= greedy - 5e-4, "전수 탐색 #1 ≥ 계산 순위 그대로(탐욕)", best.toFixed(4) + " vs " + greedy);
   ok(/id="combos"/.test(html) && /id="bmap"/.test(html), "버킷 점유 맵과 Top 5 패널이 렌더된다");
   ok(/data-code="LV5"/.test(html), "규칙 레이어 LV5 칩이 항상 뜬다");
-  // ── 겹치는 시트 칸은 따져 본다 (2026-11-10 사용자 결정) ──
+  // ── 시트 카드는 겹치는 칸도 그대로 싣고, 계산 카드는 따로 고른다 (2026-11-11 시트/계산 분리) ──
+  // 2026-11-10 의 "겹치는 시트 칸은 따져 보고 바꾼다"(🔀)는 없어졌다 — 시트는 한 칸도 안 바꾼다.
   {
-    const rec = (lead, ratio, g) => { const h = boot("ko").mode("rally").leaders(...lead).gear(10).gcap(g).mine(ratio).render();
-      const i = h.indexOf('id="rec"'), j = h.indexOf("전투 배율", i);
-      return {ids: [...h.slice(i, j).matchAll(/heroes\/([a-z-]+)\.webp/g)].map(m => m[1]), v: +/×([\d.]+)/.exec(h.slice(j))[1],
-              sw: (/id="swaps">([\s\S]*?)<\/p>/.exec(h) || [0, ""])[1].replace(/<[^>]+>/g, "")}; };
-    // 2026-11-11: 버킷이 일부만 겹치는 영웅은 따지지 않는다 — 진먼(방어+체력)은 필리·패트릭과 한쪽씩만 겹친다 → 시트 칸 그대로
-    const z = rec(["jeronimo", "reina", "greg"], [50, 20, 30], 4);
-    ok(z.ids.includes("zinman") && !z.sw, "버킷이 일부만 겹치는 칸은 시트 그대로 (진먼 유지)", z.ids.join(",") + " · " + z.sw.slice(0, 90));
-    // 가이드 §7 예시 — Gen 4 제로니모·미아·알론소 48/4/48 = 패트릭·필리·진먼·레이나
-    const z7 = rec(["jeronimo", "mia", "alonso"], [48, 4, 48], 4);
-    ok(z7.ids.slice().sort().join() === "patrick,philly,reina,zinman", "가이드 §7 예시가 시트 답과 같다", z7.ids.join(","));
-    // 겹치지 않으면 시트 그대로 — 바꾼 표시도 없다
-    const k = rec(["logan", "philly", "zinman"], [60, 40, 0], 3);
-    ok(k.ids.join() === "mia,patrick,jessie,seoyoon" && !k.sw, "겹치지 않는 행은 시트 칸 그대로 (미아·패트릭·제시·서윤)", k.ids.join(","));
-    // 바꾼 화살표는 전부 오르는 방향이다 — 시트 쪽이 같거나 높으면 안 바꾼다
-    let down = [], rows = 0;
-    for (const row of SHEET_ROWS) { const x = rec(row.lead, row.r, row.gen); if (!x.sw) continue; rows++;
-      for (const m of x.sw.matchAll(/×(\d+\.\d+) → \S+ ×(\d+\.\d+)/g)) if (!(+m[2] >= +m[1])) down.push("G" + row.gen + " " + m[0]); }
-    ok(down.length === 0 && rows > 0, "바꾼 칸은 전부 값이 오르는 쪽이다 (" + rows + "행)", down.slice(0, 3).join(" · "));
+    const card = (lead, ratio, g) => { const h = boot("ko").mode("rally").leaders(...lead).gear(10).gcap(g).mine(ratio).render();
+      const cut = (id, end) => { const i = h.indexOf('id="' + id + '"'); if (i < 0) return ""; const j = end ? h.indexOf(end, i) : -1; return j < 0 ? h.slice(i) : h.slice(i, j); };
+      const ids = t => [...t.matchAll(/heroes\/([a-z-]+)\.webp/g)].map(m => m[1]);
+      const main = (/data-k="main">([\s\S]*?)<\/div>/.exec(cut("sheet", 'class="jcol"')) || [0, ""])[1];
+      const rec = cut("rec"), b = /<p><b>([\s\S]*?)<\/b><\/p>/.exec(rec);
+      return {sheet: ids(main), rec: b ? ids(b[1]) : [], h}; };
+    // 가이드 §7 예시 — Gen 4 제로니모·미아·알론소 48/4/48 = 패트릭·필리·진먼·레이나 (시트 카드에 그대로)
+    const z7 = card(["jeronimo", "mia", "alonso"], [48, 4, 48], 4);
+    ok(z7.sheet.join() === "patrick,philly,zinman,reina", "가이드 §7 예시가 시트 카드에 시트 순서 그대로 실린다", z7.sheet.join(","));
+    // 노라 3장 행 — 시트 카드는 3장 그대로, 계산 카드는 따로
+    const n3 = card(["jeronimo", "mia", "gwen"], [48, 4, 48], 5);
+    ok(n3.sheet.filter(x => x === "norah").length === 3 && n3.rec.filter(x => x === "norah").length < 3,
+       "시트가 노라를 3칸 적은 행 — 시트 카드는 3장 그대로, 계산 카드는 3장을 쌓지 않는다", n3.sheet.join(",") + " / " + n3.rec.join(","));
+    ok(!/id="swaps"/.test(n3.h) && !/🔀/.test(n3.h), "시트 칸을 바꿨다는 안내(🔀)는 더 없다 — 바꾸지 않으니까");
   }
-  // ── 중첩 효율 표 · 효율로 전부 따져 본 추천 (2026-11-11 사용자 요청 — 둘 다 안내) ──
+  // ── 장별 이득 표 (효율) — 시트 카드와 계산 카드 양쪽에 ──
   {
     const page = (lead, ratio, g) => boot("ko").mode("rally").leaders(...lead).gear(10).gcap(g).mine(ratio).render();
     const tbl = (h, id) => { const i = h.indexOf('id="' + id + '"'); if (i < 0) return null;
       return h.slice(i, h.indexOf("</table>", i)).split("<tr>").slice(2).map(tr => tr.split("</td>").map(td => td.replace(/<[^>]+>/g, ""))); };
-    const g5 = page(["jeronimo", "mia", "gwen"], [48, 4, 48], 5), r5 = tbl(g5, "effRec");
-    ok(!!r5 && r5.length === 4, "추천 4명마다 중첩 효율 행이 있다", r5 ? r5.map(x => x[0] + " " + x[3]).join(" · ") : "표 없음");
-    const nor = r5.filter(x => x[0] === "노라").map(x => parseFloat(x[3]));
-    ok(nor.length === 2 && nor[1] < nor[0] && nor[0] < 100, "노라 효율이 100% 미만이고 2장째가 더 낮다 (리더 + 앞선 노라)", nor.join(" → "));
-    ok(r5.filter(x => x[0] === "패트릭")[0][3] === "100%" && r5.filter(x => x[0] === "노라")[1][4].includes("노라"),
-       "안 겹치면 100% · 겹치면 누구와 겹치는지 적는다", r5.map(x => x[4]).join(" | "));
-    ok(g5.includes('id="recEffSame"') && !g5.includes('id="recEff"'), "효율로 전부 따져도 같으면 한 줄로만 알린다");
-    const g3 = page(["logan", "philly", "zinman"], [60, 40, 0], 3);
-    const num = s => +s.split("전투 배율 ×")[1].slice(0, 5);
-    const recV = num(g3.slice(g3.indexOf('id="rec"'))), effV = num(g3.slice(g3.indexOf('id="recEff"')));
-    ok(g3.includes('id="recEff"') && !!tbl(g3, "effAll") && effV >= recV, "다르면 「효율로 전부 따져 본 추천」 패널이 뜨고 배율이 추천 이상이다", "추천 ×" + recV + " · 효율 ×" + effV);
-    const off = boot("ko").mode("rally").leaders("logan", "philly", "zinman").gear(10).gcap(3).mine([55, 5, 40]).render();
-    ok(!off.includes('id="recEff"') && !off.includes('id="recEffSame"') && off.includes('id="effRec"'), "시트 행이 아니면 두 번째 안내는 없고 효율 표만 뜬다");
+    const g5 = page(["jeronimo", "mia", "gwen"], [48, 4, 48], 5), s5 = tbl(g5, "effSheet"), r5 = tbl(g5, "effRec");
+    ok(!!r5 && r5.length === 4 && !!s5 && s5.length === 4, "시트 조합·계산 추천 모두 네 명마다 장별 이득 행이 있다",
+       (s5 ? s5.map(x => x[0] + " " + x[3]).join(" · ") : "시트 표 없음") + " / " + (r5 ? r5.map(x => x[0] + " " + x[3]).join(" · ") : "계산 표 없음"));
+    const nor = s5.filter(x => x[0] === "노라").map(x => parseFloat(x[3]));
+    ok(nor.length === 3 && nor[0] < 100 && nor[1] < nor[0] && nor[2] < nor[1], "시트 조합의 노라 효율이 장마다 내려간다 (리더 + 앞선 노라와 겹친다)", nor.join(" → "));
+    ok(s5.filter(x => x[0] === "패트릭")[0][3] === "100%" && s5.filter(x => x[0] === "노라")[1][4].includes("노라"),
+       "안 겹치면 100% · 겹치면 누구와 겹치는지 적는다", s5.map(x => x[4]).join(" | "));
+    const off = page(["logan", "philly", "zinman"], [55, 5, 40], 3);
+    ok(!off.includes('id="effSheet"') && off.includes('id="effRec"'), "시트 행이 아니면 시트 쪽 표는 없고 계산 쪽 표만 뜬다");
+    // 두 답이 걸리는 자리는 블록마다 표가 따로다
+    const g12 = page(["herbjorg", "lloyd", "ligeia"], [60, 20, 20], 12);
+    ok(g12.includes('id="effSheet"') && g12.includes('id="effSheet2"'), "시트 답이 둘이면 블록마다 장별 이득 표가 있다");
   }
   // ── 2026-11-10 리뷰 보강 ──
   // 10b — 위 10 은 F 버킷을 없애도 통과했다(넷째 자리가 동률 순서로 정해지는 편성이라). 값을 직접 잰다.
@@ -1818,6 +1822,42 @@ section("버킷 이론 (2026-11-10)");
   const c19 = chips(["jeronimo", "mia", "bradley"], [48, 4, 48], 12), c20 = chips(["jeronimo", "reina", "greg"], [60, 20, 20], 12);
   ok(c19.includes("NORAH_STACK") && !c19.includes("RENEE"), "48/4/48 — NORAH_STACK 뜨고 RENEE(창병 <20) 안 뜬다", c19.join(","));
   ok(c20.includes("RENEE") && !c20.includes("NORAH_STACK") && !c20.includes("REINA"), "60/20/20 리더 레이나 — RENEE 뜨고 NORAH_STACK·REINA 안 뜬다", c20.join(","));
+  // NORAH_STACK 은 **화면의 시트 카드와 어긋나는 말을 하지 않는다** (2026-11-11 리뷰).
+  // 예전에는 보+궁 ≥88% 면 무조건 "시트는 여기서 노라를 3~4장까지 적습니다" 였다 — 바로 위 시트 카드가 노라를 안 적은 편성에서도.
+  {
+    const chipText = (lead, ratio, gcap) => { const h = boot("ko").mode("rally").leaders(...lead).gear(10).gcap(gcap).mine(ratio).render();
+      const m = /data-code="NORAH_STACK">([\s\S]*?)<\/li>/.exec(h); return m ? m[1].replace(/<[^>]+>/g, "") : null; };
+    // 노라만 적힌 칸(nor)과 노라가 선택지 중 하나인 칸(opt · 시트 원문 "Norah/Patrick")을 따로 센다 — 합쳐서 "4칸" 이라고 하면 시트 카드와 어긋난다
+    const nor = c => c.j.filter(cell => cell.length === 1 && cell[0] === "norah").length, opt = c => c.j.filter(cell => cell.length > 1 && cell.includes("norah")).length;
+    const all = JSON.parse(run(CTX_KO, "JSON.stringify(SHEET_COMPS)"));
+    {
+      const withOpt = all.filter(c => opt(c) > 0);
+      ok(withOpt.length === 2 && withOpt.every(c => nor(c) === 3 && opt(c) === 1), "노라가 선택지인 칸이 있는 행은 둘이고 둘 다 '노라 3칸 + 노라/패트릭 1칸' 이다", withOpt.map(c => "g" + c.g + " " + c.lb).join(" | "));
+      const t6 = chipText(["jeronimo", "mia", "wayne"], [48, 4, 48], 6), t6m = chipText(["logan", "philly", "wayne"], [45, 5, 50], 6);
+      [["G6 제로니모·미아·웨인 48/4/48", t6], ["G6 META 로건·필리·웨인 45/5/50", t6m]].forEach(([nm, t]) =>
+        ok(t && /노라를 3칸 적었습니다/.test(t) && /그 밖에 1칸은 노라와 다른 영웅 중 하나/.test(t) && !/4칸/.test(t),
+           "'Norah/Patrick' 칸을 노라 칸으로 세지 않는다 — 3칸 + 선택지 1칸 (" + nm + ")", t));
+      const hEn = boot("en").mode("rally").leaders("jeronimo", "mia", "wayne").gear(10).gcap(6).mine([48, 4, 48]).render();
+      const mEn = (/data-code="NORAH_STACK">([\s\S]*?)<\/li>/.exec(hEn) || [0, ""])[1].replace(/<[^>]+>/g, "");
+      ok(/Norah in 3 cells/.test(mEn) && /Another 1 cell offers Norah or another hero/.test(mEn) && !/[가-힣]/.test(mEn), "영어 칩도 같다", mEn);
+      // 영어 화면의 행 라벨 — 제목이 곧 원문이라 다시 안 싣지만, META 를 태그로 떼어 낸 행은 통째 원문을 같이 적는다
+      const hMeta = boot("en").mode("rally").leaders("logan", "philly", "wayne").gear(10).gcap(6).mine([45, 5, 50]).render();
+      ok(hMeta.includes("sheet label “META - Defense - 45/5/50 or 40/0/60”"), "영어 화면도 META 행의 라벨 원문을 통째로 싣는다");
+      ok(!/sheet label “/.test((/id="sheet"[\s\S]*?id="rec"/.exec(hEn) || [""])[0]), "라벨을 안 쪼갠 행(영어)은 원문을 두 번 싣지 않는다");
+    }
+    const t3 = chipText(["jeronimo", "mia", "bradley"], [48, 4, 48], 12);
+    ok(t3 && /시트는 이 편성에 노라를 3칸 적었습니다/.test(t3), "걸린 시트 행이 노라를 3칸 적었으면 그 장수를 말한다 (G8 제로니모·미아·브레들리)", t3);
+    const t2 = chipText(["edith", "mia", "hendrik"], [48, 4, 48], 8);
+    ok(t2 && /노라를 2칸 적었습니다/.test(t2), "2칸 적은 행은 2칸이라고 말한다 (G8 에디스·미아·헨드릭)", t2);
+    ok(chipText(["gisela", "karol", "vulcanus"], [50, 10, 40], 13) === null, "걸린 시트 행이 노라를 안 겹쳤으면 칩을 내지 않는다 (G13 기젤라·가로얼·불카누스 50/10/40 — 시트 조합에 노라가 없다)");
+    ok(chipText(["gregory", "philly", "bradley"], [48, 4, 48], 10) === null, "노라가 한 칸뿐인 행도 마찬가지다 (G10 그레고리·필리·브레들리)");
+    // 시트에 없는 편성 — "이 편성" 얘기가 아니라 시트 전체의 경향이라고 밝히고, 행 수·장수는 데이터에서 센다
+    const st = all.filter(c => nor(c) >= 2 && c.rs.some(v => v[0] + v[2] >= 88)), mx = Math.max(...st.map(nor));
+    const t0 = chipText(["flint", "mia", "bradley"], [48, 4, 48], 17);
+    ok(t0 && /이 편성은 시트에 행이 없지만/.test(t0) && t0.includes(st.length + "개 행") && t0.includes("2~" + mx + "칸"), "시트에 없는 편성은 시트 전체의 경향을 세어서 말한다 (" + st.length + "행 · 최대 " + mx + "칸)", t0);
+    ok(st.length === all.filter(c => nor(c) >= 2).length, "시트가 노라를 겹쳐 적은 행은 전부 보+궁 위주 병비다 (칩 문구의 전제)", st.length + " vs " + all.filter(c => nor(c) >= 2).length);
+    ok(mx === 3, "노라만 적힌 칸은 한 행에 최대 3칸이다 — '2~4칸' 이라고 적으면 선택지 칸까지 센 것이다", "최대 " + mx);
+  }
   { const cm = chips(["logan", "philly", "zinman"], [60, 40, 0], 3);   // 시트 행 — 추천 첫 칸이 미아
     ok(cm.includes("CHANCE"), "미아가 든 추천에 CHANCE 칩 (미아류도 확률형이다)", cm.join(",")); }
 }

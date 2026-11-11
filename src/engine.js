@@ -150,29 +150,22 @@ function bestJoiners(base,cands,opt){
  for(let i=0;i<n;i++)for(let j=i;j<n;j++)for(let k=j;k<n;k++)for(let l=k;l<n;l++)consider([i,j,k,l]);
  return best.map(x=>({cls:x.ix.map(i=>C[i]),rel:x.rel,b:x.b,
    flags:x.ix.some(i=>C[i].at.some(a=>a.t==="ch"))?["CHANCE"]:[]}));}
-// 시트 행과 조합의 겹침 — 동치류 기준. 시트 칸 하나가 조합의 한 자리를 먹는다(최대 매칭, 4! 순열 전수).
-function sheetOverlap(comp,combo){
- const cells=comp.j,slots=combo.cls;let best=0;
- const perm=(arr,k)=>{if(k===arr.length){let c=0;
-   cells.forEach((cell,i)=>{const s=slots[arr[i]];if(s&&s.mem.some(x=>cell.indexOf(x.h.id)>=0))c++;});
-   if(c>best)best=c;return;}
-  for(let i=k;i<arr.length;i++){[arr[k],arr[i]]=[arr[i],arr[k]];perm(arr,k+1);[arr[k],arr[i]]=[arr[i],arr[k]];}};
- perm(slots.map((_,i)=>i),0);
- return {match:comp,overlap:best,of:cells.length};}
 // ── 규칙 레이어 (§4) — 수치 모델이 없는 판단. **점수를 건드리지 않는다.** 칩으로만 띄운다.
-// gcap — 그 서버에 아직 없는 영웅을 권하는 칩은 내지 않는다. recIds — 화면의 기본 추천(#rec) 4명. 중복 칩은 Top 1 조합뿐 아니라
-// 이것도 본다(Top 1 은 정의상 겹침을 피하므로 그것만 보면 DUP 칩이 사실상 안 뜬다 — 2026-11-10 리뷰).
-function joinerRules(ids,r,combo,b0,skHeavy,gcap,recIds){
+// gcap — 그 서버에 아직 없는 영웅을 권하는 칩은 내지 않는다. recIds — 화면의 **시트 조합(#sheet) + 계산 추천(#rec)** 영웅들(render 가 넘긴다).
+// 중복 칩은 Top 1 조합뿐 아니라 이것도 본다(Top 1 은 정의상 겹침을 피하므로 그것만 보면 DUP 칩이 사실상 안 뜬다 — 2026-11-10 리뷰).
+// ctx — {rows: 이 입력에 걸린 시트 행들, calc: 계산 추천(#rec) 영웅 id}. 노라 칩이 **화면의 시트 카드와 어긋나는 말을 하지 않게** 하려고 받는다.
+function joinerRules(ids,r,combo,b0,skHeavy,gcap,recIds,ctx){
  const has=id=>ids.indexOf(id)>=0,out=[];recIds=recIds||[];
+ const sheetRows=ctx&&ctx.rows||[],calcIds=ctx&&ctx.calc||[];
  const avail=id=>{const h=HEROES.filter(x=>x.id===id)[0];return !!h&&(gcap==null||h.gen<=gcap);};
  const inC=f=>(!!combo&&combo.cls.some(c=>c.mem.some(x=>f(x.h.id))))||recIds.some(f);
  const miaLike=id=>id==="mia"||id==="flora";
  if((has("mia")||has("flora"))&&inC(miaLike)){
   const n=nCls(r),k0=ids.filter(miaLike).length,p1=1-Math.pow(.5,n*k0),p2=1-Math.pow(.5,n*(k0+1));
-  out.push({level:"warn",code:"MIA_DUP",text:L("리더에 미아·플로라가 있는데 추천·조합에 또 미아류가 있습니다 — 같은 적 받피↑ 버킷이라 <b>확률만 오릅니다</b>: 발동 "+(p1*100).toFixed(1)+"% → "+(p2*100).toFixed(1)+"% (기대값 +"+((p2-p1)*50).toFixed(2)+"%p).",
-   "A Mia-type joiner is in the recommendation or combo while the leaders already run Mia/Flora — same enemy-damage-taken bucket, so <b>only the trigger chance rises</b>: "+(p1*100).toFixed(1)+"% → "+(p2*100).toFixed(1)+"% (EV +"+((p2-p1)*50).toFixed(2)+"pp).")});}
+  out.push({level:"warn",code:"MIA_DUP",text:L("리더에 미아·플로라가 있는데 시트 조합·계산 추천에 또 미아류가 있습니다 — 같은 적 받피↑ 버킷이라 <b>확률만 오릅니다</b>: 발동 "+(p1*100).toFixed(1)+"% → "+(p2*100).toFixed(1)+"% (기대값 +"+((p2-p1)*50).toFixed(2)+"%p).",
+   "A Mia-type joiner is in the sheet set or the calculated pick while the leaders already run Mia/Flora — same enemy-damage-taken bucket, so <b>only the trigger chance rises</b>: "+(p1*100).toFixed(1)+"% → "+(p2*100).toFixed(1)+"% (EV +"+((p2-p1)*50).toFixed(2)+"pp).")});}
  if((has("ligeia")||has("estrella"))&&inC(id=>id==="hendrik"||id==="ligeia"||id==="estrella"))
-  out.push({level:"info",code:"HENDRIK_DUP",text:L("리더에 리지아·에스텔라가 있고 추천·조합에 헨드릭류가 있습니다 — 같은 적 방어↓ 버킷입니다.","The leaders run Ligeia/Estrella and the recommendation or combo has a Hendrik-type joiner — same enemy-defense-down bucket.")});
+  out.push({level:"info",code:"HENDRIK_DUP",text:L("리더에 리지아·에스텔라가 있고 시트 조합·계산 추천에 헨드릭류가 있습니다 — 같은 적 방어↓ 버킷입니다.","The leaders run Ligeia/Estrella and the sheet set or the calculated pick has a Hendrik-type joiner — same enemy-defense-down bucket.")});
  if((has("eleonora")||has("greg"))&&inC(id=>id==="patrick"))
   out.push({level:"info",code:"PATRICK_DUP",text:L("리더에 엘레오노라·그렉(체력↑)이 있는데 패트릭이 들어 있습니다 — 체력 버킷이 겹칩니다(Ton 시트 Gen 11 · 13 비고).","Eleonora/Greg (health up) lead and Patrick is in — the health bucket overlaps (Ton sheet notes, Gen 11 and 13).")});
  if(r.lan>=20&&!has("renee")&&avail("renee")&&recIds.indexOf("renee")<0)
@@ -181,10 +174,29 @@ function joinerRules(ids,r,combo,b0,skHeavy,gcap,recIds){
   out.push({level:"info",code:"WUMING",text:L("상대 스킬 데미지가 많으면 무명이 대안입니다(보병 스킬 받피 −30%) — 버킷 미확정이라 점수 외.","Against heavy skill damage Wu Ming is the alternative (infantry skill damage taken −30%) — unconfirmed bucket, not scored.")});
  if(!skHeavy&&b0.An<=1+1e-9&&avail("reina"))
   out.push({level:"info",code:"REINA",text:L("일반공격 버킷이 비어 있습니다 — 상대 스킬 데미지가 적으면 레이나를 고려하세요(시트 Gen 7 · 11).","The normal-attack bucket is empty — if their skill damage is low, consider Reina (sheet, Gen 7 and 11).")});
- if(r.inf+r.mar>=88&&avail("norah"))
-  out.push({level:"info",code:"NORAH_STACK",text:L("보병+궁병 위주 편성입니다 — 시트는 여기서 노라를 3~4장까지 적습니다. 추천은 둘째 장까지 시트대로 두고 셋째 장부터 이득일 때만 넣습니다.","Infantry + marksman heavy — the sheet lists up to 3-4 Norah here. The recommendation follows the sheet up to two copies and adds a third only while it still wins.")});
+ // 노라 겹침 — 시트가 **이 편성의 행**에 실제로 적은 장수를 말한다. 예전에는 보+궁 ≥88% 면 무조건 "시트는 여기서 3~4장" 이라고 적어서,
+ // 바로 위 시트 카드가 노라를 한 장도(또는 한 장만) 적은 편성에서도 그 말이 떴다(G13 기젤라·카롤·불카누스 50/10/40 등 — 2026-11-11 리뷰).
+ //  · 걸린 행이 노라를 2칸 이상 적었다 → 그 장수를 말한다          · 걸린 행이 있는데 안 겹쳤다 → 칩을 내지 않는다(시트 카드가 곧 답이다)
+ //  · 걸린 행이 없다 → 시트 전체의 경향을 **세어서** 말한다(이 편성 얘기가 아니라고 밝힌다)
+ if(r.inf+r.mar>=88&&avail("norah")){
+  // 칸을 둘로 나눠 센다 — 노라만 적힌 칸(nor)과, 노라가 선택지 중 하나인 칸(opt · 시트 원문 "Norah/Patrick").
+  // 둘을 합쳐 "4칸" 이라고 하면 시트 카드(3칸 + 노라/패트릭 1칸)와 어긋난다 — G6 48/4/48 · G6 META 45/5/50 두 행이 그렇다.
+  const nor=c=>c.j.filter(cell=>cell.length===1&&cell[0]==="norah").length,opt=c=>c.j.filter(cell=>cell.length>1&&cell.indexOf("norah")>=0).length;
+  const top=sheetRows.slice().sort((a,b)=>nor(b)+opt(b)-nor(a)-opt(a))[0];
+  const nRec=calcIds.filter(id=>id==="norah").length,mine=top?nor(top):0,either=top?opt(top):0;
+  const optTxt=either?L(" 그 밖에 <b>"+either+"칸</b>은 노라와 다른 영웅 중 하나로 적었습니다(카드의 「/」 칸)."," Another <b>"+either+(either>1?" cells offer":" cell offers")+"</b> Norah or another hero (the “/” cell on the card)."):"";
+  const calcTxt=nRec>=2?L(" 계산 추천은 "+nRec+"장입니다 — 카드의 「↘ 겹친 자리」 숫자가 장당 값입니다."," The calculated pick takes "+nRec+" — the “↘ stacked copies” line on each card gives the per-copy value.")
+    :L(" 계산은 장마다 줄어드는 값을 재서 이득일 때만 겹칩니다."," The calculation stacks her only while each extra copy still wins.");
+  if(sheetRows.length){
+   if(mine+either>=2)out.push({level:"info",code:"NORAH_STACK",text:L("보병+궁병 위주 편성입니다 — 시트는 이 편성에 노라를 <b>"+mine+"칸</b> 적었습니다.",
+     "Infantry + marksman heavy — the sheet writes Norah in <b>"+mine+(mine===1?" cell":" cells")+"</b> for this lineup.")+optTxt+calcTxt});
+  }else{
+   const st=SHEET_COMPS.filter(c=>(gcap==null||c.g<=gcap)&&nor(c)>=2&&c.rs.some(v=>v[0]+v[2]>=88)),mx=st.length?Math.max.apply(null,st.map(nor)):0;
+   if(st.length)out.push({level:"info",code:"NORAH_STACK",text:L("보병+궁병 위주 편성입니다 — 이 편성은 시트에 행이 없지만, 시트는 보+궁 위주 병비의 <b>"+st.length+"개 행</b>에서 노라를 "+(mx>2?"2~"+mx:"2")+"칸 겹쳐 적습니다.",
+     "Infantry + marksman heavy — the sheet has no row for this lineup, but it stacks Norah in "+(mx>2?"2–"+mx:"2")+" cells on <b>"+st.length+" rows</b> with infantry + marksman heavy ratios.")+calcTxt});
+  }}
  if((combo&&combo.flags.indexOf("CHANCE")>=0)||recIds.some(id=>{const h=HEROES.filter(x=>x.id===id)[0];return !!h&&chanceP(h.exp[0])>0;}))
-  out.push({level:"info",code:"CHANCE",text:L("추천·조합에 확률형(미아류 포함)이 있습니다 — 열세일 때 한 방을 노리는 용도입니다(시트 원칙 3).","The recommendation or combo includes a chance-based skill (Mia types included) — that is for gambling when you are the weaker side (sheet principle 3).")});
+  out.push({level:"info",code:"CHANCE",text:L("시트 조합·계산 추천에 확률형(미아류 포함)이 있습니다 — 열세일 때 한 방을 노리는 용도입니다(시트 원칙 3).","The sheet set or the calculated pick includes a chance-based skill (Mia types included) — that is for gambling when you are the weaker side (sheet principle 3).")});
  out.push({level:"info",code:"LV5",text:L("조이너는 1번 영웅 S1 이 Lv.5 여야 채택됩니다. 미달이면 그 사람이 통째로 건너뛰어집니다.","A joiner only counts if their first hero's S1 is Lv.5 — otherwise that player is skipped entirely.")});
  return out;}
 const tgtName=i18nFill({},function(){return{infantry:L("보병","infantry"),lancer:L("창병","lancers"),marksman:L("궁병","marksmen"),"inf+mar":L("보병+궁병","infantry+marksmen"),"mar+lan":L("궁병+창병","marksmen+lancers")};});
@@ -273,7 +285,7 @@ function nearComps(ids,gcap){
 // 동률 타이브레이크용 — gcap 근처(USE_WIN 세대 안) 시트 행에서 이 영웅이 조이너 칸에 오른 행 수 (2026-10-17).
 // 시트 등재(s) 플래그만으로는 등재 영웅끼리의 동률(제시·헨드릭·패트릭 ×1.250)을 못 가른다.
 // ⚠️ skip(이 입력에 걸리는 시트 행)은 **반드시 뺀다.** 안 빼면 시트 행을 시트 답으로 맞히는 순환이 된다 —
-// 그래서 SHEET_EDGE=0 대조가 따로 손 안 대도 leave-one-out 이다.
+// 그래서 시트 행 대조(unit.mjs)가 따로 손 안 대도 leave-one-out 이다.
 // 창 폭은 쓸어서 골랐다: 0 62.3% · 1~2 62.7%(평탄) · 3~4 61.4% · 6 60.5% (52행 겹침). 전체 빈도는 저세대
 // 행을 휩쓴 제시가 이겨 효과가 없다. 값을 바꾸지 않는다 — 같은 배율 안에서만 순서를 정한다.
 const USE_WIN=2;
@@ -291,12 +303,21 @@ function matchComp(ids,r,gcap){
  const all=matchComps(ids,r,gcap);
  return all.length?all[0]:null;
 }
-// 대표 행과 **조이너 칸이 실제로 다른** 나머지 행들. 칸이 같으면 알릴 것이 없다.
+// 대표 행과 **시트 카드에 실리는 내용(칸 · 대안 · 비고)이 실제로 다른** 나머지 행들 — 화면이 블록을 따로 그린다.
+// 2026-11-11 까지는 조이너 칸(j)만 비교해서, 칸은 같고 대안·비고만 다른 행이 생기면 그 대안·비고가 조용히 사라질 구조였다
+// (지금 시트에는 그런 쌍이 없다 — unit.mjs 가 센다).
+function compKey(c){return JSON.stringify([c.j,c.jx||0,c.alt||0,c.ax||0,c.ao||0,c.c||""]);}
 function compRivals(all){
  if(!all||all.length<2)return [];
- const key=c=>c.j.map(x=>x.join("|")).join(",");
- const k0=key(all[0]);
- return all.slice(1).filter(c=>key(c)!==k0);
+ const seen=[compKey(all[0])];
+ return all.slice(1).filter(c=>{const k=compKey(c);if(seen.indexOf(k)>=0)return false;seen.push(k);return true;});
+}
+// 걸린 행 가운데 c 와 내용이 완전히 같은 다른 행들(쌍둥이) — 블록은 하나로 접고 **라벨만** 같이 보여 준다.
+// 접기만 하면 시트가 그 편성을 "Offense" 로도 적었다는 사실이 화면에서 사라진다(G1 50/20/30 · G11 60/40 — 2026-11-11 리뷰).
+function compTwins(all,c){
+ if(!all||all.length<2)return [];
+ const k0=compKey(c);
+ return all.filter(x=>x!==c&&compKey(x)===k0);
 }
 const BAND_TOL=6;   // 내 병비가 금지 비율과 이 거리 안이면 밴드
 const ROW_TOL=10;   // 상대 비율이 이 거리 밖이면 밴드 판정을 내리지 않는다
@@ -363,8 +384,9 @@ function calc(){
    wl:Math.max(0,Math.min(10,+document.getElementById(w).value||0))}));
  const r=norm(+document.getElementById("r1").value||0,+document.getElementById("r2").value||0,+document.getElementById("r3").value||0);
  const leaders=picks.filter(p=>p.hero);
- const out=document.getElementById("out");
- if(leaders.length===0){out.innerHTML='<div class="callout co-tip"><p>'+S("needLeader")+'</p></div>';return;}
+ // #out 은 setOut(render.js) 하나로만 갈아끼운다. 여기서 innerHTML 을 직접 쓰면 "마지막으로 그린 HTML" 기억(LAST_OUT)이 안 지워져,
+ // 리더를 다 비웠다가 같은 리더를 다시 고르면 안내문이 그대로 남는다(2026-11-11 리뷰에서 잡힘).
+ if(leaders.length===0){setOut('<div class="callout co-tip"><p>'+S("needLeader")+'</p></div>');return;}
 
  // ── 버킷 집계 (리더 9스킬) ──
  // 점수는 scoreAtoms 가 낸다. 여기서는 화면용 출처(src) · 병종 전용 판정(cls) · 배율 제외 칩(leaderOnly) · 수치 미확인(unknown)을 모은다.
@@ -436,7 +458,7 @@ function calc(){
  // 예전에는 데이터 순서에 맡겨서 그웬(이론·G5)이 헨드릭(시트·G8)을 앞섰다.
  // 부동소수 끝자리로 동률이 깨지지 않게 6자리에서 반올림해 비교한다.
  // sort 는 ES2019 부터 안정 정렬이라 ⑤ 는 따로 안 적어도 지켜진다.
- // 이 편성이 시트에 있는 행인가 — 있으면 애매한 자리에서 시트 쪽으로 기운다(render.js).
+ // 이 편성이 시트에 있는 행인가 — 있으면 화면의 📋 시트 카드가 그 행을 그대로 보여 준다(render.js). 계산 추천은 이 행을 보지 않는다.
  // ② 의 빈도에서 이 행들을 빼야 하므로 정렬보다 먼저 구한다.
  const comps=matchComps(picks.map(p=>p.hero&&p.hero.id||""),r,gcap);
  const use=sheetUse(gcap,comps);
@@ -461,11 +483,10 @@ function calc(){
  // 병비가 맞는 행이 없을 때만 — 리더가 같은 행을 안내한다(판정에는 안 쓴다)
  const near=comps.length?[]:nearComps(picks.map(p=>p.hero&&p.hero.id||""),gcap);
  // ── 버킷 조합 Top 5 · 규칙 레이어 · 시트 비교 (2026-11-10) ──
- // 기본 추천(#rec · 시트 우선)은 그대로 두고 **버킷 수학만의 답**을 따로 낸다(사용자 결정).
+ // 계산 추천(#rec · #recAll)은 한 명씩 고르는 탐욕이다. 여기는 4명 조합 전수 탐색이다.
  const combos=bestJoiners(base,rank,{top:5});
  const skHeavy=!!document.getElementById("skHeavy").checked;
  const ids=picks.map(p=>p.hero&&p.hero.id||"");
- const rules=joinerRules(ids,r,combos[0],buck,skHeavy,gcap);
- const sheetCmp=comp&&combos.length?sheetOverlap(comp,combos[0]):null;
- render({mode,leaders,picks,r,buck,src,cls,leaderOnly,unknown,base,s0:s0.s,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap,comp,rivals,near,combos,rules,sheetCmp,skHeavy,ids});
+ // 규칙 칩(joinerRules)은 render 가 낸다 — 화면의 시트 조합·계산 추천이 정해진 뒤라야 겹침을 볼 수 있어서다.
+ render({mode,leaders,picks,r,buck,src,cls,leaderOnly,unknown,base,s0:s0.s,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap,comp,rivals,comps,near,combos,skHeavy,ids});
 }

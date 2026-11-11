@@ -3,44 +3,34 @@ const esc=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[
 const hpic=(h,cls)=>'<img class="hpic'+(cls?" "+cls:"")+'" loading="lazy" alt="" src="img/heroes/'+
  encodeURIComponent(h.id)+'.webp" onerror="this.remove()">';
 const sTag=s=>'<span class="slot s-'+(["A","B","E","F","G","C","D"].includes(s)?s:"X")+'">'+s+'</span>';
-// 시트 행이 맞으면 그 행의 조이너 칸을 그대로 따를지 여부. 0 이면 시트를 전혀 안 본다.
-// 최상위 let 인 이유 — 검사가 0 으로 끄고 **순수 모델**의 시트 재현율을 따로 재야 하기 때문이다.
-// 시트를 따른 상태에서 재는 재현율은 순환논이라 검증이 아니다.
-// 이름은 예전 "여유폭 2%" 시절의 잔재다 — 지금은 **켜고/끄고** 스위치로만 쓴다.
-let SHEET_EDGE=1;
 const statKr=i18nFill({},function(){return{Attack:L("공격력","Attack"),Defense:L("방어력","Defense"),Lethality:L("파괴력","Lethality"),Health:L("체력","Health")};});
 
 // ── 🪣 버킷 조합 Top 5 (2026-11-10) — 시트를 보지 않는 버킷 수학만의 답 ──
-// 기본 추천(#rec)은 시트 우선 그대로다(사용자 결정). 여기는 4명 중복 허용 조합을 전부 재서 상위 5개를 보여 준다.
-// 같은 동치류(S1 효과가 완전히 같은 영웅)는 대표 한 명 + "= 나머지" 로 적는다 — 누가 그 자리에 들어갈 수 있는지 보이게.
-function comboPanel(d,comboAll,recIds){
- const {combos,sheetCmp,buck}=d;
+// 4명 **중복 허용** 조합을 전부 재서 상위 5개를 보여 준다. 계산 추천(#rec · #recAll)은 한 명씩 고르는 탐욕이고 중복을 stack 영웅으로 제한하지만,
+// 여기는 제한이 없다. 같은 동치류(S1 효과가 완전히 같은 영웅)는 대표 한 명 + "= 나머지" 로 적는다 — 누가 그 자리에 들어갈 수 있는지 보이게.
+// 규칙 칩과 시트 대조는 2026-11-11 개편에서 밖으로 나갔다(💡 #rules · 📋 #sheet · 🔍 #cmp).
+function comboPanel(d){
+ const {combos,buck}=d;
  if(!combos||!combos.length)return "";
- // 규칙 칩은 여기서 다시 낸다 — 기본 추천(#rec) 4명이 render 안에서 정해지므로 calc 는 그걸 모른다.
- const rules=joinerRules(d.ids,d.r,combos[0],buck,d.skHeavy,d.gcap,recIds);
  const nm=c=>{const h=c.mem[0].h,alt=c.mem.slice(1).map(x=>esc(HN(x.h)));
   return hpic(h,"sm")+esc(HN(h))+(alt.length?' <span class="note">= '+alt.join("·")+"</span>":"");};
  let o='<div class="callout co-tip" id="combos"><h3>'+L("🪣 버킷 조합 Top 5 — 4명 전수 탐색","🪣 Bucket combos, top 5 — every four-joiner set searched")+
-  ' <span class="tag t-warn">'+L("시트 미반영","sheet not applied")+"</span></h3>";
+  ' <span class="tag t-warn">'+L("이론 포함 · 중복 허용","includes theory · repeats allowed")+"</span></h3>";
  combos.forEach((c,i)=>{
   const cnt=[];c.cls.forEach(k=>{const f=cnt.filter(z=>z.c===k)[0];if(f)f.n++;else cnt.push({c:k,n:1});});
   const ch=ORDER.filter(sl=>Math.abs(c.b[sl]-buck[sl])>1e-9).map(sl=>sl+" "+buck[sl].toFixed(2)+"→"+c.b[sl].toFixed(2));
   o+='<div class="combo'+(i===0?" hi":"")+'"><p><b>#'+(i+1)+" ×"+c.rel.toFixed(3)+"</b> — "+cnt.map(z=>(z.n>1?z.n+"× ":"")+nm(z.c)).join(" · ")+
    '</p><p class="cap">'+ch.join(" · ")+(c.flags.length?' <span class="tag t-warn">'+L("확률형 포함","includes chance")+"</span>":"")+"</p></div>";});
- if(sheetCmp)o+='<p class="cap">📋 '+L("Ton 시트 Gen "+sheetCmp.match.g+" 행: <b>","Ton sheet, Gen "+sheetCmp.match.g+" row: <b>")+
-  sheetCmp.match.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+"</b> — "+
-  L("#1 조합과 겹침 <b>"+sheetCmp.overlap+"/"+sheetCmp.of+"</b> (동치류 기준). 경고가 아니라 정보입니다 — 이 패널은 시트를 비교 기준으로만 씁니다.",
-    "overlap with combo #1 <b>"+sheetCmp.overlap+"/"+sheetCmp.of+"</b> (by equivalence class). Information, not a warning — this panel uses the sheet only for comparison.")+"</p>";
- if(rules.length)o+='<ul class="rules">'+rules.map(x=>'<li class="'+x.level+'" data-code="'+x.code+'">'+x.text+"</li>").join("")+"</ul>";
- o+='<p class="cap">'+L("배율은 <b>리더만 있을 때 대비</b>입니다(위 추천의 전투 배율과 같은 잣대). 4명을 <b>중복 허용</b>으로 전부 재고, 같은 버킷에 겹치는 손해는 합연산으로 저절로 들어갑니다. 같은 버킷의 확률형은 <b>효과가 겹치지 않고 발동 확률만 오른다</b>고 보고, 미아·플로라는 <b>병종마다 50% 판정</b>입니다. 시트 명단도 시트 행도 보지 않으므로 위 「⭐ 추천」과 다를 수 있습니다 — 투자 문턱(실제로 Lv.5 인가)도 따지지 않습니다.",
-   "Multipliers are <b>relative to the leaders alone</b> (the same yardstick as the recommendation above). Every four-joiner set is scored <b>with repeats allowed</b>; overlap inside a bucket is costed automatically by addition. Chance skills in the same bucket are assumed <b>not to stack their effect — only the trigger chance rises</b>, and Mia/Flora <b>roll 50% per troop type</b>. Neither the sheet's joiner list nor its rows are consulted, so this can differ from the ⭐ recommendation — and it ignores the investment threshold (whether anyone actually has the hero at Lv.5).")+"</p></div>";
+ o+='<p class="cap">'+L("위 계산 추천은 한 명씩 고른 답이고, 여기는 <b>4명 조합을 전부</b> 잰 상위 5개입니다 — 같은 영웅을 몇 번이든 겹칠 수 있고 시트 명단도 보지 않습니다. 배율이 비슷한 다른 조합이 무엇인지, <b>“= ”</b> 뒤의 영웅으로 바꿔도 값이 같은지를 볼 때 씁니다. 투자 문턱(실제로 Lv.5 인가)은 따지지 않습니다.",
+   "The calculated pick above is chosen one hero at a time; this is the top five of <b>every four-joiner set</b> — any hero may repeat and the sheet’s joiner list is ignored. Use it to see which other sets score about the same, and which heroes after <b>“= ”</b> are interchangeable. It ignores the investment threshold (whether anyone actually has the hero at Lv.5).")+"</p></div>";
  return o;}
 
 function render(d){
- const {mode,leaders,picks,r,buck,src,cls,leaderOnly,unknown,base,s0,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap,comp,rivals,near,combos,rules,sheetCmp}=d;
- let o="";
+ const {mode,leaders,picks,r,buck,src,cls,leaderOnly,unknown,base,s0,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap,comp,rivals,near,combos}=d;
+ // 섹션을 조각으로 모았다가 맨 끝에서 순서대로 잇는다. 번호({{n}})는 그때 매긴다 — 카운터처럼 있을 때만 나오는 섹션이 있어서다.
+ let o="";const part={};
  const modeKr=mode==="rally"?L("공성(랠리)","Rally (offense)"):L("수성(개리슨)","Garrison (defense)");
- o+='<h2>'+L("① 리더 구성","① Leaders")+' <span>'+modeKr+L(" · 병비 "," · ratio ")+r.inf.toFixed(0)+"/"+r.lan.toFixed(0)+"/"+r.mar.toFixed(0)+'</span></h2>';
+ o+='<h2>{{n}} '+L("리더 구성","Leaders")+' <span>'+modeKr+L(" · 병비 "," · ratio ")+r.inf.toFixed(0)+"/"+r.lan.toFixed(0)+"/"+r.mar.toFixed(0)+'</span></h2>';
  o+='<div class="panel"><div class="xscroll"><table><thead><tr><th>'+L("슬롯","Slot")+'</th><th>'+L("영웅","Hero")+'</th><th>'+L("원정 3스킬","Expedition skills")+'</th><th>'+L("전무","Gear")+'</th></tr></thead><tbody>';
  [L("보병","Infantry"),L("창병","Lancer"),L("궁병","Marksman")].forEach((c,i)=>{const p=picks[i];
   if(!p.hero){o+='<tr><td class="b">'+c+'</td><td class="note" colspan="3">'+L("미선택","not selected")+'</td></tr>';return;}
@@ -52,6 +42,7 @@ function render(d){
     return"<div>"+sTag(e.slot)+esc(L(e.t,e.te||e.t))+(e.also?" "+sTag(e.also.slot):"")+"</div>";}).join("");
   o+='<tr><td class="b">'+c+'</td><td class="b"><span class="hrow">'+hpic(p.hero,"lg")+"<span>"+esc(HN(p.hero))+"</span></span>"+'<div class="note">'+(LANG==="en"?"":esc(p.hero.en)+" · ")+"Gen "+p.hero.gen+"</div></td><td>"+sk+"</td><td>Lv."+p.wl+"</td></tr>";});
  o+="</tbody></table></div></div>";
+ part.lead=o;o="";
 
  // Gen 10+ 서버에서 창병이 0 면 창병 T12 가 아예 안 켜진다.
  // 근거는 Ton 시트 "Gen 10+" 탭 머리의 T12 CHANGES 줄 하나다 — 임계값을
@@ -63,9 +54,10 @@ function render(d){
      "From Gen 10 on, the sheet says to keep <b>at least a sliver of lancers</b> even in marksman comps. That is why its marksman ratios read <b>48/4/48, 40/2/58, 50/2/48</b> rather than dropping lancers entirely.")+
    '</p><p class="cap">'+L("근거: Ton 시트 “Gen 10+” 탭 — T12 CHANGES. 서버 최대 세대를 Gen 9 이하로 내리면 이 경고는 사라집니다.",
      "Source: the Ton sheet, “Gen 10+” tab, T12 CHANGES. Set the server generation cap to 9 or below and this warning goes away.")+"</p></div>";
+ part.warn=o;o="";
 
  // 칸 진단
- o+='<h2>'+L("② SkillMod 칸 진단","② SkillMod slot diagnosis")+' <span>'+L("포화도","saturation")+'</span></h2><div class="panel"><div class="xscroll"><table><thead><tr><th>'+L("칸","Slot")+'</th><th>'+L("이름","Name")+'</th><th>'+L("값","Value")+'</th><th>'+L("포화","Saturation")+'</th><th>'+L("구성","Sources")+'</th></tr></thead><tbody>';
+ o+='<h2>{{n}} '+L("SkillMod 칸 진단","SkillMod slot diagnosis")+' <span>'+L("포화도","saturation")+'</span></h2><div class="panel"><div class="xscroll"><table><thead><tr><th>'+L("칸","Slot")+'</th><th>'+L("이름","Name")+'</th><th>'+L("값","Value")+'</th><th>'+L("포화","Saturation")+'</th><th>'+L("구성","Sources")+'</th></tr></thead><tbody>';
  const used=ORDER.filter(s=>buck[s]>1);
  const empty=ORDER.filter(s=>buck[s]===1);
  used.sort((a,b)=>buck[b]-buck[a]).forEach(s=>{
@@ -87,9 +79,10 @@ function render(d){
   (unknown.length?'<p class="cap">❓ '+L("수치 미확인·미확정: ","Unconfirmed: ")+unknown.map(x=>esc(HN(x.hero))+" "+esc(x.skill)+" ("+x.slot+(x.reason==="unsure"?L(" — 표에서도 ?"," — ? in the table"):L(" — 수치 없음 · 배율 제외"," — no value · not scored"))+")").join(" · ")+'</p>':"")+
   '</div>';
  o+="</div>";
+ part.buck=o;o="";
 
  // 위젯
- o+='<h2>'+L("③ 위젯","③ Widgets")+' <span>'+(mode==="rally"?L("집결(Rally)","Rally"):L("수비(Defender)","Defender"))+L("용만 발동","-side only")+'</span></h2>'+'<div class="panel"><div class="xscroll"><table><thead><tr><th>'+L("영웅","Hero")+'</th><th>'+L("위젯 스킬","Widget skill")+'</th><th>'+L("스탯","Stat")+'</th><th>'+L("방향","Side")+'</th><th>Lv</th><th>'+L("효과","Effect")+'</th></tr></thead><tbody>';
+ o+='<h2>{{n}} '+L("위젯","Widgets")+' <span>'+(mode==="rally"?L("집결(Rally)","Rally"):L("수비(Defender)","Defender"))+L("용만 발동","-side only")+'</span></h2>'+'<div class="panel"><div class="xscroll"><table><thead><tr><th>'+L("영웅","Hero")+'</th><th>'+L("위젯 스킬","Widget skill")+'</th><th>'+L("스탯","Stat")+'</th><th>'+L("방향","Side")+'</th><th>Lv</th><th>'+L("효과","Effect")+'</th></tr></thead><tbody>';
  if(!wg.length)o+='<tr><td colspan="6" class="note">'+L("전용무기 보유 영웅 없음 (에픽은 전용무기가 없습니다)","No hero with exclusive gear (epics have none)")+'</td></tr>';
  wg.forEach(x=>{o+="<tr"+(x.fire?' class="hi"':' class="dead"')+"><td class=\"b\">"+esc(HN(x.hero))+"</td><td class=\"cap\">"+esc(x.w.name)+
   "</td><td>"+statKr[x.w.stat]+"</td><td>"+(x.w.side==="rally"?L("집결","Rally"):L("수비","Defender"))+
@@ -103,10 +96,11 @@ function render(d){
     '<p class="cap">'+L("딜 축(공격×파괴력) ×","Damage axis (attack×lethality) ×")+wDmg.toFixed(3)+L(" · 생존 축(방어×체력) ×"," · survival axis (defense×health) ×")+wSur.toFixed(3)+L(" · 발동 "," · active ")+wg.filter(x=>x.fire).length+" / "+wg.length+"</p>"+
     (dup.length?"<p>"+dup.map(s=>statKr[s]).join("·")+L(" 이 겹쳐 <b>합연산</b>으로 뭉칩니다. 다른 스탯 위젯으로 바꾸면 곱연산이 됩니다."," collide, so they stack <b>additively</b>. Swap one for a widget on a different stat and they multiply instead.")+"</p>":"")+"</div>";}
  o+="</div>";
+ part.wid=o;o="";
 
  // 병종 전용
  if(cls.length){
-  o+='<h2>'+L("④ 병종 전용 · 주기형 스킬 판정","④ Class-locked and periodic skills")+'</h2><div class="panel"><div class="xscroll"><table><thead><tr><th>'+L("영웅","Hero")+'</th><th>'+L("스킬","Skill")+'</th><th>'+L("대상","Target")+'</th><th>'+L("현재 비중","Current share")+'</th><th>'+L("판정","Verdict")+'</th></tr></thead><tbody>';
+  o+='<h2>{{n}} '+L("병종 전용 · 주기형 스킬 판정","Class-locked and periodic skills")+'</h2><div class="panel"><div class="xscroll"><table><thead><tr><th>'+L("영웅","Hero")+'</th><th>'+L("스킬","Skill")+'</th><th>'+L("대상","Target")+'</th><th>'+L("현재 비중","Current share")+'</th><th>'+L("판정","Verdict")+'</th></tr></thead><tbody>';
   cls.forEach(c=>{o+="<tr"+(c.st==="dead"?' class="dead"':c.st==="ok"?' class="hi"':"")+'><td class="b">'+esc(HN(c.hero))+"</td><td>"+esc(c.e.n)+
    '<div class="note">'+esc(L(c.e.t,c.e.te||c.e.t))+"</div></td><td>"+tgtName[c.e.tgt]+"</td><td>"+c.v.toFixed(0)+
    '%</td><td><span class="tag t-'+(c.st==="dead"?"bad":c.st==="weak"?"warn":"ok")+'">'+c.lbl+"</span></td></tr>";});
@@ -127,134 +121,43 @@ function render(d){
    '<p class="cap">'+L("T10 기준. 사수는 공격·치명 최고 / 방어·체력 최저, 보병은 반대. 창병은 균형형.","At T10. Marksmen top attack and lethality, bottom defense and health; infantry the reverse; lancers balanced.")+'</p>'+
    "</div>";
   o+="</div>";}
+ part.cls=o;o="";
 
- // 조이너
- o+='<h2>'+L("⑤ 조이너 한계 배율 순위","⑤ Joiner marginal multiplier ranking")+' <span>'+L("S1만 기여 · 상위 4명만 채택","only S1 counts · top 4 are taken")+(gcap<99?(LANG==="en"?' · Gen '+gcap+' and below':' · Gen '+gcap+' 이하'):'')+'</span></h2><div class="panel"><details class="fold" id="single"><summary>'+L("단일 후보 한계 이득 — 1명씩 넣었을 때 (펼치기)","Single-candidate marginal gain — one joiner at a time (expand)")+'</summary><div class="xscroll"><table><thead><tr><th>#</th><th>'+L("조이너","Joiner")+'</th><th>'+L("S1 스킬","S1 skill")+'</th><th>'+L("칸","Slot")+'</th><th>'+L("계산","Working")+'</th><th>'+L("배율","Multiplier")+'</th></tr></thead><tbody>';
- rank.slice(0,14).forEach((x,i)=>{
-  const dmg=x.e.slot!=="X"&&SLOTS[x.e.slot]&&SLOTS[x.e.slot].k==="dmg";
-  o+="<tr"+(i<4?' class="hi"':x.mul<=1.001?' class="dead"':"")+"><td>"+(i+1)+'</td><td class="b"><span class="hrow">'+hpic(x.h)+"<span>"+esc(HN(x.h))+"</span></span>"+
-   (x.dup?'<span class="tag t-warn">'+L("리더도 씀","also a leader")+'</span>':"")+(x.h.s?'<span class="tag t-ok">'+L("시트","sheet")+'</span>':'<span class="tag t-warn">'+L("이론","theory")+'</span>')+
-   '</td><td class="cap">'+esc(L(x.e.t,x.e.te||x.e.t))+"</td><td>"+(x.e.slot==="X"?sTag("X")+(x.e.bk?sTag(x.e.bk):""):sTag(x.e.slot)+(x.e.also?sTag(x.e.also.slot):""))+
-   (x.cond?'<div class="note">'+x.cond.split("|")[1]+"</div>":"")+'</td><td class="note">'+x.detail.map(esc).join("<br>")+
-   '</td><td class="big">×'+x.mul.toFixed(3)+'<div class="note">'+(x.e.slot==="X"?L("조건부","conditional"):dmg?L("딜","damage"):L("생존","survival"))+"</div></td></tr>";});
- o+="</tbody></table></div>";
- o+='<p class="cap">'+L("배율이 같으면 <b>투자 문턱</b>으로 가릅니다 — <b>시트 등재 → 근처 세대(±2) 시트 행에서 자주 쓰인 영웅 → 에픽 → 낮은 세대</b> 순. 계산이 더 못 가르는 자리라, 실제로 Lv.5 까지 올라와 있을 가능성이 높은 쪽을 앞세웁니다. 빈도를 셀 때 지금 이 편성에 걸리는 시트 행은 뺍니다. 값을 바꾸는 게 아니라 같은 값 안에서만 순서를 정합니다.",
-   "Equal multipliers are broken by the <b>investment threshold</b> — <b>sheet-listed first, then heroes the sheet uses most in nearby generations (±2), then epics, then lower generations</b>. The model cannot separate them, so the tie goes to whoever is more likely to actually be maxed. The count leaves out any sheet row that matches this very lineup. This only orders within a tie; it never changes a value.")+"</p></details>";
- // 감소 계열이 왜 25% 증가에 지는지 — 근거는 볼트 「랠리 조이너 선정 규칙·개리슨 운영 (Ton)」 §5·§8.
- // 위 배율은 이미 그 나눗셈으로 계산돼 있다(감소 칸도 같은 buck 에 합산되므로 20% 는 ×1.200 이 된다).
- // 화면에 적어 두는 이유는 "×1.200 과 ×1.250 은 5%p 차이" 로 읽히기 때문이다.
- o+='<div class="callout co-warn"><h3>'+L("⚠️ 감소 계열(20%)은 나눗셈이라 25% 증가에 진다","⚠️ Reduction skills (20%) divide — they lose to a 25% increase")+'</h3><p>'+
-  L("흔한 오해는 <b>25% 증가(×1.25)와 20% 감소(×0.8)가 상쇄된다</b>는 것입니다. 감소는 곱하는 게 아니라 <b>나눕니다</b> — <b>1.25 ÷ 1.2 = 1.0417</b> 로 증가 쪽이 4.17% 앞섭니다. 네 장씩 쌓으면 <b>2.0 ÷ 1.8 = 1.111</b> 로 11.1% 벌어집니다. 20% 계열이 \"25%보다 5%p 약한\" 게 아니라 <b>구조적으로</b> 약합니다.",
-    "The common misconception is that a 25% increase (×1.25) and a 20% reduction (×0.8) cancel out. Reductions <b>divide</b> rather than multiply — <b>1.25 ÷ 1.2 = 1.0417</b>, so the increase is 4.17% ahead. Stack four of each and it is <b>2.0 ÷ 1.8 = 1.111</b>, an 11.1% gap. A 20% reduction is not \"5pp weaker than 25%\" — it is <b>structurally</b> weaker.")+
-  '</p><p>'+L("위 순위의 배율은 <b>이미 이 나눗셈으로 계산돼 있습니다</b> — 20% 감소 스킬이 ×1.200 으로 나오는 게 그 값입니다. 그리고 <b>공격용·방어용 조이너 구분은 없습니다</b>: 데미지 공식이 공수 동일하고 갈리는 건 위젯뿐이라, <b>방어 상황에서도 25% 증가 계열을 쌓는 쪽</b>이 낫습니다.",
-    "The multipliers above already carry this division — a 20% reduction showing ×1.200 <em>is</em> that value. And there is no such thing as an offensive or defensive joiner: the damage formula is identical for both, only widgets differ, so <b>stacking 25% increases wins even on defense</b>.")+
-  '</p><p class="cap">'+L("예외 — 상대가 같은 영웅을 4스택하면 상대 칸이 이미 합연산으로 포화라 우리 감소가 상대적으로 크게 먹힙니다. 그때는 20% 계열도 쓸 만합니다. · 근거: 볼트 「랠리 조이너 선정 규칙·개리슨 운영 (Ton)」 §5·§8 (Ton 반복 테스트)",
-    "Exception — if the enemy stacks the same hero four times, their slot is already saturated by addition, so your reduction bites relatively harder; 20% skills are worth taking then. · Source: vault note “Rally joiner selection & garrison ops (Ton)”, §5 and §8.")+"</p></div>";
- // 기본은 **시트 등재 영웅만**이다(2026-09-12). 계산 순위 그대로가 아니다.
- // 근거: 시트 52행 대조(SHEET_EDGE=0)에서 등재만 쪽이 #1 재현 86.5→92.3% · 겹침 48.7→58.8% 로 올라갔고,
- // **한 행도 나빠지지 않았다** — 이건 주장이 아니라 unit.mjs 가 지키는 검사다(#1·겹침 양쪽).
- // 이론 배지 영웅이 41회 끼어들던 자리다(웨인21·고든11·플린트3·알론소3·아모스2·블랑쉬1).
- // 계산 순위는 아래 보조 패널(#recAll)로 계속 보여준다 — 값을 감추는 게 아니라 순서를 바꾼 것이다.
- // 리더로 쓴 영웅도 조이너로 들어올 수 있다 — 다른 연맹원이 자기 것을 데려오는 것이다.
- // 예전에는 뽑힐 수 없게 막아 뒀는데 **근거 없는 가정**이었다 — 시트는 10개 행에서
- // 리더 영웅을 조이너 칸에 적는다(제로니모 7행 · 노라 1행 등). 2026-09-13 사용자가 짚음.
- // 대신 그 영웅의 스킬은 이미 리더 쪽에서 칸에 들어가 있으므로 한계 배율이 저절로 낮게 잡힌다.
+ // ── 조이너 안내 (2026-11-11 개편 · 사용자 결정) ──
+ // 시트 원문과 계산을 **섞지 않는다.**
+ //   📋 #sheet  — Ton 시트 행을 한 글자도 안 바꾸고 그대로: 기본 4칸 · Alternative · 비고. 답이 둘이면 둘 다.
+ //   🧮 #rec    — 시트 조이너 명단(s:1) 안에서의 계산. 시트 **행**은 전혀 안 본다.
+ //   🧮 #recAll — 전체 영웅으로 한 계산(#rec 과 다를 때만).
+ // 예전의 "시트 칸 우선 + 셋째 장부터 교체" 혼합 추천(SHEET_EDGE · fillCells · 🔀 · 📐)은 걷어냈다 — 시트도 계산도 아닌 답이라
+ // "시트가 뭐라고 적었나" 와 "공식으로는 뭐가 나오나" 가 둘 다 흐려졌다. 시트 조합에 우리 공식을 대 본 배율은 시트 카드에 따로 찍는다.
  const pool=rank.filter(x=>x.mul>1.001);
  const poolS=pool.filter(x=>x.h.s);
- // 네 명을 한 칸 묶음에 다 넣고 최종 칸으로 계산한다.
- // 각자의 한계 배율을 그냥 곱하면 같은 칸에 겹칠 때의 포화를 놓친다 —
- // Ton 시트 Rally Joiners 탭이 4×제시를 1.25⁴=2.441 이 아니라 2.0 으로 적어 둔다.
- //
- // 딜 칸만 곱하지 않는다. 전투비를 양쪽 식으로 펴면 분자/분모가 상쇄된다:
- //   R = SkillMod(나)/SkillMod(상대) = (내딜증 × 내감소) / (상대딜증 × 상대감소)
- // 내 딜 칸과 내 감소 칸이 R 에 **똑같이** 곱해지므로, 생존 칸도 같은 무게로 센다.
- // X(병종 한정)는 칸이 아니지만 역시 R 에 곱해지는 계수라 자기 배율로 넣는다.
- const lid=leaders.map(l=>l.hero.id);
- // 2026-11-10: 엔진의 scoreAtoms 를 그대로 쓴다 — ⑤ 단일 배율 · 이 추천 · 버킷 조합 Top 5 가 같은 산수다.
- // have(리더 보유분 + 앞서 고른 같은 영웅)·pc 시행 합산·같은 버킷 확률형 비중첩·두 칸 교차항이 전부 원자 목록 안에서 처리된다.
+ // 네 명을 한 버킷 묶음에 다 넣고 최종 값으로 잰다 — 각자의 한계 배율을 곱하면 같은 버킷에 겹칠 때의 포화를 놓친다
+ // (Ton 시트 Rally Joiners 탭이 4×제시를 1.25⁴=2.441 이 아니라 2.0 으로 적는다). 생존 버킷도 같은 무게로 센다 —
+ // R = (내딜증 × 내감소) / (상대딜증 × 상대감소). 엔진의 scoreAtoms 를 그대로 쓴다(단일 배율 · 이 추천 · Top 5 가 같은 산수).
  const comboAll=list=>scoreAtoms(base.concat.apply(base,list.map(q=>q.at))).s/s0;
-
- // ── 넷을 고르는 방법: 단독 배율 상위 4명이 아니라 **포화를 보며 한 명씩** 고른다 (2026-09-12)
- // 예전에는 rank 상위 4명을 그냥 잘랐다. 그러면 제시·제셀·제로니모처럼 **같은 A칸에 들어가는
- // 영웅이 나란히 뽑힌다** — 각자 단독으로는 ×1.250 이지만 둘째부터는 ×1.200, ×1.167 로 떨어지는데
- // 자르기는 그걸 모른다. 실제로 로건·필리·진먼 Gen 3 에서 미아·제시·제셀·제로니모가 나왔다.
- // 매번 "지금까지 고른 넷에 더했을 때 전투 배율이 가장 커지는 한 명"을 고르면 그 문제가 사라진다.
- //
- // ⚠️ 같은 영웅을 두 번 고르지 않는다. 예전 노트가 "탐욕을 돌리면 같은 X 영웅 4명을 쌓는 답이
- // 나온다"고 경고했는데, 그건 중복을 허용했을 때 이야기다. 후보를 서로 다른 영웅으로 제한하면
- // 시트 지침 5번("4명을 섞는 게 낫다")과 어긋나지 않는다.
- //
- // 동률이면 pool 순서가 이긴다 — pool 은 이미 투자 문턱(시트 등재 → 근처 세대 시트 빈도 → 에픽 → 낮은 세대)으로
- // 정렬돼 있으므로 그 정책이 그대로 지켜진다.
- // 시트 행과 맞으면 그 행의 조이너를 그대로 쓴다 — 이 프로젝트 1번 원칙을 그대로 옮긴 것이다.
- // 예전에는 "애매한 2% 안에서만" 였는데, 그러면 제시군 14칸·가토 5칸 같은 자리를 못 따라가고
- // 예외를 하나씩 늘리게 된다(노라 중복 → 노라 3장 → 제시군 …). 규칙 하나로 정리했다.
- // 대가는 숨기지 않는다 — 계산만으로 고른 답은 바로 아래 #recAll 에 그대로 남아 있다.
+ // 넷을 고르는 방법: 단독 배율 상위 4명을 자르지 않고 **포화를 보며 한 명씩**(2026-09-12). 동률이면 rank 순서(투자 문턱)가 이긴다.
+ // 같은 영웅을 다시 고를 수 있는 건 stack:1(시트가 한 행에 두 칸 이상 적은 영웅 — 노라·패트릭)뿐이다.
  const canRepeat=(out,c)=>c.h.stack||out.indexOf(c)<0;
- // 시트 행이면 **시트 칸을 그대로 채운다.** 칸 안에서 누구를 쓸지만 계산이 고른다
- // (제시* 칸이면 제시·제셀·제로니모 중 조합 배율이 가장 커지는 하나).
- // 이게 이 프로젝트 1번 원칙의 곧이곧대로다 — 예외 목록을 늘리는 대신 규칙 하나로 정리했다.
- // 못 채우는 칸(리더 중복 등)과 칸이 넷보다 적을 때 남는 자리는 아래 탐욕이 메운다.
- // ⚠️ 2026-11-10 (사용자 결정): **겹치는 칸은 그대로 베끼지 않고 따져 본다.** 시트 칸의 영웅이 앞서 채운 조이너와
- // 같은 영웅이거나 **같은 버킷**(제시·제셀·제로니모처럼 S1 이 같은 버킷에 들어가는 영웅 포함)이면 그 칸을 미뤄 두고,
- // 겹치지 않는 칸을 다 채운 뒤에 "그 장을 더한 값" 과 "시트 등재 영웅 중 최선을 더한 값" 을 비교한다.
- // 시트 쪽이 같거나 높으면 시트대로, 낮으면 바꾸고 out.swaps 에 적어 화면에 이유를 띄운다. 여유폭은 두지 않는다(근거 없는 숫자가 된다).
- // 리더가 채운 버킷과의 겹침은 여기서 안 본다 — 그것까지 보면 시트 우선이 통째로 순수 계산이 된다.
- const bks=c=>c.at.map(a=>a.t==="free"?"x:"+a.key:a.sl).filter(Boolean);
- // 2026-11-11 정정: "버킷이 하나라도 겹치면" 은 너무 넓었다 — 진먼(방어+체력)이 필리의 방어·패트릭의 체력과 한쪽씩만 겹치는데도
- // 걸려서 시트 칸 4행이 뒤집혔고, 바꿔 넣은 쪽이 둘째 패트릭(시트에 없던 중복)인 행도 있었다. 사용자가 말한 건 "같은 스킬" 이다
- // → 같은 영웅이거나 **S1 버킷 구성이 완전히 같은** 영웅만 겹친다고 본다.
- const bkey=c=>bks(c).slice().sort().join("|");
- // 그리고 **셋째 장부터**만 따진다(같은 날 사용자 결정) — 시트가 흔히 적는 노라 2장·패트릭 2장은 그대로 두고, 문제였던 3장 연속만 겨냥한다.
- // 여유폭 숫자 없이 가이드 60행 완전 일치가 45 → 52행이 된다. 둘째 장이 계산상 낮은 자리(G6 헥터 행 ×2.383 → ×2.262)는 📐 패널이 보여 준다.
- const overlaps=(out,c)=>{const mine=bkey(c);return out.filter(o=>o.h.id===c.h.id||(mine&&bkey(o)===mine)).length>=2;};
- const fillCells=(list,cells,out)=>{
-  const late=[];out.swaps=[];
-  cells.forEach(cell=>{
-   if(out.length+late.length>=4)return;
-   let best=null,bv=-1;
-   cell.forEach(id=>{
-    // 2026-11-10: 시트 칸은 배율이 1 인 영웅(레니·무명 — 버킷 미확정)도 그대로 채운다 → pool 이 아니라 rank 에서 찾는다.
-    const c=rank.filter(z=>z.h.id===id&&(z.h.s||list.indexOf(z)>=0))[0];
-    if(!c||!canRepeat(out,c))return;
-    const v=comboAll(out.concat([c]));
-    if(v>bv+1e-9){bv=v;best=c;}});
-   if(!best)return;
-   if(overlaps(out,best))late.push(cell);else out.push(best);});
-  late.forEach(cell=>{
-   if(out.length>=4)return;
-   const cur=comboAll(out);
-   let sh=null,sv=-1;
-   cell.forEach(id=>{const c=rank.filter(z=>z.h.id===id&&(z.h.s||list.indexOf(z)>=0))[0];
-    if(!c||!canRepeat(out,c))return;
-    const v=comboAll(out.concat([c]));if(v>sv+1e-9){sv=v;sh=c;}});
-   let alt=null,av=-1;
-   list.forEach(c=>{if(!canRepeat(out,c))return;
-    const v=comboAll(out.concat([c]));if(v>av+1e-9){av=v;alt=c;}});
-   if(sh&&(!alt||sv>=av-1e-9)){out.push(sh);return;}
-   if(alt){out.push(alt);if(sh)out.swaps.push({from:sh,to:alt,fv:sv/cur,tv:av/cur});}});
- };
- const pick4=(list,useSheet)=>{
-  const cells=useSheet&&comp?comp.j:null;
-  const out=[];out.swaps=[];
-  if(cells)fillCells(list,cells,out);
-  for(let k=out.length;k<4;k++){
-   let best=null,bv=-1;
-   list.forEach(c=>{if(!canRepeat(out,c))return;
-    const v=comboAll(out.concat([c]));
-    if(v>bv+1e-9){bv=v;best=c;}});
-   if(!best)break;
-   out.push(best);}
+ const pick4=list=>{const out=[];
+  for(let k=0;k<4;k++){let best=null,bv=-1;
+   list.forEach(c=>{if(!canRepeat(out,c))return;const v=comboAll(out.concat([c]));if(v>bv+1e-9){bv=v;best=c;}});
+   if(!best)break;out.push(best);}
   return out;};
- // 같은 영웅을 겹쳐 넣은 자리의 **이 편성 실제 값**을 찍는다 (2026-09-13).
- // 예전에는 아래 문단이 "둘째 장도 자기끼리 포화하므로 이득일 때만 집습니다" 라고 **주장만** 하고,
- // 예로 든 숫자는 일반론(제시 둘째 ×1.200)이거나 **다른 편성**(Gen 1 패트릭 ×1.185)이었다.
- // 노라 3장을 추천받은 사람이 자기 편성의 2·3장째가 얼마인지 화면에서 알 수 없었다.
- // ⚠️ 순서는 **고른 순서 그대로**여야 한다. 이유는 곱셈이 아니다 — comboAll 은 **순서 불변**이라
- // 어떤 순열로 재배치해도 곱은 같다(2026-09-14 검증, 24순열 전수 확인). 순서를 흙트러뜨리면
- // **어느 장이 "첫 장"인지가 달라져** ⑤ 표 대조와 "장마다 줄어듭니다" 서사가 깨진다.
- // ⚠️ 한 영웅의 기여는 **S1 스킬 하나**다(⑤ 표 머리말 "S1만 기여"). 영웅의 스킬을 전부
- // 먹여서 재면 전혀 다른 숫자가 나온다 — 실제로 그렇게 잘못 재어 본 적이 있다.
+ // 시트 행의 칸마다 한 명 — 칸에 이름이 여럿이면(제시* = 제시·제셀·제로니모) 배율이 가장 커지는 하나로 **잴 뿐**이다.
+ // 화면에는 칸에 적힌 이름을 전부 그대로 보여 준다. 중복·겹침을 따지지 않는다(시트가 적은 그대로가 이 카드의 요점이다).
+ const sheetPick=c=>{const out=[];
+  c.j.forEach(cell=>{let best=null,bv=-1;const cur=out.filter(Boolean);
+   cell.forEach(id=>{const z=rank.filter(q=>q.h.id===id)[0];if(!z)return;
+    const v=comboAll(cur.concat([z]));if(v>bv+1e-9){bv=v;best=z;}});
+   out.push(best);});
+  return out;};
+ // 배율에 드는가 = S1 이 버킷 원자를 하나라도 내는가(레니·무명은 버킷 미확정이라 원자가 없다).
+ // 원자는 있는데 이 병비에서 값이 0 인 것(대상 병종이 없는 병종 한정 스킬)과는 다르다 — 그건 0 으로 "들어간" 것이다.
+ const scored=z=>z.at.length>0;
+ const uniq=a=>a.filter((x,i)=>a.indexOf(x)===i);
+ // 같은 영웅을 겹쳐 넣은 자리의 **이 편성 실제 값**. 순서는 고른(적힌) 순서 그대로 — comboAll 은 순서 불변이라 곱은 같지만,
+ // 순서를 바꾸면 어느 장이 "첫 장" 인지가 달라져 단일 순위표와의 대조가 깨진다. 한 영웅의 기여는 S1 하나다.
  const stackNote=list=>{
   const mg=[];let prev=1;
   list.forEach((c,i)=>{const v=comboAll(list.slice(0,i+1));mg.push(v/prev);prev=v;});
@@ -265,23 +168,13 @@ function render(d){
    const ix=[];list.forEach((z,k)=>{if(z.h.id===c.h.id)ix.push(k);});
    if(ix.length<2)return;
    out.push("<b>"+esc(HN(c.h))+"</b> "+ix.map(k=>"×"+mg[k].toFixed(3)).join(" → "));});
-  return out.length?'<p class="cap">'+
-   L("↘ 같은 영웅을 겹쳐 넣은 자리입니다. <b>이 편성의 실제 값</b>은 ","↘ Some heroes are stacked here. <b>In this lineup</b> they actually add ")+
+  return out.length?'<p class="cap" data-k="stack">'+
+   L("↘ 같은 영웅이 겹친 자리 — <b>이 편성의 실제 값</b>은 ","↘ Stacked copies — <b>in this lineup</b> they actually add ")+
    out.join(" · ")+
-   L(" — 같은 칸에 합연산으로 들어가 <b>장마다 줄어듭니다</b>. 세 자리로 반올림한 값입니다.",
-     " — copies land in the same slot additively, so <b>each one adds less</b>. Rounded to three decimals.")+"</p>":"";};
- // 시트 칸을 바꾼 자리 — 무엇을 왜 바꿨는지 숫자로 적는다(몰래 바꾸지 않는다).
- const swapNote=list=>(list.swaps&&list.swaps.length)?'<p class="cap" id="swaps">'+
-  L("🔀 <b>시트 칸을 바꾼 자리</b> — 같은 영웅(또는 같은 스킬의 영웅)이 <b>셋째 장</b>이 되는 칸부터는 그 장의 실제 값을 따져 봅니다(둘째 장까지는 시트대로): ",
-    "🔀 <b>Sheet cells that were swapped</b> — from the <b>third copy</b> of the same hero (or a hero with the same skill), a cell is checked at its actual value (up to two copies follow the sheet): ")+
-  list.swaps.map(w=>L("시트 <b>"+esc(HN(w.from.h))+"</b> ×"+w.fv.toFixed(3)+" → <b>"+esc(HN(w.to.h))+"</b> ×"+w.tv.toFixed(3),
-    "sheet <b>"+esc(HN(w.from.h))+"</b> ×"+w.fv.toFixed(3)+" → <b>"+esc(HN(w.to.h))+"</b> ×"+w.tv.toFixed(3))).join(" · ")+
-  L(". 시트 쪽이 같거나 높으면 시트대로 둡니다. 시트 원래 칸은 아래 📋 문단에 그대로 있습니다.",
-    ". When the sheet’s pick is equal or better it stays. The sheet’s original cells are in the 📋 note below.")+"</p>":"";
- // ── 중첩 효율 (2026-11-10 사용자 요청) ──
- // 효율 = (이 편성에서 그 장이 실제로 더한 이득) ÷ (버킷이 전부 비어 있을 때의 이득). 리더가 채운 버킷과의 겹침도,
- // 앞서 넣은 조이너와의 겹침도 같은 숫자로 보인다. ⚠️ **효율은 순서를 정하지 않는다** — 효율 75% 인 노라 2장째(+22.8%)가
- // 효율 80% 인 제시(+20.0%)보다 실제 이득이 크다. 누구를 넣을지는 언제나 "이 편성" 열(실제 이득)로 정한다.
+   L(". 같은 버킷에 합연산으로 들어가 <b>장마다 줄어듭니다</b>(세 자리 반올림).",
+     ". Copies land in the same bucket additively, so <b>each one adds less</b> (rounded to three decimals).")+"</p>":"";};
+ // 중첩 효율 = 이 편성에서 그 장이 실제로 더한 이득 ÷ 버킷이 전부 비었을 때의 이득. ⚠️ 효율은 순서를 정하지 않는다 —
+ // 효율이 낮아도 실제 이득(「이 편성」 열)이 더 클 수 있다. 정렬 키나 문턱으로 쓰지 말 것.
  const effRows=list=>{let prev=1;return list.map((c,i)=>{
    const v=comboAll(list.slice(0,i+1)),gain=v/prev-1;prev=v;
    const alone=scoreAtoms(c.at).s-1,mine=c.at.filter(a=>a.t!=="free"&&a.sl).map(a=>a.sl).filter((x,k,arr)=>arr.indexOf(x)===k);
@@ -289,113 +182,184 @@ function render(d){
    mine.forEach(sl=>{const who=[];if(buck[sl]>1+1e-9)who.push(L("리더","leaders"));
     list.slice(0,i).forEach(o=>{if(o.at.some(a=>a.sl===sl)){const n=esc(HN(o.h));if(who.indexOf(n)<0)who.push(n);}});
     if(who.length)why.push(SLOTS[sl].n+" ← "+who.join("·"));});
-   return {c:c,gain:gain,alone:alone,eff:alone>1e-9?gain/alone:null,why:why};});};
- const effTable=(list,id)=>'<div class="xscroll"><table id="'+id+'"><thead><tr><th>'+L("조이너","Joiner")+"</th><th>"+L("빈 버킷일 때","On empty buckets")+"</th><th>"+
+   return {c:c,gain:gain,alone:alone,eff:alone>1e-9?gain/alone:null,why:why,ns:!scored(c)};});};
+ const effTable=(list,id)=>'<details class="fold"><summary>'+L("장별 이득 · 겹치는 버킷 보기","Per-joiner gain and bucket overlap")+'</summary><div class="xscroll"><table id="'+id+'"><thead><tr><th>'+L("조이너","Joiner")+"</th><th>"+L("빈 버킷일 때","On empty buckets")+"</th><th>"+
    L("이 편성","This lineup")+"</th><th>"+L("효율","Efficiency")+"</th><th>"+L("겹치는 버킷","Overlapping buckets")+"</th></tr></thead><tbody>"+
-  effRows(list).map(x=>"<tr><td>"+esc(HN(x.c.h))+"</td><td>"+(x.eff==null?"—":"+"+(x.alone*100).toFixed(1)+"%")+"</td><td>"+(x.eff==null?"—":"+"+(x.gain*100).toFixed(1)+"%")+
-   "</td><td>"+(x.eff==null?L("점수 외","not scored"):(x.eff*100).toFixed(0)+"%")+'</td><td class="cap">'+(x.why.join(" / ")||(x.eff==null?L("버킷 미확정","bucket unconfirmed"):L("없음","none")))+"</td></tr>").join("")+
-  "</tbody></table></div>";
- const effNote='<p class="cap">'+L("📐 <b>중첩 효율</b> = 이 편성에서 실제로 더한 이득 ÷ 버킷이 전부 비어 있을 때의 이득. 리더나 앞선 조이너가 같은 버킷을 채웠으면 그만큼 내려갑니다. <b>효율이 순서를 정하지는 않습니다</b> — 효율이 낮아도 실제 이득(「이 편성」 열)이 더 클 수 있습니다.",
-   "📐 <b>Stacking efficiency</b> = the gain actually added in this lineup ÷ the gain on completely empty buckets. It drops when leaders or earlier joiners already filled the same bucket. <b>Efficiency does not set the order</b> — a lower-efficiency pick can still add more (the “This lineup” column).")+"</p>";
- // ① 순수 계산 — 시트 우선을 **끄고** 둔다. 이게 보조 패널(#recAll)의 존재 이유다:
- // 시트를 따르느라 얼마를 포기했는지를 사용자가 볼 수 있어야 한다(노라 3장 행은 최대 8% 다).
- const calcTop=pick4(pool,false);
- // 시트 등재 영웅은 에픽 8명이 gen 0 이라 gcap 을 아무리 낮춰도 넷은 남는다.
- // 그래도 빈 경우엔 계산 순위로 되돌린다 — 화면이 비는 것보다 낫다.
- const sheetTop=pick4(poolS,SHEET_EDGE>0);
- const top=sheetTop.length?sheetTop:calcTop;
- const effTop=pick4(poolS,false);
- o+='<div class="callout co-key" id="rec"><h3>'+L("⭐ 추천 조이너 4명","⭐ Recommended four joiners")+
-  ' <span class="tag t-ok">'+L("시트 등재만","sheet-listed only")+'</span></h3><p><b>'+top.map(x=>hpic(x.h,"sm")+esc(HN(x.h))).join(" · ")+
-  '</b></p><p class="cap">'+L("전투 배율 ×","Combat multiplier ×")+comboAll(top).toFixed(3)+
-  L(" · 리더가 쓰는 영웅도 조이너로 들어올 수 있습니다 — 다른 연맹원이 자기 것을 데려오는 것이라 막지 않습니다."," · a hero already run by a leader can still join — a different alliance member brings their own copy, so it is not blocked.")+"</p>"+
-  stackNote(top)+swapNote(top)+effTable(top,"effRec")+effNote+
-  '<p class="cap">'+L("여기 나오는 건 <b>Ton 시트 조이너 명단에 오른 영웅만</b>입니다. 계산 순위 1~4위를 그대로 쓰지 않는 이유는 <b>투자 문턱</b> 때문입니다 — 이론 순위가 높아도 전설은 만렙 보유자가 적고, 만렙 찍은 사람은 대개 이미 그 영웅을 리더로 쓰고 있어 조이너로 못 뺍니다. 시트 58행과 대조했더니 <b>이쪽이 #1 재현 81.0% · 겹침 61.8%</b> 로, 계산 순위 그대로(79.3% · 56.6%)보다 낫고 <b>한 행도 나빠지지 않았습니다</b>. (#1 을 놓친 행은 대부분 시트 #1 이 레니인 행입니다 — 레니 S1 은 버킷이 미확정이라 점수에 넣지 않습니다. 그 행을 빼면 97.9% 입니다.)",
-     "These are only heroes on the Ton sheet’s joiner list. The raw top four is not used because of the <b>investment threshold</b>: legendaries are rarely maxed, and whoever did max one is usually already running it as a leader. Checked against all 58 sheet rows, this list reproduces the sheet’s #1 joiner <b>81.0%</b> of the time with <b>61.8%</b> overlap, against 79.3% / 56.6% for the raw ranking — and it was never worse on any row. (Most #1 misses are rows whose sheet #1 is Renee — her S1 bucket is unconfirmed, so she is not scored. Without those rows it is 97.9%.)")+"</p>"+
-  (comp?'<p class="cap">'+L("📋 이 편성은 <b>Ton 시트 Gen "+comp.g+" 행</b>에 있습니다(병비 "+comp.rs.map(v=>v.join("/")).join(" · ")+"). 시트가 적은 조이너는 <b>"+
-     comp.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+"</b> 입니다. <b>시트 행이면 그 칸을 우선 따릅니다</b> — 칸 안에서 누구를 쓸지는 계산이 고릅니다(“제시*” 칸이면 제시·제셀·제로니모 중 하나). 이 계산기의 1번 원칙이 <b>“계산이 시트와 엇갈리면 시트를 따른다”</b> 이기 때문입니다. 다만 <b>같은 영웅(또는 같은 스킬의 영웅)이 셋째 장이 되는 칸부터</b>는 그대로 베끼지 않고 시트 등재 영웅 중 최선과 비교해, 시트 쪽이 낮을 때만 바꿉니다(바꾼 자리는 위 🔀 에 적습니다). 그 대가는 숨기지 않습니다 — 계산만으로 고른 답이 바로 아래 <b>「🧮 계산 순위 그대로」</b> 에 그대로 있습니다. <b>시트에 없는 편성에서는 아무 일도 일어나지 않습니다</b> — 그게 보통입니다.",
-     "📋 This lineup is <b>row Gen "+comp.g+" of the Ton sheet</b> (ratios "+comp.rs.map(v=>v.join("/")).join(", ")+"), whose joiners are <b>"+
-     comp.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+"</b>. <b>On a row the sheet covers we follow its cells first</b> — the numbers decide who fills a cell that lists alternatives (a “Jessie*” cell takes Jessie, Jasser or Jeronimo), because this calculator’s first rule is <b>“when the numbers disagree with the sheet, follow the sheet”</b>. The exception: <b>a cell that would be the third copy of the same hero (or of a hero with the same skill)</b> is compared against the best sheet-listed alternative and replaced only when the sheet’s hero scores lower (swaps are listed under 🔀 above). The cost is not hidden — what the numbers alone would pick is in <b>🧮 Raw ranking</b> just below. <b>Nothing is applied to lineups the sheet does not cover</b>, which is the usual case.")+"</p>":"")+
-  // 병비가 맞는 행이 없을 때 — 리더가 같은 시트 행을 안내한다 (2026-10-10, 사용자 요청).
-  // 아모세·필리·린 60/40 에서 "시트랑 왜 달라?" 가 나왔다 — 시트는 그 셋을 50/2/48 에만 적어 뒀는데
-  // 화면이 아무 말도 안 해서 사용자가 알 길이 없었다. 판정에는 안 쓰고 안내만 한다.
-  (!comp&&near&&near.length?'<p class="cap">'+L("📍 <b>이 병비로는 시트에 없는 편성</b>이라 위 넷은 계산만으로 골랐습니다. 다만 <b>같은 리더 조합이 시트에 다른 병비로 있습니다</b> — "+
-     near.map(c=>"Gen "+c.g+" <b>"+c.rs.map(v=>v.join("/")).join(" · ")+"</b> → "+c.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+
-       (c.alt&&c.alt.length?" (대체 "+c.alt.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+")":"")).join(" / ")+
-     ". 병비를 그 값으로 두면 그 행의 칸을 우선 따릅니다.",
-     "📍 <b>The sheet has no row for this lineup at this ratio</b>, so the four above come from the numbers alone. But <b>the same leaders do appear in the sheet at other ratios</b> — "+
-     near.map(c=>"Gen "+c.g+" <b>"+c.rs.map(v=>v.join("/")).join(" · ")+"</b> → "+c.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+
-       (c.alt&&c.alt.length?" (alternatives "+c.alt.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")+")":"")).join(" / ")+
-     ". Set the ratio to one of those and that row’s cells are followed first.")+"</p>":"")+
-  // 시트는 조이너 넷 옆에 "Alternative #1~#3" 칸을 따로 둔다(48/54 행 · 69칸).
-  // 넷을 못 구할 때 쓰라는 목록이라 **순위에도 pick4 에도 넣지 않는다** — 시트가 그 셋에
-  // 순서를 매기지 않았으므로 우리도 매기지 않고 그대로 보여주기만 한다.
-  // ⚠️ 시트가 답을 둘 적어 둔 자리에서 **대표 행의 alt 만** 보여 주던 결함이 있었다 —
-  // g12 60/20/20 에서 다른 행의 "가토" 대체 칸이 화면에서 사라졌다(2026-09-14 검증).
-  // ⚖️ 문단이 "우리가 몰래 고르지 않습니다" 라고 적는데 alt 만 몰래 고르고 있었던 것이다.
-  // 그래서 대표 + 나머지 행의 대체 칸을 **합쳐서** 낸다(칸 내용이 같으면 한 번만).
-  (function(){
-   var cs=comp?[comp].concat(rivals||[]):[],seen={},cells=[];
-   cs.forEach(function(c){(c.alt||[]).forEach(function(cell){
-    var k=cell.join("|"); if(seen[k])return; seen[k]=1; cells.push(cell);});});
-   if(!cells.length)return "";
-   var names=cells.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ");
-   var many=cs.length>1;
-   return '<p class="cap">'+L("🔁 시트는 이 행에 <b>대체 조이너</b>도 적어 뒀습니다 — <b>"+names+
-     "</b>. 위 넷을 못 구할 때 쓰라는 칸이라 <b>순위 계산에는 넣지 않았습니다</b> — 시트가 그 안에서 순서를 매기지 않았기 때문입니다."+
-     (many?" 시트가 이 편성에 답을 여럿 적었으므로 <b>그 행들의 대체 칸을 모두</b> 모았습니다.":""),
-     "🔁 The sheet also lists <b>alternative joiners</b> for this row — <b>"+names+
-     "</b>. They are for when the four above are unavailable, so they are <b>kept out of the ranking</b> — the sheet does not order them either."+
-     (many?" Since the sheet gives this lineup more than one answer, the alternatives from <b>all</b> of those rows are collected here.":""))+"</p>";})()+
-  // 시트가 같은 리더·병비에 답을 둘 이상 적어 둔 자리가 있다. 우리가 몰래 하나를 고르고
-  // 나머지를 감추면 "시트를 따른다"는 말이 반쪽이 된다 — 다른 답도 그대로 보여준다.
-  (rivals&&rivals.length?'<p class="cap">'+L("⚖️ <b>시트가 이 편성에 답을 "+(rivals.length+1)+"개 적어 뒀습니다.</b> 위는 그중 하나이고, 나머지는 <b>"+
-     rivals.map(c=>c.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")).join("</b> / <b>")+
-     "</b> 입니다. 시트가 어느 쪽을 우선하라고 적어 두지 않았으므로 <b>우리도 고르지 않습니다</b> — 위 칸은 세대 → 병비 근접 → 시트가 “META” 라고 표시한 쪽 → <b>그래도 갈리지 않으면 시트에 먼저 적힌 행</b> 순으로 하나를 집어 채운 것뿐입니다. 공격/수비 라벨로는 갈리지 않습니다(전무는 영웅에 붙어 있고, 위젯은 SkillMod 칸에 들어가지 않아 조이너 순위를 바꾸지 않습니다).",
-     "⚖️ <b>The sheet gives "+(rivals.length+1)+" answers for this lineup.</b> The one above is one of them; the other(s) are <b>"+
-     rivals.map(c=>c.j.map(cell=>cell.map(id=>esc(HN(byId[id]))).join("/")).join(" · ")).join("</b> / <b>")+
-     "</b>. The sheet does not say which takes precedence, so <b>neither do we</b> — the cells above were chosen only by generation, then closest ratio, then whichever row the sheet labels “META”, and <b>failing all that, whichever the sheet lists first</b>. The offense/defense label does not separate them: exclusive weapons belong to the heroes, and widgets never enter a SkillMod slot, so they do not change joiner ranking.")+"</p>":"")+
-  '<p class="cap">'+L("넷은 ⑤ 순위 상위 4명을 그냥 자른 게 아니라, <b>포화를 보며 한 명씩</b> 골랐습니다 — 매번 “여기에 더했을 때 전투 배율이 가장 커지는 한 명”입니다. 자르기만 하면 <b>제시·제셀·제로니모처럼 같은 버킷(파괴력)에 들어가는 영웅이 나란히 뽑힙니다</b>(각자 ×1.250 이지만 둘째는 ×1.200, 셋째는 ×1.167 로 떨어집니다). 그래서 순위표 1~4위와 명단이 다를 수 있습니다.",
-     "The four are not the top four of ranking ⑤ — each is picked in turn as <b>whoever raises the combined multiplier most</b>, given the ones already chosen. Plain truncation lines up heroes that share a bucket (Jessie, Jasser and Jeronimo all fill Lethality: ×1.250, then ×1.200, then ×1.167). So this list can differ from rows 1–4 of the table.")+"</p>"+
-  (top.filter((x,i)=>top.indexOf(x)!==i).length?'<p class="cap">'+
-   L("같은 영웅이 두 번 나온 것은 <b>시트가 한 행에 그 영웅을 두 칸 이상 적어 둔 경우만</b> 허용하기 때문입니다 — 지금은 <b>노라(11행)·패트릭(2행)</b> 둘뿐이고, 나머지는 중복이 막혀 있습니다. 둘째 장도 같은 칸에 합연산으로 들어가 <b>자기끼리 포화</b>하므로, 계산은 그래도 이득일 때만 집습니다. (예: Gen 1 은 풀이 얇아 <b>2장째 패트릭 ×1.185 가 20% 계열 ×1.167 보다 낫습니다.</b>)","A hero appears twice only where <b>the sheet itself writes that hero in two or more cells of the row</b> — today that is <b>Norah (11 rows) and Patrick (2)</b>; everyone else is blocked from repeating. A second copy still adds into the same slot, so it <b>saturates against itself</b> and the numbers take it only when it still wins. (At Gen 1 the pool is thin enough that a <b>second Patrick, ×1.185, beats the 20% tier at ×1.167.</b>)")+"</p>":"")+
-  (top.filter((x,i)=>top.indexOf(x)!==i).length>=2?'<p class="cap">'+
-   L("노라가 <b>세 장</b>인 것은 <b>시트가 이 행에 노라 칸을 셋 적었기 때문</b>입니다. 셋째 노라는 우리 계산으로는 <b>−3% 쯤 손해</b>라 계산만으로는 안 뽑힙니다. 그 차이가 <b>시트를 따른 대가</b>이고, 계산만으로 고른 답은 아래 <b>「🧮 계산 순위 그대로」</b> 에 있습니다.",
-     "Norah appears <b>three times</b> because <b>the sheet writes three Norah cells for this row</b>. By our numbers the third copy is worth about <b>−3%</b>, so it would never be chosen on merit — that gap is what following the sheet costs here, and what the numbers alone would pick is in <b>🧮 Raw ranking</b> below.")+"</p>":"")+
-  '<p class="cap">'+L("위 배율은 네 명의 단독 배율을 곱한 값이 아니라 <b>같은 칸에 겹치는 분을 합쳤을 때</b>의 값입니다. 순위표의 배율을 넣는 순서대로 곱하면 더 크게 나오는데, 그건 포화를 빼먹은 숫자입니다. 그리고 <b>생존 칸도 같은 무게로 셉니다</b> — 전투비를 양쪽 식으로 펴면 <code>(내딜증 × 내감소) ÷ (상대딜증 × 상대감소)</code> 라, 내 딜 칸과 내 감소 칸이 결과에 똑같이 곱해집니다.",
-     "This multiplier is not the product of the four individual figures — it is what you get after <b>adding up the parts that land in the same slot</b>. Multiplying the ranking figures together gives a larger number that ignores saturation. <b>Survival slots count the same</b>: expand the kill ratio for both sides and it reduces to <code>(my damage-up × my reduction) ÷ (theirs × theirs)</code>, so your damage slots and your reduction slots multiply the outcome equally.")+"</p>"+
-  (top.filter(x=>x.dup).length?'<p class="cap">'+L("⚠️ 리더와 같은 영웅: <b>"+top.filter(x=>x.dup).map(x=>esc(HN(x.h))).join(" · ")+"</b> — 다른 연맹원이 데려오는 것이라 <b>들어올 수 있습니다</b>(시트도 10개 행에서 리더 영웅을 조이너 칸에 적습니다). 다만 그 스킬이 이미 칸에 들어가 있어 <b>한 장 더 얹는 값</b>으로 재어 있습니다.","⚠️ Also a leader: <b>"+top.filter(x=>x.dup).map(x=>esc(HN(x.h))).join(" · ")+"</b> — a different alliance member brings their own copy, so this is <b>allowed</b> (the sheet does it in ten rows). The multiplier already accounts for the leader’s copy already sitting in the slot.")+"</p>":"")+"</div>"+
-  // 효율이 100% 미만인 칸을 **전부** 따져 본 답 — 리더와 겹치는 칸까지 비교하면 시트 칸을 안 보는 것과 같아진다
-  // (= 시트 등재 영웅 안에서의 순수 계산). 위 추천(시트 우선 · 조이너끼리 겹칠 때만 교체)과 나란히 안내한다(사용자 결정).
-  (function(){
-   if(!comp||!effTop.length)return "";
-   const same=top.map(x=>x.h.id).slice().sort().join()===effTop.map(x=>x.h.id).slice().sort().join();
-   if(same)return '<p class="cap" id="recEffSame">'+L("📐 리더와 겹치는 칸까지 <b>전부</b> 효율로 따져 봐도 위 넷과 같습니다.","📐 Checking <b>every</b> cell by efficiency — including overlap with the leaders — gives the same four.")+"</p>";
-   const a=comboAll(top),b=comboAll(effTop);
-   return '<div class="callout co-tip" id="recEff"><h3>'+L("📐 효율로 전부 따져 본 추천","📐 Every cell checked by efficiency")+
-    ' <span class="tag t-ok">'+L("시트 등재만","sheet-listed only")+'</span></h3><p><b>'+effTop.map(x=>hpic(x.h,"sm")+esc(HN(x.h))).join(" · ")+
-    '</b></p><p class="cap">'+L("전투 배율 ×","Combat multiplier ×")+b.toFixed(3)+L(" — 위 추천(×"+a.toFixed(3)+") 대비 "," — vs the recommendation above (×"+a.toFixed(3)+"): ")+
-    (b>=a?"+":"")+((b/a-1)*100).toFixed(1)+"%</p>"+effTable(effTop,"effAll")+
-    '<p class="cap">'+L("위 ⭐ 추천은 <b>시트 칸을 우선</b>하고 조이너끼리 겹치는 칸만 바꿉니다. 여기는 <b>리더가 이미 채운 버킷과 겹치는 칸까지</b> 전부 실제 이득으로 비교한 답입니다 — 시트 등재 영웅 안에서 한 명씩, 그때그때 이득이 가장 큰 영웅을 고릅니다. 시트가 적은 영웅을 구할 수 있으면 위를, 효율을 끝까지 따지려면 여기를 보세요.",
-      "The ⭐ recommendation above <b>keeps the sheet’s cells</b> and swaps only cells that overlap another joiner. This one compares <b>every cell, including overlap with buckets the leaders already filled</b>, by actual gain — one sheet-listed hero at a time, whichever adds most. Use the one above when the sheet’s heroes are available, this one to push efficiency all the way.")+"</p></div>";})()+
-  (top.map(x=>x.h.id).join()!==calcTop.map(x=>x.h.id).join()?
-   '<div class="callout co-tip" id="recAll"><h3>'+L("🧮 계산 순위 그대로","🧮 Raw ranking")+
-   // 아래 캡션이 "여기 이론 배지가 붙은 영웅은…" 이라고 가리키므로 배지를 실제로 붙인다.
-   // 안 붙이면 넷 중 누가 시트 밖인지 화면에서 알 수 없다(2026-09-13 배포본 육안 검증에서 발견).
-   ' <span class="tag t-warn">'+L("이론 포함","includes theory")+'</span></h3><p><b>'+
-   calcTop.map(x=>hpic(x.h,"sm")+esc(HN(x.h))+
-    (x.h.s?"":' <span class="tag t-warn">'+L("이론","theory")+'</span>')).join(" · ")+
-   '</b></p><p class="cap">'+L("전투 배율 ×","Combat multiplier ×")+comboAll(calcTop).toFixed(3)+
-   L(" — 시트 명단도 시트 행도 보지 않고 <b>계산만으로</b> 고르면 이렇게 됩니다. 위 추천보다 배율이 높으면, 그 차가 <b>시트를 따르느라 포기한 양</b>입니다."," — picked on the numbers alone, ignoring both the sheet’s joiner list and its rows. If this beats the recommendation above, the gap is what following the sheet costs.")+'</p>'+
-   stackNote(calcTop)+
-   '<p class="cap">'+L('여기 <span class="tag t-warn">이론</span> 배지가 붙은 영웅은 시트 조이너 명단에 없습니다. <b>배율이 틀렸다는 뜻이 아니라</b>, 그 영웅이 실제로 Lv.5 로 올라와 조이너로 들어올 가능성이 낮다는 뜻입니다. <b>연맹원이 이미 그 영웅을 만렙으로 갖고 있다면 이쪽을 쓰는 게 맞습니다.</b>',
-     'Heroes tagged <span class="tag t-warn">theory</span> here are not on the sheet’s joiner list. That does <b>not</b> mean the multiplier is wrong — only that such a hero is unlikely to actually show up maxed as a joiner. <b>If someone in your alliance already has it maxed, this is the list to use.</b>')+'</p></div>':"")+comboPanel(d,comboAll,top.map(x=>x.h.id))+"</div>";
+  effRows(list).map(x=>"<tr><td>"+esc(HN(x.c.h))+"</td><td>"+(x.ns?"—":"+"+(x.alone*100).toFixed(1)+"%")+"</td><td>"+(x.ns?"—":"+"+(x.gain*100).toFixed(1)+"%")+
+   "</td><td>"+(x.ns?L("점수 외","not scored"):x.eff==null?"—":(x.eff*100).toFixed(0)+"%")+'</td><td class="cap">'+
+   (x.ns?L("버킷 미확정 · 수치 모델 없음","bucket unconfirmed / no numeric model"):x.eff==null?L("이 병비에서는 값이 0 (대상 병종 없음)","adds nothing at this ratio (no target troops)"):x.why.join(" / ")||L("없음","none"))+"</td></tr>").join("")+
+  '</tbody></table></div><p class="cap">'+L("<b>효율</b> = 이 편성에서 실제로 더한 이득 ÷ 버킷이 전부 비어 있을 때의 이득. 리더나 앞선 조이너가 같은 버킷을 채웠으면 그만큼 내려갑니다. <b>효율이 순서를 정하지는 않습니다</b> — 효율이 낮아도 실제 이득(「이 편성」 열)이 더 클 수 있습니다.",
+   "<b>Efficiency</b> = the gain actually added in this lineup ÷ the gain on completely empty buckets. It drops when leaders or earlier joiners already filled the same bucket. <b>Efficiency does not set the order</b> — a lower-efficiency pick can still add more (the “This lineup” column).")+"</p></details>";
+ const names=cell=>cell.map(id=>esc(HN(byId[id]))).join("/");
+ // raw — 그 칸의 **시트 원문 표기**(jx · ax). 이름 하나가 여러 영웅으로 펴진 칸에만 있다(Jessie* → 제시/제셀/제로니모).
+ // 펴 놓기만 하면 시트가 실제로 뭐라고 적었는지(별표가 있는지 없는지)가 화면에서 사라진다 — 원문을 작은 글씨로 같이 싣는다.
+ const faces=(cell,raw)=>cell.map(id=>hpic(byId[id],"sm")+esc(HN(byId[id]))).join('<i class="or">/</i>')+(raw?'<i class="raw">'+esc(raw)+"</i>":"");
+ const stackNames=HEROES.filter(h=>h.stack).map(h=>esc(HN(h))).join(" · ");
+ const hc=(x,theory)=>'<span class="hc">'+hpic(x.h,"sm")+esc(HN(x.h))+(theory&&!x.h.s?' <span class="tag t-warn">'+L("이론","theory")+'</span>':"")+"</span>";
+ // 시트 행 라벨 — 원문은 영어다. 한국어 화면에서는 낱말만 옮기고(비율은 그대로) 원문을 옆에 같이 싣는다.
+ const lbText=c=>{let s=c.lb.replace(/^\s*(META|NEW)\s*-?\s*/i,"");
+  [["Offense & Defense",L("공격·수비","Offense & Defense")],["Lancers",L("창병","Lancers")],["Marksmen",L("궁병","Marksmen")],["Mix",L("혼합","Mix")],
+   ["Offense",L("공격","Offense")],["Defense",L("수비","Defense")],[" or ",L(" 또는 "," or ")]].forEach(p=>{s=s.split(p[0]).join(p[1]);});
+  return s;};
+ // 시트 행 한 개를 그대로 그린다. mult — 지금 병비에서 우리 공식으로 잰 배율을 붙일지(병비가 다른 📍 행에는 안 붙인다).
+ const sheetBlock=(c,mult,effId,same)=>{
+  const lst=sheetPick(c),got=lst.filter(Boolean),un=uniq(got.filter(z=>!scored(z)).map(z=>esc(HN(z.h))));
+  const multi=uniq(lst.filter((z,i)=>z&&c.j[i].length>1).map(z=>esc(HN(z.h))));
+  const seq=c.ao||(c.alt||[]).map((_,i)=>i),free=seq.filter(a=>typeof a!=="number");
+  // 펴서 실은 칸의 원문 표기. 시트 범례가 정의한 것은 Jessie* 와 Sergey** 둘뿐이다 — 그 밖의 표기(별표 없는 Jessie · Jessie** · Jessies)를
+  // 같은 칸으로 읽은 것은 우리 해석이므로 따로 밝힌다.
+  const jx=c.jx||{},ax=c.ax||{},rawAll=uniq(Object.keys(jx).map(k=>jx[k]).concat(Object.keys(ax).map(k=>ax[k])));
+  const LEGEND=["Jessie*","Sergey**"],rawOurs=rawAll.filter(x=>LEGEND.indexOf(x)<0);
+  let s='<div class="srow"><p class="shd"><span class="tag t-ok">Gen '+c.g+"</span>"+(/^\s*META/i.test(c.lb)?'<span class="tag t-warn">META</span>':"")+
+   (/^\s*NEW/i.test(c.lb)?'<span class="tag t-off">NEW</span>':"")+" <b>"+esc(lbText(c))+'</b></p><p class="note">'+
+   // 영어 화면은 제목이 곧 원문 라벨이라 다시 안 싣는다 — 다만 META/NEW 를 태그로 떼어 낸 행은 통째 원문을 같이 적는다
+   L("리더 ","Leaders ")+c.l.map(names).join(" · ")+(LANG==="en"&&lbText(c)===c.lb?"":" · "+L("시트 라벨 “","sheet label “")+esc(c.lb)+"”")+"</p>"+
+   // 내용이 완전히 같아 접은 쌍둥이 행 — 블록은 하나지만 시트가 그 라벨로도 적었다는 사실은 남긴다
+   (same&&same.length?'<p class="note" data-k="twin">'+L("시트의 다른 행 ","The sheet’s row ")+same.map(t=>"“"+esc(t.lb)+"”").join(" · ")+
+     L(" 도 이 편성에 걸리고 조합·대안·비고가 똑같습니다 — 한 번만 싣습니다."," also matches this lineup with the same set, alternatives and comment — shown once.")+"</p>":"")+
+   '<div class="jlab">'+L("기본 조합 <span>Joiner #1~#4</span>","Main set <span>Joiner #1–#4</span>")+'</div><div class="chips" data-k="main">'+
+   c.j.map((cell,i)=>'<span class="hc"><i class="no">'+(i+1)+"</i>"+faces(cell,jx[i])+"</span>").join("")+
+   (c.j.length<4?'<span class="hc free">'+L("#"+(c.j.length+1)+(c.j.length<3?"~4":"")+" 시트 빈칸","#"+(c.j.length+1)+(c.j.length<3?"–4":"")+" blank on the sheet")+"</span>":"")+"</div>";
+  if(mult&&got.length)s+='<p class="mult"><b>'+L("전투 배율 ×","Combat multiplier ×")+comboAll(got).toFixed(3)+'</b> <span class="note">'+
+    L("시트 조합을 우리 공식으로 잰 값 · 리더만 있을 때 대비","the sheet’s set scored by our formula · vs the leaders alone")+
+    (got.length<4?L(" · 조이너 "+got.length+"명만"," · "+got.length+" joiners only"):"")+"</span></p>"+
+    (multi.length?'<p class="note">'+L("이름이 여럿인 칸은 그중 한 명입니다 — 배율은 <b>"+multi.join("·")+"</b> 기준으로 쟀습니다.",
+      "A cell with several names means any one of them — the multiplier uses <b>"+multi.join(", ")+"</b>.")+"</p>":"")+
+    stackNote(got)+
+    (un.length?'<p class="note" data-k="unscored">⚠️ '+L("<b>"+un.join("·")+"</b>의 S1 은 버킷이 미확정이라 <b>배율에 넣지 못했습니다</b> — 위 숫자는 그만큼 실제보다 낮습니다. 시트가 틀렸다는 뜻이 아닙니다.",
+      "<b>"+un.join(", ")+"</b>: the S1 bucket is unconfirmed, so it is <b>not scored</b> — the figure above is that much too low. This does not mean the sheet is wrong.")+"</p>":"");
+  s+='<div class="jlab">'+L("대안 <span>Alternative #1~#3</span>","Alternatives <span>Alternative #1–#3</span>")+"</div>"+
+   (seq.length?'<div class="chips" data-k="alt">'+seq.map(a=>typeof a==="number"?'<span class="hc">'+faces(c.alt[a],ax[a])+"</span>":'<span class="hc free">'+esc(a)+"</span>").join("")+"</div>":
+     '<p class="note" data-k="noalt">'+L("시트가 이 행에 대안을 적지 않았습니다.","The sheet lists no alternatives for this row.")+"</p>")+
+   (free.length?'<p class="note">'+L("점선 칸(<b>"+free.map(esc).join(" · ")+"</b>)은 시트 원문 표기입니다 — 영웅을 특정하지 않고 <b>그 % 계열 스킬 조이너 아무나</b>라는 뜻으로 읽습니다(우리 해석).",
+     "Dashed chips (<b>"+free.map(esc).join(" · ")+"</b>) are the sheet’s own wording — read here as <b>any joiner with a skill of that %</b>, no specific hero (our reading).")+"</p>":"")+
+   (rawAll.length?'<p class="note" data-k="raw">'+L("칩 끝의 작은 글씨(<b>"+rawAll.map(esc).join(" · ")+"</b>)가 그 칸의 <b>시트 원문 표기</b>입니다. 시트 범례(*Jessie = Jessie, Jasser or Jeronimo · **Sergey = Bahiti, Lumak Bokan)에 따라 이름을 펼쳐 실었습니다.",
+     "The small text at the end of a chip (<b>"+rawAll.map(esc).join(" · ")+"</b>) is <b>what the sheet actually writes</b> in that cell. Names are expanded per the sheet’s legend (*Jessie = Jessie, Jasser or Jeronimo · **Sergey = Bahiti, Lumak Bokan).")+
+     (rawOurs.length?" "+L("<b>"+rawOurs.map(esc).join(" · ")+"</b> 는 범례에 없는 표기입니다 — Jessie* 와 같은 칸으로 읽었습니다(<b>우리 해석</b>).",
+       "<b>"+rawOurs.map(esc).join(" · ")+"</b> is not a notation the legend defines — it is read here as the same cell as Jessie* (<b>our reading</b>)."):"")+"</p>":"");
+  if(c.c)s+='<div class="jlab">'+L("비고 <span>Comments</span>","Comments")+'</div><p class="quote" data-k="note">'+
+   (LANG==="en"?esc(c.c):esc(SHEET_NOTE_KO[c.c]||c.c)+' <span class="note">— '+L("원문 “","")+esc(c.c)+L("”","")+"</span>")+"</p>";
+  if(mult&&got.length)s+=effTable(got,effId);
+  return s+"</div>";};
+ // 계산 추천 넷이 시트 칸 몇 개와 맞는가 — 한 명은 한 칸만 먹는다(최대 배정).
+ const matchCells=(picks,cells)=>{let bn=-1,ba=[];const used=cells.map(()=>0),cur=[];
+  (function go(i,n){if(i===picks.length){if(n>bn){bn=n;ba=cur.slice();}return;}
+   for(let k=0;k<cells.length;k++)if(!used[k]&&cells[k].indexOf(picks[i].h.id)>=0){used[k]=1;cur[i]=k;go(i+1,n+1);used[k]=0;}
+   cur[i]=-1;go(i+1,n);})(0,0);
+  return {n:bn,a:ba};};
+ const top=pick4(poolS),calcTop=pick4(pool);
+ // 시트 등재 영웅은 에픽 8명이 gen 0 이라 gcap 을 아무리 낮춰도 넷은 남는다. 그래도 비면 전체 풀로 되돌린다.
+ const rec=top.length?top:calcTop;
+ const recV=comboAll(rec),allV=comboAll(calcTop);
+ const sheetRows=comp?[comp].concat(rivals||[]):[];
+ o+='<h2>{{n}} '+L("조이너 안내","Joiner guide")+' <span>'+L("시트 조합 · 계산 추천 · S1만 기여","sheet set · calculated pick · only S1 counts")+
+  (gcap<99?(LANG==="en"?' · Gen '+gcap+' and below':' · Gen '+gcap+' 이하'):'')+L(" · 병비 "," · ratio ")+r.inf.toFixed(0)+"/"+r.lan.toFixed(0)+"/"+r.mar.toFixed(0)+'</span></h2><div class="jgrid">';
+ // ── 📋 시트 카드 ──
+ o+='<div class="jcard sheet" id="sheet"><h3>📋 '+L("Ton 시트 조합","Ton sheet set")+' <span class="tag t-ok">'+L("시트 원문","sheet, as written")+"</span></h3>";
+ if(comp){
+  if(sheetRows.length>1)o+='<p class="cap" data-k="rivals">⚖️ <b>'+L("시트가 이 편성에 답을 "+sheetRows.length+"개 적어 뒀습니다.","The sheet gives "+sheetRows.length+" answers for this lineup.")+"</b> "+
+   L("어느 쪽이 우선인지 시트가 적지 않았으므로 <b>우리도 고르지 않고 전부 그대로</b> 싣습니다. 공격/수비 라벨로는 갈리지 않습니다 — 전무는 영웅에 붙어 있고 위젯은 버킷에 들어가지 않아 조이너 계산이 공수에서 같습니다.",
+     "It does not say which takes precedence, so <b>neither do we — all are shown as written</b>. The offense/defense label does not separate them: exclusive weapons belong to the heroes and widgets never enter a bucket, so joiner maths is the same on both sides.")+"</p>";
+  sheetRows.forEach((c,i)=>{o+=sheetBlock(c,true,"effSheet"+(i?i+1:""),compTwins(d.comps,c));});
+ }else if(near&&near.length){
+  // 병비가 맞는 행이 없을 때 — 리더가 같은 시트 행을 안내한다(2026-10-10 사용자 요청). 판정이 아니라 안내다.
+  o+='<p class="cap" data-k="near">📍 '+L("<b>이 병비로는 시트에 행이 없습니다.</b> 다만 <b>같은 리더 조합이 다른 병비로</b> 시트에 있습니다 — 아래가 그 행입니다(배율은 병비가 달라 재지 않았습니다).",
+    "<b>The sheet has no row at this ratio.</b> But <b>the same leaders appear at other ratios</b> — those rows are below (not scored, since the ratio differs).")+"</p>";
+  near.forEach(c=>{o+=sheetBlock(c,false,"")+'<p class="note" data-k="goto">'+L("이 병비로 보기: ","View at this ratio: ")+
+    c.rs.map(v=>'<button type="button" class="chip" data-r="'+v.join(",")+'">'+v.join("/")+"</button>").join("")+"</p>";});
+ }else o+='<p class="cap" data-k="none">'+(leaders.length<2?L("리더를 둘 이상 고르면 시트에서 같은 편성의 행을 찾습니다.","Pick at least two leaders and the matching sheet row is looked up."):
+   L("<b>이 리더 조합은 시트에 없습니다.</b> 시트는 세대별 대표 편성 60행만 다룹니다 — 이럴 때는 옆의 계산 추천이 유일한 안내입니다.",
+     "<b>The sheet has no row for these leaders.</b> It only covers 60 representative lineups by generation — here the calculated pick alongside is the only guidance."))+"</p>";
+ o+='<p class="note">'+L("시트 = TontonYouTube 공개 시트(2026-11-10 사본). 필자의 실전 경험으로 적은 조합이라 계산과 다를 수 있습니다. 대안 칸은 시트가 순서를 매기지 않았고, <b>계산 추천에는 넣지 않았습니다</b>.",
+   "Sheet = the public TontonYouTube sheet (copy of 2026-11-10). Its sets come from the author’s field experience, so they can differ from the maths. The sheet does not order its alternatives, and they are <b>not fed into the calculated pick</b>.")+"</p></div>";
+ // ── 🧮 계산 카드 ──
+ const dups=uniq(rec.filter(x=>x.dup).map(x=>esc(HN(x.h))));
+ o+='<div class="jcol"><div class="jcard calc" id="rec"><h3>🧮 '+L("계산 추천","Calculated pick")+' <span class="tag t-ok">'+L("시트 등재만","sheet-listed only")+'</span></h3><p><b>'+
+  rec.map(x=>hc(x,false)).join("")+'</b></p><p class="mult"><b>'+L("전투 배율 ×","Combat multiplier ×")+recV.toFixed(3)+'</b> <span class="note">'+L("리더만 있을 때 대비","vs the leaders alone")+"</span></p>"+
+  stackNote(rec)+
+  (dups.length?'<p class="note" data-k="dup">'+L("<b>"+dups.join("·")+"</b> — 리더도 쓰는 영웅입니다. 다른 연맹원이 자기 것을 데려오므로 막지 않습니다. 이미 채워진 버킷에 <b>한 장 더 얹는 값</b>으로 쟀습니다.",
+    "<b>"+dups.join(", ")+"</b> is also a leader — another member brings their own copy, so it is allowed. It is scored as <b>one more copy</b> on a bucket the leader already filled.")+"</p>":"")+
+  effTable(rec,"effRec")+
+  // ⚠️ "시트를 안 본다" 고 뭉뚱그려 적지 말 것 — 후보 풀(시트 조이너 명단)과 동률 순서(sheetUse)는 시트에서 온다. 안 보는 것은 **이 편성에 걸리는 행**이다.
+  '<p class="note" data-k="scope">'+L("<b>Ton 시트 조이너 명단에 오른 영웅 안에서</b>, 버킷 겹침을 보며 전투 배율이 가장 커지는 한 명씩 고른 답입니다. <b>이 편성에 걸리는 시트 행(시트 카드의 조합)은 보지 않습니다.</b> 시트에서 가져오는 것은 셋입니다 — ① 그 명단 ② 같은 영웅을 두 장 이상 넣을 수 있는 영웅("+stackNames+" — 시트가 한 행에 두 칸 이상 적은 영웅입니다) ③ 배율이 <b>완전히 같은</b> 후보끼리의 순서를 정할 때 쓰는 근처 세대(±2) 시트 행의 등장 빈도. ③ 에서도 이 편성의 행은 뺍니다.",
+    "Chosen <b>among heroes on the Ton sheet’s joiner list</b>, one at a time — whoever raises the combat multiplier most given bucket overlap. <b>The sheet row for this lineup (the set on the sheet card) is not consulted.</b> Three things do come from the sheet: (1) that list; (2) which heroes may be taken more than once ("+stackNames+" — the ones the sheet writes in two or more cells of a single row); (3) how often a hero appears in sheet rows of nearby generations (±2) — used only to order candidates whose multipliers are <b>exactly equal</b>, and counted without this lineup’s own row.")+"</p></div>";
+ if(rec.map(x=>x.h.id).join()!==calcTop.map(x=>x.h.id).join())
+  o+='<div class="jcard theory" id="recAll"><h3>🧮 '+L("계산 추천 — 전체 영웅","Calculated pick — all heroes")+' <span class="tag t-warn">'+L("이론 포함","includes theory")+'</span></h3><p><b>'+
+   calcTop.map(x=>hc(x,true)).join("")+'</b></p><p class="mult"><b>'+L("전투 배율 ×","Combat multiplier ×")+allV.toFixed(3)+'</b> <span class="note">'+
+   L("시트 등재만 대비 ","vs sheet-listed only ")+(allV>=recV?"+":"")+((allV/recV-1)*100).toFixed(1)+"%</span></p>"+stackNote(calcTop)+effTable(calcTop,"effAll")+
+   '<p class="note">'+L('시트 조이너 명단으로 <b>거르지 않고 전체 영웅에서</b> 같은 방법으로 고른 답입니다(두 장 이상 넣을 수 있는 영웅과 완전 동률일 때의 순서는 위와 같은 기준을 씁니다). <span class="tag t-warn">이론</span> 배지 영웅은 시트 조이너 명단에 없습니다 — <b>배율이 틀렸다는 뜻이 아니라</b> 실제로 Lv.5 로 올라와 조이너로 들어올 가능성이 낮다는 뜻입니다. <b>연맹원이 이미 만렙으로 갖고 있다면 이쪽이 맞습니다.</b>',
+     'The same method <b>over every hero, without filtering by the sheet’s joiner list</b> (which heroes may repeat, and how exact ties are ordered, follow the same rules as above). Heroes tagged <span class="tag t-warn">theory</span> are not on that list — that does <b>not</b> mean the multiplier is wrong, only that such a hero is unlikely to show up maxed as a joiner. <b>If someone in your alliance already has it maxed, this is the list to use.</b>')+"</p></div>";
+ o+="</div></div>";
+ // ── 🔍 시트 vs 계산 — **걸린 시트 행마다** 비교한다. 시트가 답을 둘 적은 편성에서 대표 행 하나만 비교하면,
+ // 위에서는 "우리도 고르지 않는다" 고 해 놓고 여기서 몰래 한 행을 고른 셈이 된다(2026-11-11 리뷰).
+ const sheetIds=[];
+ if(comp){
+  o+='<div class="callout co-tip" id="cmp"><h3>🔍 '+L("시트 vs 계산","Sheet vs calculation")+"</h3>";
+  sheetRows.forEach((c,ri)=>{
+   const got=sheetPick(c).filter(Boolean),m=matchCells(rec,c.j);
+   got.forEach(z=>sheetIds.push(z.h.id));
+   const hit=c.j.map(()=>0);m.a.forEach(k=>{if(k>=0)hit[k]=1;});
+   const onlyS=c.j.filter((_,k)=>!hit[k]).map(names),onlyC=rec.filter((_,i)=>!(m.a[i]>=0)).map(x=>esc(HN(x.h)));
+   const sv=comboAll(got),blank=got.length<4,un=uniq(got.filter(z=>!scored(z)).map(z=>esc(HN(z.h)))),fair=!blank&&!un.length;
+   // 비교가 안 되는 이유를 있는 그대로 — 빈칸 때문인지, 배율에 못 넣은 영웅 때문인지, 둘 다인지
+   const why=blank&&un.length?L("시트가 조이너 칸을 "+got.length+"칸만 채웠고, 배율에 넣지 못한 영웅(<b>"+un.join("·")+"</b>)도 있습니다(S1 버킷 미확정).","the sheet fills only "+got.length+" joiner cells, and <b>"+un.join(", ")+"</b> in its set cannot be scored either (S1 bucket unconfirmed).")
+    :blank?L("시트가 조이너 칸을 "+got.length+"칸만 채웠습니다.","the sheet fills only "+got.length+" joiner cells.")
+    :L("시트 조합에 배율에 넣지 못한 영웅(<b>"+un.join("·")+"</b>)이 있습니다(S1 버킷 미확정).","<b>"+un.join(", ")+"</b> in the sheet’s set cannot be scored (S1 bucket unconfirmed).");
+   o+='<div class="cmprow">'+(sheetRows.length>1?'<p class="shd"><span class="tag t-ok">Gen '+c.g+"</span>"+(/^\s*META/i.test(c.lb)?'<span class="tag t-warn">META</span>':"")+" <b>"+esc(lbText(c))+"</b></p>":"")+"<p>"+
+    L("시트 기본 조합 "+c.j.length+"칸 중 <b>"+m.n+"칸</b>이 계산 추천과 같습니다.","<b>"+m.n+" of "+c.j.length+"</b> cells in the sheet’s main set match the calculated pick.")+
+    (onlyS.length||onlyC.length?" "+L("시트에만 <b>"+(onlyS.join(" · ")||"—")+"</b> · 계산에만 <b>"+(onlyC.join(" · ")||"—")+"</b>.","Sheet only: <b>"+(onlyS.join(" · ")||"—")+"</b> · calculation only: <b>"+(onlyC.join(" · ")||"—")+"</b>."):"")+"</p><p>"+
+    L("우리 공식으로 잰 배율 — 시트 조합 <b>×"+sv.toFixed(3)+"</b> · 계산 추천 <b>×"+recV.toFixed(3)+"</b>","Scored by our formula — sheet set <b>×"+sv.toFixed(3)+"</b> · calculated pick <b>×"+recV.toFixed(3)+"</b>")+
+    (fair?L(" (계산 쪽 "+(recV>=sv?"+":"")+((recV/sv-1)*100).toFixed(1)+"%)."," (calculation "+(recV>=sv?"+":"")+((recV/sv-1)*100).toFixed(1)+"%)."):
+      L(". <b>이 둘은 그대로 비교할 수 없습니다</b> — ",". <b>These two are not directly comparable</b> — ")+why)+"</p></div>";});
+  o+='<p class="cap">'+L("시트는 필자의 실전 경험, 계산은 버킷 공식입니다. 둘이 다를 때 <b>어느 쪽이 맞는지는 이 도구로 가릴 수 없습니다</b> — 실전 전투 리포트가 있어야 합니다. 계산은 누가 그 영웅을 Lv.5 로 갖고 있는지도 모릅니다. 연맹원이 실제로 데려올 수 있는 영웅에 맞춰 둘을 참고하세요.",
+     "The sheet is the author’s field experience; the calculation is the bucket formula. Where they differ, <b>this tool cannot tell which is right</b> — that takes real battle reports. The calculation also does not know who actually has a hero at Lv.5. Use both, against what your members can really bring.")+"</p></div>";}
+ // ── 💡 규칙 레이어 — 수치 모델이 없는 판단. 점수를 건드리지 않는다. 시트 조합(걸린 행 전부)과 계산 추천을 둘 다 본다.
+ {const calcIds=rec.map(x=>x.h.id);
+  const rl=joinerRules(d.ids,r,combos&&combos[0],buck,d.skHeavy,gcap,calcIds.concat(sheetIds),{rows:sheetRows,calc:calcIds});
+  if(rl.length)o+='<div class="callout co-key" id="rules"><h3>💡 '+L("이 편성에서 같이 볼 것","Also worth knowing for this lineup")+'</h3><ul class="rules">'+
+   rl.map(x=>'<li class="'+x.level+'" data-code="'+x.code+'">'+x.text+"</li>").join("")+"</ul></div>";}
+ o+=comboPanel(d);
+ // ── 단일 후보 순위표 (접힘) ──
+ o+='<div class="panel"><details class="fold" id="single"><summary>'+L("단일 후보 순위표 — 조이너를 1명씩 넣었을 때의 한계 배율 (펼치기)","Single-candidate ranking — the marginal multiplier of one joiner at a time (expand)")+'</summary><div class="xscroll"><table><thead><tr><th>#</th><th>'+L("조이너","Joiner")+'</th><th>'+L("S1 스킬","S1 skill")+'</th><th>'+L("칸","Slot")+'</th><th>'+L("계산","Working")+'</th><th>'+L("배율","Multiplier")+'</th></tr></thead><tbody>';
+ rank.slice(0,14).forEach((x,i)=>{
+  const dmg=x.e.slot!=="X"&&SLOTS[x.e.slot]&&SLOTS[x.e.slot].k==="dmg";
+  o+="<tr"+(x.mul<=1.001?' class="dead"':"")+"><td>"+(i+1)+'</td><td class="b"><span class="hrow">'+hpic(x.h)+"<span>"+esc(HN(x.h))+"</span></span>"+
+   (x.dup?'<span class="tag t-warn">'+L("리더도 씀","also a leader")+'</span>':"")+(x.h.s?'<span class="tag t-ok">'+L("시트","sheet")+'</span>':'<span class="tag t-warn">'+L("이론","theory")+'</span>')+
+   '</td><td class="cap">'+esc(L(x.e.t,x.e.te||x.e.t))+"</td><td>"+(x.e.slot==="X"?sTag("X")+(x.e.bk?sTag(x.e.bk):""):sTag(x.e.slot)+(x.e.also?sTag(x.e.also.slot):""))+
+   (x.cond?'<div class="note">'+x.cond.split("|")[1]+"</div>":"")+'</td><td class="note">'+x.detail.map(esc).join("<br>")+
+   '</td><td class="big">×'+x.mul.toFixed(3)+'<div class="note">'+(x.e.slot==="X"?L("조건부","conditional"):dmg?L("딜","damage"):L("생존","survival"))+"</div></td></tr>";});
+ o+="</tbody></table></div>";
+ o+='<p class="cap">'+L("한 명만 넣었을 때의 값이라 <b>위 추천 4명과 순서가 다를 수 있습니다</b> — 추천은 넷을 같이 넣고 버킷 겹침을 본 값입니다. 배율이 같으면 <b>투자 문턱</b>으로 가릅니다 — <b>시트 등재 → 근처 세대(±2) 시트 행에서 자주 쓰인 영웅 → 에픽 → 낮은 세대</b> 순. 계산이 더 못 가르는 자리라, 실제로 Lv.5 까지 올라와 있을 가능성이 높은 쪽을 앞세웁니다. 빈도를 셀 때 지금 이 편성에 걸리는 시트 행은 뺍니다. 값을 바꾸는 게 아니라 같은 값 안에서만 순서를 정합니다.",
+   "These are one-joiner-at-a-time figures, so <b>the order can differ from the four picked above</b> — the pick scores all four together with bucket overlap. Equal multipliers are broken by the <b>investment threshold</b> — <b>sheet-listed first, then heroes the sheet uses most in nearby generations (±2), then epics, then lower generations</b>. The model cannot separate them, so the tie goes to whoever is more likely to actually be maxed. The count leaves out any sheet row that matches this very lineup. This only orders within a tie; it never changes a value.")+"</p></details>";
+ // ── 계산 방식 (접힘) — 편성과 무관한 일반 설명은 여기 모은다. 이 편성에 걸리는 경고는 접지 않는다(위 💡 · ⚠️).
+ o+='<details class="fold" id="how"><summary>'+L("계산 방식과 한계 — 왜 이렇게 고르나 (펼치기)","How this is calculated, and its limits (expand)")+"</summary>"+
+  '<p class="cap">'+L("추천 넷은 단일 순위표 상위 4명을 그냥 자른 게 아니라, <b>포화를 보며 한 명씩</b> 골랐습니다 — 매번 “여기에 더했을 때 전투 배율이 가장 커지는 한 명”입니다. 자르기만 하면 <b>제시·제셀·제로니모처럼 같은 버킷(파괴력)에 들어가는 영웅이 나란히 뽑힙니다</b>(각자 ×1.250 이지만 둘째는 ×1.200, 셋째는 ×1.167 로 떨어집니다).",
+     "The four are not the top four of the single-candidate ranking — each is picked in turn as <b>whoever raises the combined multiplier most</b>, given the ones already chosen. Plain truncation lines up heroes that share a bucket (Jessie, Jasser and Jeronimo all fill Lethality: ×1.250, then ×1.200, then ×1.167).")+"</p>"+
+  '<p class="cap">'+L("전투 배율은 네 명의 단독 배율을 곱한 값이 아니라 <b>같은 칸에 겹치는 분을 합쳤을 때</b>의 값입니다. 단독 배율을 차례로 곱하면 더 크게 나오는데, 그건 포화를 빼먹은 숫자입니다. 그리고 <b>생존 칸도 같은 무게로 셉니다</b> — 전투비를 양쪽 식으로 펴면 <code>(내딜증 × 내감소) ÷ (상대딜증 × 상대감소)</code> 라, 내 딜 칸과 내 감소 칸이 결과에 똑같이 곱해집니다.",
+     "The combat multiplier is not the product of the four individual figures — it is what you get after <b>adding up the parts that land in the same slot</b>. Multiplying the single figures together gives a larger number that ignores saturation. <b>Survival slots count the same</b>: expand the kill ratio for both sides and it reduces to <code>(my damage-up × my reduction) ÷ (theirs × theirs)</code>, so your damage slots and your reduction slots multiply the outcome equally.")+"</p>"+
+  '<p class="cap">'+L("기본 계산 추천을 <b>시트 조이너 명단 영웅으로 한정</b>하는 이유는 <b>투자 문턱</b>입니다 — 이론 순위가 높아도 전설은 만렙 보유자가 적고, 만렙 찍은 사람은 대개 이미 그 영웅을 리더로 쓰고 있어 조이너로 못 뺍니다. 시트 58행과 대조했더니 <b>이쪽이 #1 재현 81.0% · 겹침 61.8%</b> 로, 계산 순위 그대로(79.3% · 56.6%)보다 낫고 <b>한 행도 나빠지지 않았습니다</b>. (#1 을 놓친 행은 대부분 시트 #1 이 레니인 행입니다 — 레니 S1 은 버킷이 미확정이라 점수에 넣지 않습니다. 그 행을 빼면 97.9% 입니다.)",
+     "The default calculated pick is <b>limited to heroes on the sheet’s joiner list</b> because of the <b>investment threshold</b>: legendaries are rarely maxed, and whoever did max one is usually already running it as a leader. Checked against all 58 sheet rows, this list reproduces the sheet’s #1 joiner <b>81.0%</b> of the time with <b>61.8%</b> overlap, against 79.3% / 56.6% for the all-hero pick — and it was never worse on any row. (Most #1 misses are rows whose sheet #1 is Renee — her S1 bucket is unconfirmed, so she is not scored. Without those rows it is 97.9%.)")+"</p>"+
+  '<p class="cap">'+L("계산이 같은 영웅을 두 번 고를 수 있는 것은 <b>시트가 한 행에 그 영웅을 두 칸 이상 적어 둔 경우만</b>입니다 — 지금은 <b>노라·패트릭</b> 둘뿐이고, 나머지는 중복이 막혀 있습니다. 둘째 장도 같은 칸에 합연산으로 들어가 <b>자기끼리 포화</b>하므로, 그래도 이득일 때만 집습니다. 같은 버킷의 확률형은 효과가 겹치지 않고 발동 확률만 오른다고 보고, 미아·플로라는 병종마다 50% 판정입니다.",
+     "The calculation may pick a hero twice only where <b>the sheet itself writes that hero in two or more cells of a row</b> — today that is <b>Norah and Patrick</b>; everyone else is blocked from repeating. A second copy still adds into the same slot, so it <b>saturates against itself</b> and is taken only when it still wins. Chance skills in the same bucket are assumed not to stack their effect — only the trigger chance rises — and Mia/Flora roll 50% per troop type.")+"</p>"+
+  // 감소 계열이 왜 25% 증가에 지는지 — 근거는 볼트 「랠리 조이너 선정 규칙·개리슨 운영 (Ton)」 §5·§8.
+  // 배율은 이미 그 나눗셈으로 계산돼 있다(감소 버킷도 1+Σ 로 쌓이므로 20% 는 ×1.200). "×1.200 과 ×1.250 은 5%p 차이" 로 읽히기 때문에 적어 둔다.
+  '<div class="callout co-warn"><h3>'+L("⚠️ 감소 계열(20%)은 나눗셈이라 25% 증가에 진다","⚠️ Reduction skills (20%) divide — they lose to a 25% increase")+'</h3><p>'+
+  L("흔한 오해는 <b>25% 증가(×1.25)와 20% 감소(×0.8)가 상쇄된다</b>는 것입니다. 감소는 곱하는 게 아니라 <b>나눕니다</b> — <b>1.25 ÷ 1.2 = 1.0417</b> 로 증가 쪽이 4.17% 앞섭니다. 네 장씩 쌓으면 <b>2.0 ÷ 1.8 = 1.111</b> 로 11.1% 벌어집니다. 20% 계열이 \"25%보다 5%p 약한\" 게 아니라 <b>구조적으로</b> 약합니다.",
+    "The common misconception is that a 25% increase (×1.25) and a 20% reduction (×0.8) cancel out. Reductions <b>divide</b> rather than multiply — <b>1.25 ÷ 1.2 = 1.0417</b>, so the increase is 4.17% ahead. Stack four of each and it is <b>2.0 ÷ 1.8 = 1.111</b>, an 11.1% gap. A 20% reduction is not \"5pp weaker than 25%\" — it is <b>structurally</b> weaker.")+
+  '</p><p>'+L("위 배율은 <b>이미 이 나눗셈으로 계산돼 있습니다</b> — 20% 감소 스킬이 ×1.200 으로 나오는 게 그 값입니다. 그리고 <b>공격용·방어용 조이너 구분은 없습니다</b>: 데미지 공식이 공수 동일하고 갈리는 건 위젯뿐이라, <b>방어 상황에서도 25% 증가 계열을 쌓는 쪽</b>이 낫습니다.",
+    "The multipliers above already carry this division — a 20% reduction showing ×1.200 <em>is</em> that value. And there is no such thing as an offensive or defensive joiner: the damage formula is identical for both, only widgets differ, so <b>stacking 25% increases wins even on defense</b>.")+
+  '</p><p class="cap">'+L("예외 — 상대가 같은 영웅을 4스택하면 상대 칸이 이미 합연산으로 포화라 우리 감소가 상대적으로 크게 먹힙니다. 그때는 20% 계열도 쓸 만합니다. · 근거: 볼트 「랠리 조이너 선정 규칙·개리슨 운영 (Ton)」 §5·§8 (Ton 반복 테스트)",
+    "Exception — if the enemy stacks the same hero four times, their slot is already saturated by addition, so your reduction bites relatively harder; 20% skills are worth taking then. · Source: vault note “Rally joiner selection & garrison ops (Ton)”, §5 and §8.")+"</p></div></details>";
+ // ── 시트 머리말 (접힘) — 두 탭 머리의 지침을 원문 그대로 ──
+ o+='<details class="fold" id="tips"><summary>'+L("📜 시트 머리말 — Ton 이 적어 둔 조이너 고르는 지침 (펼치기)","📜 The sheet’s own head notes on choosing joiners (expand)")+'</summary><ul class="rules">'+
+  SHEET_TIPS.map(t=>"<li>"+(LANG==="en"?esc(t[0]):esc(t[1])+'<div class="note">'+esc(t[0])+"</div>")+"</li>").join("")+"</ul></details></div>";
+ part.join=o;o="";
 
  // 카운터 · 밴드 — 근거는 가이드 카운터표 하나뿐이다
  if(ctr){
   const e=ctr.en,mine=[r.inf,r.lan,r.mar],def=ctr.mode==="defender";
   const enLbl=def?L("들어오는 랠리","Incoming rally"):L("상대 방어","Their defense");
-  o+='<h2>⑥ '+(def?L("들어오는 랠리 · 수비","Incoming rally · garrison"):L("상대 카운터 · 랠리 밴드 판정","Counter table · rally ban check"))+'</h2><div class="panel">';
+  o+='<h2>{{n}} '+(def?L("들어오는 랠리 · 수비","Incoming rally · garrison"):L("상대 카운터 · 랠리 밴드 판정","Counter table · rally ban check"))+'</h2><div class="panel">';
   // 수비도 같은 표다 — 행을 고르는 키가 내 개리슨 비율이고, 비교 대상이 들어오는 랠리다.
   if(def){
    const V=ctr.verdict;
@@ -450,7 +414,25 @@ function render(d){
     "</div>";
   }
   o+="</div>";}
- document.getElementById("out").innerHTML=o;
+ part.ctr=o;
+ // 순서 (2026-11-11 사용자 결정): 조이너 안내가 맨 위. 상대 병비를 넣었으면 카운터 판정이 그다음이고, 리더·버킷·위젯·병종 진단은 그 아래다.
+ const NUM=["①","②","③","④","⑤","⑥","⑦"];let k=0;
+ setOut(["warn","join","ctr","lead","buck","wid","cls"].map(key=>part[key]?part[key].replace("{{n}}",()=>NUM[k++]):"").join(""));
+}
+// #out 을 갈아끼우는 **유일한 자리**다 — render 도, calc 의 "리더를 고르세요" 안내도 여기를 거친다.
+// 결과가 같으면 다시 그리지 않는다. 입력칸은 input 과 change 를 둘 다 듣는데, 숫자를 고치고 곧바로 결과 안의 버튼·접기를 누르면
+// 포커스가 빠지며 change 가 한 번 더 온다 — 그때 통째로 갈아끼우면 누르던 요소가 사라져 **첫 클릭이 삼켜진다**(2026-11-11 브라우저 검사에서 잡힘).
+// 진짜로 바뀔 때는 열어 둔 접기를 다시 열어 준다 — 순위표를 펴 놓고 병비를 만지는 동안 계속 닫히면 못 쓴다.
+// ⚠️ 다른 곳에서 out.innerHTML 을 직접 쓰지 말 것. LAST_OUT 이 안 따라가면 "같은 결과" 라고 오판해 화면이 안 돌아온다 —
+// 리더를 다 비웠다가 같은 리더를 다시 고르면 안내문이 그대로 남던 버그가 그거였다(2026-11-11 리뷰).
+let LAST_OUT=null;
+function setOut(html){
+ const out=document.getElementById("out");
+ if(html===LAST_OUT)return;
+ const fkey=x=>x.id||(x.querySelector("table[id]")||{}).id||"";
+ const opened=Array.from(out.querySelectorAll("details[open]")).map(fkey).filter(Boolean);
+ out.innerHTML=html;LAST_OUT=html;
+ if(opened.length)Array.from(out.querySelectorAll("details")).forEach(x=>{if(opened.indexOf(fkey(x))>=0)x.open=true;});
 }
 
 // ── 병비 프리셋 & 합계 경고 ────────────────────────────────────────────
@@ -553,6 +535,11 @@ function rebuildSelects(){
  document.getElementById("lgKo").onclick=()=>setLang("ko");
  document.getElementById("lgEn").onclick=()=>setLang("en");
  const sums=()=>{showSum("rSum",["r1","r2","r3"]);showSum("eSum",["e1","e2","e3"]);};
+ // 📍 "이 병비로 보기" — 시트 카드가 안내한 행의 병비를 내 병비 칸에 넣는다. #out 은 calc 마다 통째로 갈리므로 위임으로 듣는다.
+ document.getElementById("out").addEventListener("click",ev=>{
+  const b=ev.target&&ev.target.closest?ev.target.closest("[data-r]"):null;if(!b)return;
+  b.getAttribute("data-r").split(",").forEach((v,i)=>{document.getElementById("r"+(i+1)).value=v;});
+  sums();calc();});
  ["hInf","hLan","hMar","wInf","wLan","wMar","r1","r2","r3","e1","e2","e3","gcap","skHeavy"].forEach(id=>{
   const el=document.getElementById(id);const f=()=>{sums();calc();};el.addEventListener("change",f);el.addEventListener("input",f);});
  applyStatic();

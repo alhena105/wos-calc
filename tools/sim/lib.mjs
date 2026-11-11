@@ -32,21 +32,33 @@ export function parseRec(html, id) {
   const m = /(?:전투 배율|Combat multiplier) ×([\d.]+)/.exec(after);
   return {ids, mul: m ? +m[1] : null};
 }
-// ⑤ 순위표 (14행) — [{id, mul}]
+// 시트 카드(#sheet)의 첫 행 블록 — 기본 조합 칸(칸마다 후보 id 배열)과 화면이 찍은 배율
+// 2026-11-11: 시트는 한 칸도 안 바꾸고 따로 싣는다. 칸에 이름이 여럿이면 화면은 그중 한 명으로 잰 값을 찍는다.
+export function parseSheetCard(html) {
+  const at = html.indexOf('id="sheet"');
+  if (at < 0) return null;
+  const blk = html.slice(at).split('class="jcol"')[0].split('<div class="srow">')[1];
+  if (!blk) return null;
+  const m = /data-k="main">([\s\S]*?)<\/div>/.exec(blk);
+  if (!m) return null;
+  const cells = m[1].split('<span class="hc').slice(1).map(c => [...c.matchAll(/heroes\/([a-z-]+)\.webp/g)].map(x => x[1])).filter(c => c.length);
+  const mul = /(?:전투 배율|Combat multiplier) ×([\d.]+)/.exec(blk);
+  return {cells, mul: mul ? +mul[1] : null};
+}
+// 단일 후보 순위표 (14행 · #single) — [{id, mul}]
 export function parseRank(html) {
-  const tb = /⑤[\s\S]*?<tbody>([\s\S]*?)<\/tbody>/.exec(html);
+  const tb = /id="single"[\s\S]*?<tbody>([\s\S]*?)<\/tbody>/.exec(html);
   if (!tb) return [];
   return tb[1].split("<tr").slice(1).map(tr => {
     const id = /heroes\/([a-z-]+)\.webp/.exec(tr), mul = /×([\d.]+)<div/.exec(tr) || /×([\d.]+)/.exec(tr);
     return id && mul ? {id: id[1], mul: +mul[1]} : null;
   }).filter(Boolean);
 }
-// 렌더 한 번 — {rec, recAll, rank, html}
-export function renderRow(lead, r, gen, edge = 0, lang = "ko") {
+// 렌더 한 번 — {rec, recAll, sheet, rank, html}. 계산 카드(#rec · #recAll)는 시트 행을 안 본다(예전 SHEET_EDGE 스위치는 없어졌다).
+export function renderRow(lead, r, gen, lang = "ko") {
   const a = boot(lang).leaders(lead[0] || "", lead[1] || "", lead[2] || "").mine(r).gcap(gen);
-  a.js("SHEET_EDGE=" + edge);
   const html = a.render();
-  return {rec: parseRec(html, "rec"), recAll: parseRec(html, "recAll"), rank: parseRank(html), html, a};
+  return {rec: parseRec(html, "rec"), recAll: parseRec(html, "recAll"), sheet: parseSheetCard(html), rank: parseRank(html), html, a};
 }
 
 // ── xlsx TSV → 행 구조 ────────────────────────────────────────────────
@@ -58,6 +70,8 @@ const ALIAS = {
   "patrik": ["patrick"], "zinmang": ["zinman"], "ziman": ["zinman"],
   "wu ming": ["wuming"], "hervor": ["herbjorg"], "bradley": ["bradley"], "greg": ["greg"],
   "jeronimo": ["jeronimo"], "jasser": ["jasser"],
+  // 2026-11-10 Gen 13 행의 시트 표기 — 오타(Gisala)와 복수형(Seeyons · Jessies). 화면에는 SHEET_COMPS 의 id 로 싣는다
+  "gisala": ["gisela"], "seeyons": ["seoyoon"], "jessies": ["jessie", "jasser", "jeronimo"],
 };
 export function heroIds(txt, HEROES) {
   const byEn = Object.fromEntries(HEROES.map(h => [h.en.toLowerCase(), h.id]));
@@ -74,6 +88,9 @@ export function heroIds(txt, HEROES) {
 export function parseRatios(label) {
   // "Defense - 60/40/0 or 60/10/30 or 50/20/30", "Defense - 60/40 or 60/30/10"
   const out = [];
+  // 범위 표기 "50/5-10/40-45" (Gen 13 META) = 50/5/45 ~ 50/10/40 — 양 끝 두 점으로 읽는다
+  const rg = /(\d+)\s*\/\s*(\d+)-(\d+)\s*\/\s*(\d+)-(\d+)/.exec(label);
+  if (rg) return [[+rg[1], +rg[2], +rg[5]], [+rg[1], +rg[3], +rg[4]]];
   for (const m of label.matchAll(/(\d+)\s*\/\s*(\d+)(?:\s*\/\s*(\d+))?/g)) {
     let a = +m[1], b = +m[2], c = m[3] === undefined ? null : +m[3];
     if (c === null) { // 2자리 약칭: 60/40 = 보60·창40 (CLAUDE.md 규칙)
@@ -101,8 +118,10 @@ export function parseSheet(tsvPath, HEROES) {
     const altRaw = c.slice(6, 9).map(s => s.trim()).filter(Boolean);
     const alt = altRaw.filter(s => !/^or 25%|^20% ones/i.test(s)).map(s => heroIds(s, HEROES));
     const altFree = altRaw.filter(s => /^or 25%|^20% ones/i.test(s));
+    // 시트 순서 그대로 — 영웅 칸은 id 배열, 자유 문구는 원문 문자열 (SHEET_COMPS 의 ao 와 대조한다)
+    const altSeq = altRaw.map(s => /^or 25%|^20% ones/i.test(s) ? s : heroIds(s, HEROES));
     rows.push({g: gen, label, mode: /Offense/i.test(label) && !/Defense/i.test(label) ? "off" : /Defense/i.test(label) && !/Offense/i.test(label) ? "def" : "both",
-      meta: /META/i.test(label) ? 1 : 0, rs: parseRatios(label), l: leaders, j, alt, altFree, comment: (c[9] || "").trim()});
+      meta: /META/i.test(label) ? 1 : 0, rs: parseRatios(label), l: leaders, j, alt, altFree, altSeq, comment: (c[9] || "").trim()});
   }
   return rows;
 }

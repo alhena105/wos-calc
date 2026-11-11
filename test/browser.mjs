@@ -73,8 +73,14 @@ const ko = await open();
 const koOut = await outText(ko);
 // ④ 는 리더가 병종 전용·주기형 스킬을 들고 있을 때만 나온다. 기본 리더 조합엔 없으므로
 // 항상 나오는 것만 본다 (unit.mjs 의 섹션 목록과 같은 기준).
-for (const sec of ["① 리더 구성", "② SkillMod 칸 진단", "③ 위젯", "⑤ 조이너 한계 배율"])
+// 2026-11-11: 조이너 안내가 맨 위로 올라왔고 번호는 화면 순서대로 다시 매긴다 → 제목으로 본다.
+for (const sec of ["조이너 안내", "리더 구성", "SkillMod 칸 진단", "위젯"])
   ok(koOut.includes(sec), "섹션 " + sec + " 렌더");
+{
+  const heads = await ko.evaluate(() => [...document.querySelectorAll("#out h2")].map(h => h.textContent.trim()));
+  ok(/^① 조이너 안내/.test(heads[0] || ""), "조이너 안내가 결과 맨 위 섹션이다", heads.map(h => h.slice(0, 12)).join(" | "));
+  ok(heads.every((h, i) => h.startsWith("①②③④⑤⑥⑦"[i])), "섹션 번호가 화면 순서대로 매겨진다", heads.map(h => h.slice(0, 2)).join(""));
+}
 ok(errors.length === 0, "로드 중 에러 없음", errors.join(" | "));
 
 // ── 2. 시트 판정 4상태 ─────────────────────────────────────────────────
@@ -418,6 +424,123 @@ for (const w of [1400, 768, 430, 390, 360, 320]) {
 }
 ok(!/tab=gear/.test(ko.url()), "URL 에서 tab=gear 가 빠진다", ko.url());
 ok(/①/.test(await outText(ko)), "편성 결과가 그대로 있다");
+
+// ── 3.7 조이너 안내 — 시트 카드 · 계산 카드 (2026-11-11) ────────────────
+// 지금 편성은 제로니모·미아·그웬 48/4/48 Gen 7 — 시트가 노라를 3칸 적은 행이다.
+section("조이너 안내 — 시트 카드 · 계산 카드");
+{
+  const j = await ko.evaluate(() => {
+    const q = s => document.querySelector(s), qa = s => [...document.querySelectorAll(s)];
+    const names = s => qa(s).map(e => e.textContent.replace(/^\d/, "").trim());
+    const box = s => { const e = q(s); if (!e) return null; const r = e.getBoundingClientRect(); return {l: r.left, r: r.right, t: r.top, b: r.bottom}; };
+    return {
+      sheet: names('#sheet .srow [data-k="main"] .hc'), rec: names("#rec > p > b .hc"),
+      cmp: !!q("#cmp"), cmpText: q("#cmp") ? q("#cmp").textContent : "",
+      broken: qa("#out img.hpic").filter(i => i.complete && i.naturalWidth === 0).length,
+      // 칩 줄만 flex 여야 한다 — 설명 문단의 굵은 글씨까지 flex 가 되면 줄이 깨진다(실제로 그렇게 됐다)
+      flexB: qa("#out .jcard p.cap b, #out .jcard p.note b").filter(b => getComputedStyle(b).display === "flex").length,
+      chipFlex: getComputedStyle(q("#rec > p > b")).display,
+      open: ["single", "how", "tips"].map(id => q("#" + id) ? q("#" + id).open : null),
+      sb: box("#sheet"), rb: box("#rec"),
+    };
+  });
+  // Gen 7 행의 4번 칸은 시트 원문이 "Norah/Patrick" 이다 — 한 칸에 두 이름이 그대로 보여야 한다
+  ok(j.sheet.join() === "노라,노라,노라,노라/패트릭", "시트 카드가 시트 칸을 그대로 싣는다 (노라 3칸 + 노라/패트릭 칸)", j.sheet.join(","));
+  ok(j.rec.length === 4 && j.rec.filter(x => x === "노라").length < 3, "계산 카드는 네 명을 따로 고른다 (노라 3장을 쌓지 않는다)", j.rec.join(","));
+  ok(j.cmp && /칸 중/.test(j.cmpText), "시트 vs 계산 비교 문단이 뜬다");
+  ok(j.broken === 0, "카드의 초상이 깨지지 않는다", j.broken + "개");
+  ok(j.flexB === 0 && j.chipFlex === "flex", "칩 줄만 flex 고 설명 문단의 굵은 글씨는 그대로다", "문단 속 flex " + j.flexB + " · 칩 줄 " + j.chipFlex);
+  ok(j.open.every(x => x === false), "순위표 · 계산 방식 · 시트 머리말은 접힌 채로 뜬다", j.open.join(","));
+  ok(j.sb && j.rb && j.rb.l >= j.sb.r - 1 && Math.abs(j.rb.t - j.sb.t) < 4, "넓은 화면에서는 시트 카드와 계산 카드가 나란히 선다",
+     j.sb && j.rb ? "시트 " + Math.round(j.sb.l) + "~" + Math.round(j.sb.r) + " · 계산 " + Math.round(j.rb.l) + "~" + Math.round(j.rb.r) : "카드 없음");
+  // 접힌 것은 눌러야 열린다
+  await ko.click("#how > summary");
+  ok(await ko.evaluate(() => document.getElementById("how").open), "「계산 방식과 한계」를 누르면 펼쳐진다");
+  ok(await ko.isVisible("#how .callout"), "펼치면 감소 계열 안내가 보인다");
+  await ko.click("#how > summary");
+  // 숫자를 고친 직후의 첫 클릭이 삼켜지지 않는다 — 입력칸에서 포커스가 빠질 때 오는 change 가 결과를 통째로 다시 그리면
+  // 누르던 요소가 사라진다. 결과가 같으면 다시 그리지 않으므로 살아 있어야 한다.
+  await ko.fill("#r3", "48");
+  await ko.click("#single > summary");
+  ok(await ko.evaluate(() => document.getElementById("single").open), "병비 칸을 만진 직후에도 순위표 접기가 첫 클릭에 열린다");
+  // 열어 둔 접기는 입력이 바뀌어 다시 그려져도 열린 채다
+  await setRatio(ko, "r", [50, 2, 48]);
+  ok(await ko.evaluate(() => document.getElementById("single").open), "병비를 바꿔도 열어 둔 순위표는 열린 채다");
+  await ko.click("#single > summary");
+  await setRatio(ko, "r", [48, 4, 48]);
+  ok(!(await ko.evaluate(() => document.getElementById("single").open)), "닫아 둔 접기는 닫힌 채다");
+
+  // 좁은 화면에서는 위아래로 쌓인다
+  await ko.setViewportSize({width: 390, height: 900});
+  const m = await ko.evaluate(() => { const b = id => document.getElementById(id).getBoundingClientRect();
+    return {st: b("sheet").top, sb: b("sheet").bottom, rt: b("rec").top, w: document.body.scrollWidth}; });
+  ok(m.rt >= m.sb - 1, "390px 에서는 시트 카드 아래에 계산 카드가 온다", "시트 끝 " + Math.round(m.sb) + " · 계산 시작 " + Math.round(m.rt));
+  ok(m.w <= 392, "390px 에서 본문이 가로로 넘치지 않는다", m.w + "px");
+  await ko.setViewportSize({width: 1280, height: 720});
+
+  // 병비가 다른 시트 행 안내(📍) — 버튼을 누르면 그 병비로 옮겨 간다
+  await ko.evaluate(() => {
+    const set = (id, v) => { const e = document.getElementById(id); e.value = v; e.dispatchEvent(new Event("change")); };
+    set("gcap", "4"); set("hInf", "ahmose"); set("hLan", "philly"); set("hMar", "lynn");
+  });
+  await setRatio(ko, "r", [60, 40, 0]);
+  ok(await ko.isVisible('#sheet [data-k="near"]'), "병비가 맞는 행이 없으면 리더가 같은 행을 안내한다");
+  ok(!(await ko.evaluate(() => !!document.getElementById("cmp"))), "그때는 비교 문단이 없다 (병비가 다른 행과는 비교하지 않는다)");
+  await ko.click('#sheet button[data-r="50,2,48"]');
+  await ko.waitForTimeout(80);
+  const after = await ko.evaluate(() => ({r: [r1.value, r2.value, r3.value].join("/"), near: !!document.querySelector('#sheet [data-k="near"]'),
+    mult: !!document.querySelector("#sheet .srow .mult"), cmp: !!document.getElementById("cmp")}));
+  ok(after.r === "50/2/48" && !after.near && after.mult && after.cmp, "병비 버튼을 누르면 그 병비로 바뀌고 시트 행이 잡힌다", JSON.stringify(after));
+
+  // 시트가 답을 둘 적어 둔 자리 — 블록 두 개
+  await ko.evaluate(() => {
+    const set = (id, v) => { const e = document.getElementById(id); e.value = v; e.dispatchEvent(new Event("change")); };
+    set("gcap", "12"); set("hInf", "herbjorg"); set("hLan", "lloyd"); set("hMar", "ligeia");
+  });
+  await setRatio(ko, "r", [60, 20, 20]);
+  ok((await ko.evaluate(() => document.querySelectorAll("#sheet .srow").length)) === 2, "시트가 답을 둘 적은 편성은 두 블록이 다 뜬다");
+  ok((await ko.evaluate(() => document.querySelectorAll("#cmp .cmprow").length)) === 2, "비교 문단도 행마다 뜬다 (대표 행 하나만 고르지 않는다)");
+
+  // 이름을 펴서 실은 칸에는 시트 원문 표기가 같이 보인다 — Gen 5 헥터·노라·린 50/20/30 의 4번 칸은 시트가 별표 없이 "Jessie" 라고 적었다
+  await ko.evaluate(() => {
+    const set = (id, v) => { const e = document.getElementById(id); e.value = v; e.dispatchEvent(new Event("change")); };
+    set("gcap", "5"); set("hInf", "hector"); set("hLan", "norah"); set("hMar", "lynn");
+  });
+  await setRatio(ko, "r", [50, 20, 30]);
+  const rawChip = await ko.evaluate(() => {
+    const chips = [...document.querySelectorAll('#sheet .srow [data-k="main"] .hc')];
+    const c = chips[3], raw = c && c.querySelector("i.raw"), note = document.querySelector('#sheet [data-k="raw"]');
+    const cr = c && c.getBoundingClientRect(), card = document.getElementById("sheet").getBoundingClientRect();
+    return {n: chips.length, raw: raw ? raw.textContent : null, vis: raw ? raw.getBoundingClientRect().width > 0 : false,
+            imgs: c ? c.querySelectorAll("img").length : 0, inside: !!cr && cr.right <= card.right + 1, note: note ? note.textContent : ""};
+  });
+  ok(rawChip.n === 4 && rawChip.raw === "Jessie" && rawChip.vis && rawChip.imgs === 3 && rawChip.inside,
+     "펴서 실은 칸에 시트 원문 표기(Jessie)가 보이고 칩이 카드 밖으로 나가지 않는다", JSON.stringify(rawChip).slice(0, 160));
+  ok(/우리 해석/.test(rawChip.note) && /Jessie\*/.test(rawChip.note), "범례에 없는 표기는 우리 해석이라고 밝힌다", rawChip.note.slice(0, 120));
+  await ko.setViewportSize({width: 390, height: 900});
+  ok((await ko.evaluate(() => document.body.scrollWidth)) <= 392, "원문 표기가 붙은 칩도 390px 에서 넘치지 않는다");
+  await ko.setViewportSize({width: 1280, height: 720});
+
+  // 리더를 다 비웠다가 같은 리더를 다시 고르면 결과가 돌아온다 (2026-11-11 리뷰 — 안내문이 그대로 남던 버그)
+  const setLeaders = (a, b, c) => ko.evaluate(([a, b, c]) => {
+    const set = (id, v) => { const e = document.getElementById(id); e.value = v; e.dispatchEvent(new Event("change")); };
+    set("hInf", a); set("hLan", b); set("hMar", c);
+  }, [a, b, c]);
+  const before = await ko.evaluate(() => document.getElementById("out").innerHTML.length);
+  await setLeaders("", "", "");
+  const empty = await ko.evaluate(() => ({t: document.getElementById("out").textContent, sheet: !!document.getElementById("sheet")}));
+  ok(/리더를 한 명 이상 선택하세요/.test(empty.t) && !empty.sheet, "리더를 다 비우면 안내문만 남는다", empty.t.slice(0, 60));
+  await setLeaders("hector", "norah", "lynn");
+  const back = await ko.evaluate(() => ({sheet: !!document.getElementById("sheet"), rec: document.querySelectorAll("#rec > p > b .hc").length, n: document.getElementById("out").innerHTML.length}));
+  ok(back.sheet && back.rec === 4 && back.n === before, "같은 리더를 다시 고르면 조이너 안내가 돌아온다", JSON.stringify(back) + " · 전 " + before);
+
+  // 원래 편성으로 되돌린다 (아래 검사들이 기본 상태를 기대한다)
+  await ko.evaluate(() => {
+    const set = (id, v) => { const e = document.getElementById(id); e.value = v; e.dispatchEvent(new Event("change")); };
+    set("gcap", "7"); set("hInf", "jeronimo"); set("hLan", "mia"); set("hMar", "gwen");
+  });
+  await setRatio(ko, "r", [48, 4, 48]);
+}
 
 // ?tab=gear 딥링크
 {

@@ -13,10 +13,17 @@ SkillMod = (내 피해증폭 × 적 방어감소) ÷ (적 피해감소 × 적 �
 
 ```bash
 python tools/sim/xlsx2tsv.py data.xlsx   # ① Ton 시트 오프라인 사본 → out/xlsx/*.tsv (openpyxl 필요)
-node tools/sim/01-xlsx-diff.mjs          # ② xlsx 54행 ↔ SHEET_COMPS · SHEET_ROWS · s:1 · stack 대조
-node tools/sim/02-formula.mjs            # ③ 시트 Rally Joiners 16행 · 54행 추천 배율 · ⑤ 단독 배율 752건 · 탐욕 vs 전수 최적
+node tools/sim/01-xlsx-diff.mjs          # ② xlsx 60행 ↔ SHEET_COMPS(j·alt·meta·lb·ao·c) · SHEET_ROWS · s:1 · stack 대조
+node tools/sim/02-formula.mjs            # ③ 시트 Rally Joiners 16행 · 시트 행 추천 배율 · 단독 배율 · 탐욕 vs 전수 최적
 node tools/sim/03-sweep.mjs              # ④ 세대별 재현율 · DW.infantry/NA_SHARE 민감도 · 포화 곡선
+node tools/sim/04-sheet-fixture.mjs      # ⑤ ① 의 TSV → test/fixtures-sheet.mjs (시트 원문 정답지) 재생성
 ```
+
+**⑤ 는 대조가 아니라 생성이다.** ②~④ 는 gitignore 된 `out/` 과 파이썬이 있어야 돌아서 커밋 게이트 밖이다. ⑤ 가 만든
+`test/fixtures-sheet.mjs` 는 저장소에 들어가고, `node test/unit.mjs` 가 SHEET_COMPS 60행(라벨·칸·원문 표기·대안·비고)과
+SHEET_TIPS 를 그것과 한 행씩 대조한다 — 시트 원문 대조가 그렇게 게이트 안으로 들어갔다(2026-11-11).
+시트(`data.xlsx`)가 바뀌면 ① → ⑤ → unit 순서로 돌리고, 정답지를 손으로 고치지 않는다. 이름 매핑이 안 되는 칸이 있으면 ⑤ 가 던진다
+(`lib.mjs` 의 `ALIAS` 에 표기를 더할 것).
 
 산출물은 `out/out-0N.json` (gitignore). 기대 상태(2026-09-14):
 - ② 차이 0 (g12 60/20/20 쌍둥이 행은 키가 같아 스크립트가 한 쌍으로 묶는다 — 차이가 아니다)
