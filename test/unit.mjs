@@ -220,12 +220,19 @@ ok(Math.abs(E.norm(48, 4, 48).inf - 48) < 1e-9, "병비 정규화 (합 100이면
 ok(Math.abs(E.norm(60, 60, 0).inf - 50) < 1e-9, "병비 정규화 (합 120 → 50/50/0)");
 ok(E.tgtStat("marksman", E.norm(60, 40, 0))[0] === "dead", "궁병 0% → 사망 판정");
 ok(E.tgtStat("marksman", E.norm(50, 20, 30))[0] === "ok", "궁병 30% → 정상 판정");
-ok(E.DW.infantry === 0.3 && E.NA_SHARE === 0.5, "딜 지분 가정 고정 (NA_SHARE 0.5 — 2026-10-17 엔진 격자 · 상한 2/3 에서 여유)");
+ok(E.DW.infantry === 0.1 && E.NA_SHARE === 0.5, "딜 지분 가정 고정 (보병 0.1 — 2026-11-13 사용자 결정 · NA_SHARE 0.5 — 2026-10-17 엔진 격자 · 상한 2/3 에서 여유)");
+// 0.1 을 고른 기준 — 시트에서 보병이 가장 많은 병비에서 "보병 피해량 +100%"(플린트 S1)가 20% 계열(×1.200)을 넘지 않는다.
+// 시트가 주는 건 이 상한(DW < 1/6) 하나뿐이다. 시트에 보병이 더 많은 행이 생기면 여기서 먼저 알려 준다.
+{ const top = Math.max(...E.SHEET_COMPS.flatMap(c => c.rs).map(v => v[0] * 100 / (v[0] + v[1] + v[2])));
+  const worst = E.SHEET_COMPS.flatMap(c => c.rs).filter(v => Math.abs(v[0] * 100 / (v[0] + v[1] + v[2]) - top) < 1e-9)
+    .map(v => E.dmgShare("infantry", E.norm(v[0], v[1], v[2]))).reduce((a, b) => Math.max(a, b), 0);
+  ok(top === 60 && worst < 0.2 - 1e-9, "시트의 보병 최대 병비(60%)에서 보병 딜 지분이 20% 미만 — 플린트 S1 이 20% 계열을 넘지 않는다",
+     "보병 최대 " + top + "% · 딜 지분 " + (worst * 100).toFixed(1) + "%"); }
 ok(E.twoStat(.15, .10) === 1 && E.twoStat(0, .2) === 1, "두 칸 스킬은 곱한다 — 교차항 제거는 폐지됐다 (2026-11-10 · twoStat ≡ 1)");
 { const ph = E.atoms(E.byId.philly.exp[0], {inf: 60, lan: 40, mar: 0});
   const v = E.scoreAtoms(ph).s; ok(Math.abs(v - 1.15 * 1.10) < 1e-12 && !ph.some(a => a.t === "two"), "필리 S1 = 공격 1.15 × 방어 1.10 = ×1.265 (다른 버킷은 곱)", v); }
-ok(Math.abs(E.dmgShare("infantry", E.norm(50, 20, 30)) - (50 * 0.3) / (50 * 0.3 + 20 + 30)) < 1e-9,
-   "보병 딜 지분에 가중치 0.3 적용");
+ok(Math.abs(E.dmgShare("infantry", E.norm(50, 20, 30)) - (50 * 0.1) / (50 * 0.1 + 20 + 30)) < 1e-9,
+   "보병 딜 지분에 가중치 0.1 적용");
 
 // ── 7. i18n ────────────────────────────────────────────────────────────
 section("i18n");
@@ -667,7 +674,7 @@ section("X 스킬의 칸 귀속 (bk)");
   ok(bad.length === 0, "bk 는 X 슬롯에만 붙고 같은 계열의 실재 칸을 가리킨다", bad.slice(0, 3).join(" | "));
 
   // (3) 리더의 bk 스킬이 칸에 실제로 들어가는가 — 플린트 보병 100% @ 60/40
-  //     보병 딜 지분 = 60*0.3 / (60*0.3 + 40) = 18/58 = 0.3103 → A 에 +0.31
+  //     보병 딜 지분 = 60*0.1 / (60*0.1 + 40) = 6/46 = 0.1304 → A 에 +0.13  (2026-11-13 까지 0.3 → 18/58 = 0.31)
   {
     const a = boot("ko").leaders("flint", "", "").mine([60, 40, 0]);
     const html = a.render();
@@ -676,8 +683,8 @@ section("X 스킬의 칸 귀속 (bk)");
     ok(m && Math.abs(+m[1] - +want.toFixed(2)) < 5e-3,
        "리더 플린트의 보병 피해량이 A 칸에 지분 환산으로 들어간다",
        "화면 " + (m && m[1]) + " / 기대 " + want.toFixed(2));
-    ok(/Pyromaniac \+31% \(병종 지분 환산\)/.test(html),
-       "② 구성 칸에 환산됐다는 표시가 남는다");
+    ok(html.includes("Pyromaniac +" + ((want - 1) * 100).toFixed(0) + "% (병종 지분 환산)") && (want - 1) > 0.12 && (want - 1) < 0.14,
+       "② 구성 칸에 환산됐다는 표시가 남는다 (60/40 → +13%)", ((want - 1) * 100).toFixed(1) + "%");
   }
 
   // (4) 조이너의 bk 스킬은 칸에서 잰다 → 포화를 겪는다
@@ -1860,6 +1867,75 @@ section("버킷 이론 (2026-11-10)");
   }
   { const cm = chips(["logan", "philly", "zinman"], [60, 40, 0], 3);   // 시트 행 — 추천 첫 칸이 미아
     ok(cm.includes("CHANCE"), "미아가 든 추천에 CHANCE 칩 (미아류도 확률형이다)", cm.join(",")); }
+}
+
+// ── 보병 전용 몫 — 플린트 · 아모세 (2026-11-13 · 사용자 결정) ─────────────
+// "보병만 버프하는 스킬이라 효율이 좋을 수가 없다." 그런데 계산은 플린트(보병 피해량 +100%)를 60/40 에서 ×1.310,
+// 아모세(보병 받피 −70%)를 ×1.25~1.27 로 재서 「계산 추천 — 전체 영웅」에 21행·13행, Top 5 에 2~3장씩 겹쳐 올렸다.
+//   · 보병 딜 가중 DW.infantry 0.3 → 0.1   · 아모세 Viper Formation 의 보병 몫은 배율에서 뺀다(off:1) — 창·궁 몫만 계산
+// 여기서 지키는 것: 그 둘이 20% 계열 아래로 내려갔는가 · 시트 편성 어디서도 추천·Top 5 에 안 드는가 · 뺀 몫을 화면이 숨기지 않는가.
+section("보병 전용 몫 — 플린트 · 아모세 (2026-11-13)");
+{
+  // (1) off 는 명단을 박아 둔다 — 늘릴 때는 그 영웅 주석에 근거부터 적어야 한다(data.js 머리말).
+  const offs = [];
+  for (const h of E.HEROES) for (const e of h.exp) for (const q of [e, e.also].filter(Boolean))
+    if (q.off) offs.push(h.id + "/" + e.n + "/" + q.tgt + (q === e ? "" : "(also)"));
+  ok(offs.join(",") === "ahmose/Viper Formation/infantry(also)", "배율에서 뺀 몫(off)은 아모세 Viper Formation 의 보병 몫 하나뿐", offs.join(","));
+
+  // (2) 원자 — 아모세 S1 은 창·궁 −30% 몫(시간평균 .15 × 병력 비중)만 D 버킷에 든다. 보병 몫(.35 × 60%)은 안 든다.
+  const r64 = E.norm(60, 40, 0), at = E.atoms(E.byId.ahmose.exp[0], r64);
+  ok(at.length === 1 && at[0].t === "det" && at[0].sl === "D" && Math.abs(at[0].v - .15 * .4) < 1e-12,
+     "아모세 S1 은 60/40 에서 D 버킷에 +0.06 만 넣는다 (보병 몫 +0.21 은 뺐다)", JSON.stringify(at));
+  ok(Math.abs(E.scoreAtoms(E.atoms(E.byId.flint.exp[0], r64)).s - (1 + 6 / 46)) < 1e-12, "플린트 S1 은 60/40 빈 버킷에서 ×1.130 (보병 딜 지분 6/46)");
+
+  // (3) 시트 60행 × 리더 대안 × 병비 전부 — 둘 다 20% 계열(×1.200) 아래이고, 전체 영웅 추천·Top 5 어디에도 안 든다.
+  //     고치기 전: 전체 영웅 추천에 플린트 21행·아모세 13행, Top 5 에 같은 영웅 2~3장(로건·필리·진먼 60/40 → 미아 + 플린트 2장).
+  const a = boot("ko");
+  a.js("var __dInf=null;var __rInf=render;render=function(d){__dInf=d;return __rInf(d);};");
+  const pickIds = (html, id) => { const i = html.indexOf('id="' + id + '"'); if (i < 0) return null;
+    const b = /<p><b>([\s\S]*?)<\/b><\/p>/.exec(html.slice(i)); return b ? [...b[1].matchAll(/heroes\/([a-z-]+)\.webp/g)].map(m => m[1]) : []; };
+  const T = ["flint", "ahmose"], inRec = [], inTop = [], high = [];
+  let runs = 0, seen = {flint: 0, ahmose: 0};
+  for (const c of E.SHEET_COMPS) for (const i of c.l[0]) for (const l of c.l[1]) for (const m of c.l[2]) for (const v of c.rs) {
+    runs++;
+    const html = a.leaders(i, l, m).mine(v).gcap(c.g).render(), d = a.js("__dInf"), tag = [i, l, m].join("+") + " " + v.join("/");
+    for (const t of T) { const x = d.rank.filter(q => q.h.id === t)[0]; if (!x) continue; seen[t]++; if (!(x.mul < 1.2 - 1e-9)) high.push(t + " ×" + x.mul.toFixed(3) + " @ " + tag); }
+    const all = pickIds(html, "recAll") || pickIds(html, "rec") || [];
+    if (all.some(x => T.includes(x))) inRec.push(tag + " → " + all.join(","));
+    (d.combos || []).forEach(k => { if (k.cls.some(q => q.mem.some(x => T.includes(x.h.id)))) inTop.push(tag); });
+  }
+  ok(runs >= 140 && seen.flint >= 130 && seen.ahmose >= 100, "스윕이 실제로 돌았다 (플린트·아모세가 후보에 있는 편성 수)", runs + "회 · 플린트 " + seen.flint + " · 아모세 " + seen.ahmose);
+  ok(high.length === 0, "시트 편성 어디서도 조이너 플린트·아모세가 20% 계열(×1.200)을 넘지 않는다", high.slice(0, 3).join(" | "));
+  ok(inRec.length === 0, "시트 편성 어디서도 플린트·아모세가 계산 추천(전체 영웅)에 들지 않는다", inRec.slice(0, 3).join(" | "));
+  ok(inTop.length === 0, "시트 편성 어디서도 플린트·아모세가 버킷 조합 Top 5 에 들지 않는다", inTop.slice(0, 3).join(" | "));
+
+  // (4) 리더 아모세 — D 버킷에는 창·궁 몫만 들어가고, 뺀 몫을 화면이 숨기지 않는다(버킷 맵 문단 + 병종 전용 표의 태그).
+  const hk = boot("ko").leaders("ahmose", "reina", "lynn").mine([60, 40, 0]).gcap(4).render();
+  const dk = (() => { const b = boot("ko"); b.js("var __dInf=null;var __rInf=render;render=function(d){__dInf=d;return __rInf(d);};");
+    b.leaders("ahmose", "", "").mine([60, 40, 0]).gcap(4).render(); return b.js("JSON.stringify({D:__dInf.buck.D,offs:__dInf.offs.map(x=>x.hero.id+'/'+x.tgt)})"); })();
+  ok(JSON.parse(dk).offs.join(",") === "ahmose/infantry" && Math.abs(JSON.parse(dk).D - 1.06) < 1e-9, "리더 아모세의 D 버킷은 60/40 에서 1.06 (창·궁 몫만)", dk);
+  const offP = (/<p class="cap" data-k="off">([\s\S]*?)<\/p>/.exec(hk) || [0, ""])[1];
+  ok(/배율에서 뺀 몫/.test(offP) && offP.includes("Viper Formation") && offP.includes("보병 몫") && /나머지 몫은 그대로 계산/.test(offP),
+     "버킷 맵이 뺀 몫을 적는다 — 아모세 Viper Formation (보병 몫)", offP.replace(/<[^>]+>/g, "").slice(0, 80));
+  const rowsV = hk.split("<tr").filter(s => s.includes("Viper Formation") && s.includes("</td><td>"));
+  const tagged = rowsV.filter(s => s.includes(">배율 제외</span>"));
+  ok(rowsV.length >= 2 && tagged.length === 1 && tagged[0].includes("<td>보병</td>"),
+     "병종 전용 표에서 보병 몫 행에만 「배율 제외」 태그가 붙는다 (창·궁 몫 행에는 없다)", rowsV.length + "행 · 태그 " + tagged.length);
+  ok(!/data-k="off"/.test(boot("ko").leaders("flint", "philly", "zinman").mine([60, 40, 0]).gcap(4).render()), "뺀 몫이 없는 리더 구성에서는 그 문단이 안 뜬다");
+  const he = boot("en").leaders("ahmose", "reina", "lynn").mine([60, 40, 0]).gcap(4).render();
+  ok(/data-k="off">[^<]*Left out of the score/.test(he) && !/[가-힣]/.test((/<p class="cap" data-k="off">([\s\S]*?)<\/p>/.exec(he) || [0, ""])[1]) && he.includes(">not scored</span>"),
+     "영어 화면도 뺀 몫을 적는다 (한글 잔존 없음)");
+
+  // (5) 조이너 아모세의 판정 라벨은 계산에 드는 몫(창·궁)을 본다 — 보병 비중으로 "정상" 이라고 적으면 뺀 몫을 근거로 삼는 셈이다.
+  { const b = boot("ko"); b.js("var __dInf=null;var __rInf=render;render=function(d){__dInf=d;return __rInf(d);};");
+    b.leaders("jeronimo", "mia", "alonso").mine([100, 0, 0]).gcap(4).render();
+    const x = JSON.parse(b.js("JSON.stringify((function(){var x=__dInf.rank.filter(function(q){return q.h.id==='ahmose';})[0];return {mul:x.mul,cond:x.cond,detail:x.detail};})())"));
+    ok(Math.abs(x.mul - 1) < 1e-9 && /^dead\|/.test(x.cond) && x.detail.some(t => /보병 몫은 배율 제외/.test(t)),
+       "보병 100% 편성에서 조이너 아모세는 ×1.000 · 사망 판정 — 계산에 드는 창·궁 몫이 0 이다", JSON.stringify(x).slice(0, 160)); }
+
+  // (6) 가정 문구 — 화면이 새 값을 적는다(0.3 이 남아 있으면 계산과 화면이 어긋난다).
+  ok(/보병 가중치 0\.1/.test(E.STR.assump[0]) && /infantry weighted 0\.1/.test(E.STR.assump[1]) && !/0\.3/.test(E.STR.assump[0] + E.STR.assump[1]) &&
+     /아모세 S1 의 보병 몫/.test(E.STR.assump[0]) && /infantry part of Ahmose/.test(E.STR.assump[1]), "계산 가정 문구가 보병 가중치 0.1 · 아모세 보병 몫 제외를 적는다");
 }
 
 // ── 편성 저장 · 이전 편성 (2026-11-11) ──────────────────────────────────

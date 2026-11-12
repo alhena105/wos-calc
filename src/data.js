@@ -29,6 +29,9 @@
 //   무명 S1 · 헤르보르 S2 · 시걸 S3(일반공격 받피 −25% / 스킬 받피 −30%)도 버킷이 미확정이라 v:null 이다.
 //   조이너로서 레니·무명은 수치 대신 규칙 레이어(engine.js joinerRules)가 안내한다.
 // unsure:1 — Ton 표에서도 "?" 로 적힌 자리. 값은 그대로 배율에 들어가고 화면에 플래그만 단다.
+// off:1 — 값은 적혀 있지만 **실전 가치를 잴 자료가 없어 배율에 넣지 않는 몫** (지금은 아모세 Viper Formation 의 보병 몫 하나 ·
+//   2026-11-13 사용자 결정). 화면에는 숨기지 않고 "배율에서 뺀 몫" 으로 적는다. v:null 과 다르다 — 수치는 있다.
+//   ⚠️ 같은 스킬의 나머지 몫은 그대로 계산한다. 새로 달 때는 근거(왜 값을 못 믿는가)를 그 영웅 주석에 적을 것.
 // partial:1 — 그웬 S1. "일부 공격에만 걸린다"(Ton) → engine.js 의 GWEN_EFF(0.5) 로 감쇄. 0.5 는 근거 없는 값이다(사용자 결정).
 // 제시·제셀·제로니모(S1)·린(S1) 은 slot:"E"(파괴력) 다 — wosheroes 원문은 "damage dealt" 지만
 //   실험으로 나눈 집결원 스킬 분류표(2026-10-17 사용자 제공)가 넷을 블랑쉬·알론소와 같은 LETHALITY UP 에,
@@ -138,7 +141,13 @@ const HEROES = [
       // 원문이 문자 그대로 "reducing damage taken" 이라 bk:"D" 다(노라·에디스와 같은 규칙). 예전엔 빠져 있었다.
       // ⚠️ "보병이 4회마다 공격을 쉰다"는 비용은 여전히 안 실린다 → 아모세는 과대평가 쪽이고, 시트 미등재라 #rec 에는 안 들지만
       // #recAll(이론) 에는 든다(2026-09-14 실측: bk 없이 39행 · bk 넣고 16행 · also 없던 예전 2행).
-      {n:"Viper Formation",slot:"X",k:"sur",v:.35,tgt:"infantry",bk:"D",also:{slot:"X",k:"sur",v:.15,tgt:"mar+lan",bk:"D"},t:"4공격마다 2턴 보병 받피 −70%, 창·궁 −30%",te:"every 4th attack, 2 turns: infantry damage taken −70%, lancer/marksman −30%"},
+      // 2026-11-13 (사용자 결정): 보병 −70% 몫(.35)은 **배율에서 뺀다**(off:1). 병력 비중으로 환산하면 이 몫만으로 +17~21% 라
+      // 아모세가 ×1.25~1.27 로 25% 조이너와 나란히 섰고, 「계산 추천 — 전체 영웅」에 13/60 행 올라왔다. 사용자: "보병만 버프하는 스킬이라
+      // 효율이 좋을 수가 없다." 시트도 아모세를 조이너로 적은 적이 없다. 보병 전용 생존 버프의 실전 가치도, 같이 붙는 대가
+      // (원문 "pauses the attack once every four times" — 2026-11-13 wosheroes 재확인)도 잴 자료가 없어 **값을 고쳐 넣지 않고 뺐다.**
+      // ⚠️ "대가를 못 실어서 뺐다" 가 근거의 전부가 아니다 — DW 0.1 로 그 대가를 어림하면 3% 남짓이라 그것만으로는 이 몫이 안 지워진다.
+      // 창·궁 −30% 몫(.15)은 그대로 계산한다 → 본체를 그쪽으로 두고 보병 몫을 also 로 돌렸다(조이너 판정 라벨도 창·궁 비중을 본다).
+      {n:"Viper Formation",slot:"X",k:"sur",v:.15,tgt:"mar+lan",bk:"D",also:{slot:"X",k:"sur",v:.35,tgt:"infantry",bk:"D",off:1},t:"보병이 4회마다 공격을 쉬고, 2턴 보병 받피 −70% · 창·궁 −30%",te:"infantry pause their attack once every four times; for 2 turns infantry damage taken −70%, lancer/marksman −30%"},
       {n:"Prayer of Flame",slot:"X",k:"dmg",v:1.0,tgt:"infantry",bk:"A",t:"보병 피해량 +100%",te:"infantry damage +100%"},
       {n:"Blade of Light",slot:"X",k:"dmg",v:.60,tgt:"infantry",unsure:1,also:{slot:"G",v:null},t:"보병 공격당 피해 +60% & 대상 받피 +25%",te:"infantry, per attack: +60% damage & target takes +25% damage"}],
  w:{side:"defender",stat:"Health",name:"Oath of Guardian"}},

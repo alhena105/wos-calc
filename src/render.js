@@ -26,7 +26,7 @@ function comboPanel(d){
  return o;}
 
 function render(d){
- const {mode,leaders,picks,r,buck,src,cls,leaderOnly,unknown,base,s0,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap,comp,rivals,near,combos}=d;
+ const {mode,leaders,picks,r,buck,src,cls,leaderOnly,unknown,offs,base,s0,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap,comp,rivals,near,combos}=d;
  // 섹션을 조각으로 모았다가 맨 끝에서 순서대로 잇는다. 번호({{n}})는 그때 매긴다 — 카운터처럼 있을 때만 나오는 섹션이 있어서다.
  let o="";const part={};
  const modeKr=mode==="rally"?L("공성(랠리)","Rally (offense)"):L("수성(개리슨)","Garrison (defense)");
@@ -77,6 +77,10 @@ function render(d){
   '<p class="cap">'+L("같은 버킷은 더하고 다른 버킷은 곱합니다(버킷 값 = 1 + Σ%). 감소 계열도 1+Σ 로 나눗셈 쪽에 들어갑니다. <b>회색 칩</b>은 스킬 데미지·리더 전용 버킷(보호막·표식 대상·특정 병종 상대·추가 피해·스킬 데미지↑)이라 <b>수치 모델이 없어 배율에 넣지 않았습니다</b> — 근거: Ton 2026-11-10 영상의 원정스킬 버킷표.",
    "Same bucket adds, different buckets multiply (bucket = 1 + Σ%). Reductions also enter as 1+Σ, on the dividing side. <b>Grey chips</b> are skill damage and leader-only buckets (shield, marked target, vs a troop type, extra damage, skill damage up) — <b>there is no numeric model for them, so they are not scored</b>. Source: the expedition-skill bucket table in Ton's 2026-11-10 video.")+'</p>'+
   (unknown.length?'<p class="cap">❓ '+L("수치 미확인·미확정: ","Unconfirmed: ")+unknown.map(x=>esc(HN(x.hero))+" "+esc(x.skill)+" ("+x.slot+(x.reason==="unsure"?L(" — 표에서도 ?"," — ? in the table"):L(" — 수치 없음 · 배율 제외"," — no value · not scored"))+")").join(" · ")+'</p>':"")+
+  // off — 값은 적혀 있지만 배율에서 뺀 몫(아모세 Viper 의 보병 몫). 숨기지 않고 여기 적는다.
+  (offs&&offs.length?'<p class="cap" data-k="off">⏸ '+L("배율에서 뺀 몫: ","Left out of the score: ")+offs.map(x=>esc(HN(x.hero))+" "+esc(x.skill)+" ("+tgtName[x.tgt]+L(" 몫"," part")+")").join(" · ")+
+    L(" — 수치는 있지만 실전 가치를 잴 자료가 없어 점수에 넣지 않았습니다. 같은 스킬의 나머지 몫은 그대로 계산합니다.",
+      " — the number is known, but there is no data to value it in battle, so it is not scored. The rest of the same skill is scored as usual.")+'</p>':"")+
   '</div>';
  o+="</div>";
  part.buck=o;o="";
@@ -103,7 +107,8 @@ function render(d){
   o+='<h2>{{n}} '+L("병종 전용 · 주기형 스킬 판정","Class-locked and periodic skills")+'</h2><div class="panel"><div class="xscroll"><table><thead><tr><th>'+L("영웅","Hero")+'</th><th>'+L("스킬","Skill")+'</th><th>'+L("대상","Target")+'</th><th>'+L("현재 비중","Current share")+'</th><th>'+L("판정","Verdict")+'</th></tr></thead><tbody>';
   cls.forEach(c=>{o+="<tr"+(c.st==="dead"?' class="dead"':c.st==="ok"?' class="hi"':"")+'><td class="b">'+esc(HN(c.hero))+"</td><td>"+esc(c.e.n)+
    '<div class="note">'+esc(L(c.e.t,c.e.te||c.e.t))+"</div></td><td>"+tgtName[c.e.tgt]+"</td><td>"+c.v.toFixed(0)+
-   '%</td><td><span class="tag t-'+(c.st==="dead"?"bad":c.st==="weak"?"warn":"ok")+'">'+c.lbl+"</span></td></tr>";});
+   '%</td><td><span class="tag t-'+(c.st==="dead"?"bad":c.st==="weak"?"warn":"ok")+'">'+c.lbl+"</span>"+
+   (c.e.off?' <span class="tag t-warn">'+L("배율 제외","not scored")+"</span>":"")+"</td></tr>";});
   o+="</tbody></table></div>";
   const dead=cls.filter(c=>c.st==="dead");
   if(dead.length)o+='<div class="callout co-warn"><h3>'+L("⚠️ 죽은 스킬 ","⚠️ Dead skills: ")+dead.length+L("개","")+"</h3><p>"+
@@ -337,8 +342,8 @@ function render(d){
      "The four are not the top four of the single-candidate ranking — each is picked in turn as <b>whoever raises the combined multiplier most</b>, given the ones already chosen. Plain truncation lines up heroes that share a bucket (Jessie, Jasser and Jeronimo all fill Lethality: ×1.250, then ×1.200, then ×1.167).")+"</p>"+
   '<p class="cap">'+L("전투 배율은 네 명의 단독 배율을 곱한 값이 아니라 <b>같은 칸에 겹치는 분을 합쳤을 때</b>의 값입니다. 단독 배율을 차례로 곱하면 더 크게 나오는데, 그건 포화를 빼먹은 숫자입니다. 그리고 <b>생존 칸도 같은 무게로 셉니다</b> — 전투비를 양쪽 식으로 펴면 <code>(내딜증 × 내감소) ÷ (상대딜증 × 상대감소)</code> 라, 내 딜 칸과 내 감소 칸이 결과에 똑같이 곱해집니다.",
      "The combat multiplier is not the product of the four individual figures — it is what you get after <b>adding up the parts that land in the same slot</b>. Multiplying the single figures together gives a larger number that ignores saturation. <b>Survival slots count the same</b>: expand the kill ratio for both sides and it reduces to <code>(my damage-up × my reduction) ÷ (theirs × theirs)</code>, so your damage slots and your reduction slots multiply the outcome equally.")+"</p>"+
-  '<p class="cap">'+L("기본 계산 추천을 <b>시트 조이너 명단 영웅으로 한정</b>하는 이유는 <b>투자 문턱</b>입니다 — 이론 순위가 높아도 전설은 만렙 보유자가 적고, 만렙 찍은 사람은 대개 이미 그 영웅을 리더로 쓰고 있어 조이너로 못 뺍니다. 시트 58행과 대조했더니 <b>이쪽이 #1 재현 81.0% · 겹침 61.8%</b> 로, 계산 순위 그대로(79.3% · 56.6%)보다 낫고 <b>한 행도 나빠지지 않았습니다</b>. (#1 을 놓친 행은 대부분 시트 #1 이 레니인 행입니다 — 레니 S1 은 버킷이 미확정이라 점수에 넣지 않습니다. 그 행을 빼면 97.9% 입니다.)",
-     "The default calculated pick is <b>limited to heroes on the sheet’s joiner list</b> because of the <b>investment threshold</b>: legendaries are rarely maxed, and whoever did max one is usually already running it as a leader. Checked against all 58 sheet rows, this list reproduces the sheet’s #1 joiner <b>81.0%</b> of the time with <b>61.8%</b> overlap, against 79.3% / 56.6% for the all-hero pick — and it was never worse on any row. (Most #1 misses are rows whose sheet #1 is Renee — her S1 bucket is unconfirmed, so she is not scored. Without those rows it is 97.9%.)")+"</p>"+
+  '<p class="cap">'+L("기본 계산 추천을 <b>시트 조이너 명단 영웅으로 한정</b>하는 이유는 <b>투자 문턱</b>입니다 — 이론 순위가 높아도 전설은 만렙 보유자가 적고, 만렙 찍은 사람은 대개 이미 그 영웅을 리더로 쓰고 있어 조이너로 못 뺍니다. 시트 58행과 대조했더니 <b>이쪽이 #1 재현 81.0% · 겹침 62.2%</b> 로, 계산 순위 그대로(81.0% · 61.8%)와 같거나 낫고 <b>한 행도 나빠지지 않았습니다</b>. (#1 을 놓친 행은 대부분 시트 #1 이 레니인 행입니다 — 레니 S1 은 버킷이 미확정이라 점수에 넣지 않습니다. 그 행을 빼면 97.9% 입니다.)",
+     "The default calculated pick is <b>limited to heroes on the sheet’s joiner list</b> because of the <b>investment threshold</b>: legendaries are rarely maxed, and whoever did max one is usually already running it as a leader. Checked against all 58 sheet rows, this list reproduces the sheet’s #1 joiner <b>81.0%</b> of the time with <b>62.2%</b> overlap, against 81.0% / 61.8% for the all-hero pick — the same or better, and never worse on any row. (Most #1 misses are rows whose sheet #1 is Renee — her S1 bucket is unconfirmed, so she is not scored. Without those rows it is 97.9%.)")+"</p>"+
   '<p class="cap">'+L("계산이 같은 영웅을 두 번 고를 수 있는 것은 <b>시트가 한 행에 그 영웅을 두 칸 이상 적어 둔 경우만</b>입니다 — 지금은 <b>노라·패트릭</b> 둘뿐이고, 나머지는 중복이 막혀 있습니다. 둘째 장도 같은 칸에 합연산으로 들어가 <b>자기끼리 포화</b>하므로, 그래도 이득일 때만 집습니다. 같은 버킷의 확률형은 효과가 겹치지 않고 발동 확률만 오른다고 보고, 미아·플로라는 병종마다 50% 판정입니다.",
      "The calculation may pick a hero twice only where <b>the sheet itself writes that hero in two or more cells of a row</b> — today that is <b>Norah and Patrick</b>; everyone else is blocked from repeating. A second copy still adds into the same slot, so it <b>saturates against itself</b> and is taken only when it still wins. Chance skills in the same bucket are assumed not to stack their effect — only the trigger chance rises — and Mia/Flora roll 50% per troop type.")+"</p>"+
   // 감소 계열이 왜 25% 증가에 지는지 — 근거는 볼트 「랠리 조이너 선정 규칙·개리슨 운영 (Ton)」 §5·§8.

@@ -32,10 +32,11 @@ export function makeSim(E, opt = {}) {
     const put = (k, v) => { add[k] = (add[k] || 0) + v; };
     const n = cls(r);
     for (const {h, e} of skills) {
-      const parts = [e].concat(e.also ? [Object.assign({}, e, e.also, {also: null})] : []);
+      // off — 값은 있지만 배율에서 뺀 몫(아모세 Viper 의 보병 몫 · 2026-11-13). also 가 본체의 off 를 물려받지 않게 따로 적는다.
+      const parts = [e].concat(e.also ? [Object.assign({}, e, e.also, {also: null, off: e.also.off || 0})] : []);
       const plain = [];
       parts.forEach((q, idx) => {
-        if (q.slot === "ECO" || EXCL.has(q.slot) || q.v == null) return;
+        if (q.slot === "ECO" || EXCL.has(q.slot) || q.v == null || q.off) return;
         if (q.slot === "X") {
           const v = q.v * share(q, r);
           if (q.bk) put(q.bk, v); else { const k = "self:" + h.id + "/" + e.n + "/" + q.tgt; self[k] = (self[k] || 0) + v; }

@@ -26,7 +26,12 @@ const norm=(a,b,c)=>{const s=a+b+c;return s<=0?{inf:0,lan:0,mar:0}:{inf:a*100/s,
 function tgtRatio(t,r){return t==="infantry"?r.inf:t==="lancer"?r.lan:t==="marksman"?r.mar:
  t==="inf+mar"?r.inf+r.mar:t==="mar+lan"?r.mar+r.lan:100;}
 // 보병은 탱커라 병력 비중 대비 딜 기여가 낮다 → 딜 계열 병종한정 스킬은 딜 지분으로 환산
-const DW={infantry:.3,lancer:1,marksman:1};
+// ⚠️ 0.3 → 0.1 (2026-11-13 · 사용자 결정). 0.3 에서는 플린트 S1(보병 피해량 +100%)이 60/40 에서 ×1.310 으로 25% 조이너를 전부 제치고,
+// 「계산 추천 — 전체 영웅」에 21/60 행 · Top 5 에 2~3장씩 겹쳐 올라왔다. 사용자: "보병만 버프하는 스킬이라 효율이 좋을 수가 없다."
+// 시트도 같은 방향이다 — 60행 어디에도 플린트를 조이너로 적지 않았다.
+// 시트가 주는 건 **상한 하나**다: 시트에서 보병이 가장 많은 병비(60/40)에서 플린트가 20% 계열(×1.200)을 넘지 않으려면 DW < 1/6.
+// 0.1 은 그 안에서 여유를 둔 값이고(60/40 ×1.130) **우리가 고른 숫자다** — 보병의 실제 딜 비중을 잰 자료는 없다.
+const DW={infantry:.1,lancer:1,marksman:1};
 function dmgShare(t,r){
  const tot=r.inf*DW.infantry+r.lan+r.mar; if(tot<=0)return 0;
  const p=t==="infantry"?r.inf*DW.infantry:t==="lancer"?r.lan:t==="marksman"?r.mar:
@@ -93,7 +98,7 @@ function sig(e){return JSON.stringify([e.slot,e.v,e.p||"",e.pc||0,e.k||"",e.tgt|
 function atoms(e,r){
  const out=[],key=sig(e);
  const one=(q,k2)=>{
-  if(q.slot==="ECO"||EXCL.indexOf(q.slot)>=0||q.v==null)return null;
+  if(q.slot==="ECO"||EXCL.indexOf(q.slot)>=0||q.v==null||q.off)return null;
   if(q.slot==="X"){const v=q.v*xShare(q,r);
    out.push(q.bk&&BUCKET[q.bk]?{t:"det",sl:q.bk,v:v,x:1}:{t:"free",key:k2,v:v});return null;}
   if(!BUCKET[q.slot])return null;
@@ -390,16 +395,18 @@ function calc(){
 
  // ── 버킷 집계 (리더 9스킬) ──
  // 점수는 scoreAtoms 가 낸다. 여기서는 화면용 출처(src) · 병종 전용 판정(cls) · 배율 제외 칩(leaderOnly) · 수치 미확인(unknown)을 모은다.
- const base=[],src={},cls=[],leaderOnly=[],unknown=[];
+ const base=[],src={},cls=[],leaderOnly=[],unknown=[],offs=[];
  ORDER.forEach(s=>{src[s]=[];});
  leaders.forEach(({hero})=>hero.exp.forEach(e=>{
    if(e.slot==="ECO")return;
    [e].concat(e.also?[e.also]:[]).forEach(q=>{
     if(EXCL.indexOf(q.slot)>=0)leaderOnly.push({hero,skill:e.n,slot:q.slot});
     else if(q.v==null)unknown.push({hero,skill:e.n,slot:q.slot,reason:"v:null"});
+    else if(q.off)offs.push({hero,skill:e.n,tgt:q.tgt});
     else if(q.unsure)unknown.push({hero,skill:e.n,slot:q.slot==="X"?(q.bk||"X"):q.slot,reason:"unsure"});
     // X 는 병종 전용 판정(cls)으로도 빠진다 — 한 스킬이 두 병종에 다르게 걸리면 also 로 둘 다 단다.
-    if(q.slot==="X"){const[st,lbl,v]=tgtStat(q.tgt,r);cls.push({hero,e:q===e?e:Object.assign({},e,q),st,lbl,v});}});
+    // off 는 그 몫 자신의 표시다 — also 가 본체의 off 를 물려받지 않게 따로 적는다.
+    if(q.slot==="X"){const[st,lbl,v]=tgtStat(q.tgt,r);cls.push({hero,e:q===e?e:Object.assign({},e,q,{off:q.off||0}),st,lbl,v});}});
    const at=atoms(e,r);
    at.forEach(a=>{
     if(a.t==="det")src[a.sl].push(HN(hero)+" "+e.n+" +"+(a.v*100).toFixed(0)+"%"+
@@ -430,6 +437,7 @@ function calc(){
    if(e.slot==="X"){const[st,lbl,v]=tgtStat(e.tgt,r);cond=st+"|"+tgtName[e.tgt]+" "+v.toFixed(0)+"% ("+lbl+")";
      // 2026-09-14: 조이너 쪽 사망 절벽은 없앴다 — 지분 환산(xShare)이 이미 연속으로 줄인다. 라벨(cond)만 안내로 남는다.
      [e].concat(e.also&&e.also.slot==="X"?[e.also]:[]).forEach(x=>{const sh=xShare(x,r);
+       if(x.off){detail.push(L(tgtName[x.tgt]+" 몫은 배율 제외 — 실전 가치를 잴 자료 없음",tgtName[x.tgt]+" part not scored — no data to value it"));return;}
        detail.push(L(tgtName[x.tgt]+" "+(x.k==="sur"?"병력":"딜")+" 지분 "+(sh*100).toFixed(0)+"% 환산",
                      tgtName[x.tgt]+" "+(x.k==="sur"?"headcount":"damage")+" share "+(sh*100).toFixed(0)+"%"));});}
    if(EXCL.indexOf(e.slot)>=0)detail.push(L("배율 제외 — "+SLOTS[e.slot].n+" (수치 모델 없음)","not scored — "+SLOTS[e.slot].n+" (no numeric model)"));
@@ -488,5 +496,5 @@ function calc(){
  const skHeavy=!!document.getElementById("skHeavy").checked;
  const ids=picks.map(p=>p.hero&&p.hero.id||"");
  // 규칙 칩(joinerRules)은 render 가 낸다 — 화면의 시트 조합·계산 추천이 정해진 뒤라야 겹침을 볼 수 있어서다.
- render({mode,leaders,picks,r,buck,src,cls,leaderOnly,unknown,base,s0:s0.s,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap,comp,rivals,comps,near,combos,skHeavy,ids});
+ render({mode,leaders,picks,r,buck,src,cls,leaderOnly,unknown,offs,base,s0:s0.s,wg,wstat,wmul,wDmg,wSur,rank,ctr,gcap,comp,rivals,comps,near,combos,skHeavy,ids});
 }
