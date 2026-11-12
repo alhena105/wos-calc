@@ -426,6 +426,33 @@ for (const w of [1400, 768, 430, 390, 360, 320]) {
   ok(r.body <= w + 2, "편성 탭 " + w + "px 에서 본문이 가로로 넘치지 않는다",
      r.body + "px" + (r.guilty.length ? " · 범인: " + r.guilty.join(" | ") : ""));
 }
+// 위 검사는 「병종 전용 · 주기형 스킬 판정」 섹션이 **없는** 편성만 지나갔다(제로니모·미아·그웬에는 병종 전용 스킬이 없다).
+// 그 섹션의 「실제 병종 메커니즘」 안내에는 표가 셋 있는데 .xscroll 밖이어서, 영어 화면 320px 에서 병종 스탯 표가 본문을 25px 밀고 있었다
+// (2026-11-13 · 아모세 리더로 화면을 확인하다 발견). 병종 전용 스킬을 가진 리더로, 진짜 뷰포트에서, 한·영 둘 다 본다 — 영어가 더 넓다.
+for (const [lang, q] of [["한국어", ""], ["영어", "?lang=en"]]) {
+  const p = await open(q);
+  await p.evaluate(() => {
+    const set = (id, v) => { const e = document.getElementById(id); e.value = v; e.dispatchEvent(new Event("change")); };
+    set("gcap", "4"); set("hInf", "ahmose"); set("hLan", "reina"); set("hMar", "lynn");
+  });
+  await setRatio(p, "r", [60, 40, 0]);
+  ok((await p.evaluate(() => document.querySelectorAll("#out .callout table.hgrid").length)) === 3,
+     lang + " — 병종 전용 스킬 리더(아모세)면 병종 메커니즘 안내의 표 셋이 뜬다 (아래 넘침 검사가 이 상태를 지나간다)");
+  for (const w of [430, 390, 360, 320]) {
+    await p.setViewportSize({width: w, height: 800});
+    const r = await p.evaluate(() => {
+      const cw = document.documentElement.clientWidth, guilty = [];
+      document.querySelectorAll("#tab-comp table").forEach(t => {
+        if (t.closest(".xscroll")) return;
+        if (t.getBoundingClientRect().right > cw + 1) guilty.push([...t.querySelectorAll("thead th")].map(x => x.innerText.trim()).join("/").slice(0, 40));
+      });
+      return {body: document.documentElement.scrollWidth, cw, guilty};
+    });
+    ok(r.body <= r.cw + 2, lang + " — 병종 전용 섹션이 뜬 편성도 " + w + "px 에서 본문이 가로로 넘치지 않는다",
+       r.body + "px / " + r.cw + "px" + (r.guilty.length ? " · 범인: " + r.guilty.join(" | ") : ""));
+  }
+  await p.close();
+}
 ok(!/tab=gear/.test(ko.url()), "URL 에서 tab=gear 가 빠진다", ko.url());
 ok(/①/.test(await outText(ko)), "편성 결과가 그대로 있다");
 

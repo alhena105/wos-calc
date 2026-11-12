@@ -349,8 +349,8 @@ var STR={
  phInf:["보","inf"], phLan:["창","lan"], phMar:["궁","mar"],
  lbGcap:["서버 최대 세대 (조이너 풀 제한)","Server's highest generation (limits the joiner pool)"],
  lbSkHeavy:["상대 스킬 데미지 많음 (무명·레이나 안내용)","Opponent has heavy skill damage (for the Wu Ming / Reina hints)"],
- assump:['<b>계산 가정</b> — 원정스킬은 전부 Lv.5(4성 이상)로 간주 · 확률·주기 스킬은 <b>기대값</b>으로 환산 · 병종 전용 딜 스킬은 보병 가중치 0.1을 적용한 <b>딜 지분</b>으로 환산(보병은 탱커라 병력 비중 대비 딜이 적음 — 0.1 은 우리가 고른 값) · 아모세 S1 의 보병 몫은 실전 가치를 잴 자료가 없어 <b>배율에서 제외</b>(창·궁 몫만 계산) · 일반공격 한정 스킬은 총딜의 50%를 일반공격으로 가정 · 한 스킬이 두 버킷을 채우면(공격+방어 등) 다른 버킷이라 <b>곱함</b> · <b>스킬 데미지</b>(추가피해·추가공격·N% 피해·치명률)와 리더 전용 버킷(보호막·표식 대상·특정 병종 상대·추가 피해·스킬 데미지↑)은 수치 모델이 없어 <b>배율에서 제외</b> · 버킷이 정해지지 않은 병종 한정 스킬은 <b>버킷 없이 따로 곱함</b>(같은 스킬끼리만 합산) · 같은 버킷의 확률형은 <b>효과가 겹치지 않고 발동 확률만 오름</b> · 미아·플로라는 <b>병종마다 50% 판정</b> · 그웬 S1 은 일부 공격에만 걸려 0.5 로 감쇄(근거 없는 값) · 버킷 분류 근거는 Ton 2026-11-10 영상의 원정스킬 버킷표.<br>전무 레벨 0 = 미보유 · 숫자 옆 칸이 전무 레벨입니다. 병비 합이 100이 아니면 자동으로 정규화합니다.',
-   '<b>Assumptions</b> — every expedition skill is treated as Lv.5 (4★ or above) · chance-based and periodic skills are converted to <b>expected value</b> · class-locked damage skills are converted to a <b>damage share</b> with infantry weighted 0.1 (infantry tanks, so it contributes less damage than its headcount — 0.1 is our own choice) · the infantry part of Ahmose’s S1 is <b>not scored</b> because there is no data to value it (only the lancer/marksman part counts) · normal-attack-only skills assume 50% of total damage is normal attacks · a skill that fills two buckets (attack + defense etc.) <b>multiplies</b>, since they are different buckets · <b>skill damage</b> (extra damage, extra attack, N% damage, crit rate) and leader-only buckets (shield, marked target, vs a troop type, extra damage, skill damage up) have no numeric model and are <b>left out of the multiplier</b> · class-locked skills with no confirmed bucket are <b>multiplied on their own, outside any bucket</b> (only the same skill adds to itself) · chance skills in the same bucket <b>do not stack their effect — only the trigger chance rises</b> · Mia and Flora <b>roll 50% per troop type</b> · Gwen’s S1 only hits some attacks and is scaled by 0.5 (an unsourced value) · bucket classification follows the expedition-skill bucket table in Ton’s 2026-11-10 video.<br>Exclusive-gear level 0 = not owned; the box beside each hero is its level. If the ratio does not add to 100 it is normalised automatically.'],
+ assump:['<b>계산 가정</b> — 원정스킬은 전부 Lv.5(4성 이상)로 간주 · 확률·주기 스킬은 <b>기대값</b>으로 환산 · 병종 전용 딜 스킬은 보병 가중치 0.1을 적용한 <b>딜 지분</b>으로 환산(보병은 탱커라 병력 비중 대비 딜이 적음 — 0.1 은 우리가 고른 값) · <b>보병만 버프하는 딜 스킬</b>(플린트 S1 · 아모세 S2·S3 · 헥터 S2 의 보병 몫 · 헤르보르 S3 의 피해량 몫)과 아모세 S1 의 보병 몫은 실전 가치를 잴 자료가 없어 <b>배율에서 제외</b>(같은 스킬의 다른 병종 몫은 그대로 계산) · 일반공격 한정 스킬은 총딜의 50%를 일반공격으로 가정 · 한 스킬이 두 버킷을 채우면(공격+방어 등) 다른 버킷이라 <b>곱함</b> · <b>스킬 데미지</b>(추가피해·추가공격·N% 피해·치명률)와 리더 전용 버킷(보호막·표식 대상·특정 병종 상대·추가 피해·스킬 데미지↑)은 수치 모델이 없어 <b>배율에서 제외</b> · 버킷이 정해지지 않은 병종 한정 스킬은 <b>버킷 없이 따로 곱함</b>(같은 스킬끼리만 합산) · 같은 버킷의 확률형은 <b>효과가 겹치지 않고 발동 확률만 오름</b> · 미아·플로라는 <b>병종마다 50% 판정</b> · 그웬 S1 은 일부 공격에만 걸려 0.5 로 감쇄(근거 없는 값) · 버킷 분류 근거는 Ton 2026-11-10 영상의 원정스킬 버킷표.<br>전무 레벨 0 = 미보유 · 숫자 옆 칸이 전무 레벨입니다. 병비 합이 100이 아니면 자동으로 정규화합니다.',
+   '<b>Assumptions</b> — every expedition skill is treated as Lv.5 (4★ or above) · chance-based and periodic skills are converted to <b>expected value</b> · class-locked damage skills are converted to a <b>damage share</b> with infantry weighted 0.1 (infantry tanks, so it contributes less damage than its headcount — 0.1 is our own choice) · <b>infantry-only damage skills</b> (Flint S1, Ahmose S2/S3, the infantry part of Hector S2, the damage part of Hervor S3) and the infantry part of Ahmose’s S1 are <b>not scored</b> because there is no data to value them (other troop types’ parts of the same skill still count) · normal-attack-only skills assume 50% of total damage is normal attacks · a skill that fills two buckets (attack + defense etc.) <b>multiplies</b>, since they are different buckets · <b>skill damage</b> (extra damage, extra attack, N% damage, crit rate) and leader-only buckets (shield, marked target, vs a troop type, extra damage, skill damage up) have no numeric model and are <b>left out of the multiplier</b> · class-locked skills with no confirmed bucket are <b>multiplied on their own, outside any bucket</b> (only the same skill adds to itself) · chance skills in the same bucket <b>do not stack their effect — only the trigger chance rises</b> · Mia and Flora <b>roll 50% per troop type</b> · Gwen’s S1 only hits some attacks and is scaled by 0.5 (an unsourced value) · bucket classification follows the expedition-skill bucket table in Ton’s 2026-11-10 video.<br>Exclusive-gear level 0 = not owned; the box beside each hero is its level. If the ratio does not add to 100 it is normalised automatically.'],
  srcData:['데이터 출처: <a href="https://wosheroes.com/">wosheroes</a> · <a href="https://www.whiteoutsurvival-community.com/">whiteoutsurvival-community</a> · <a href="https://www.whiteoutsurvival.wiki/">whiteoutsurvival.wiki</a> (2026-08-15 수집 · Gen14~17 2026-08-22 보강) · 영웅 초상: <a href="https://www.whiteoutsurvival.wiki/">whiteoutsurvival.wiki</a> (© Century Games)',
    'Data: <a href="https://wosheroes.com/">wosheroes</a> · <a href="https://www.whiteoutsurvival-community.com/">whiteoutsurvival-community</a> · <a href="https://www.whiteoutsurvival.wiki/">whiteoutsurvival.wiki</a> (collected 2026-08-15; Gen 14-17 added 2026-08-22) · Hero portraits: <a href="https://www.whiteoutsurvival.wiki/">whiteoutsurvival.wiki</a> (© Century Games)'],
  srcModel:['계산 모델: <a href="https://blog.astris.kr/posts/f7a87706-3c2f-40c0-b282-d77a311ab4e3">랠리 편성 × 조이너 스킬 × 데미지 공식 통합 해설</a> · 확률/주기 스킬은 기대값으로 환산한 근사치입니다.',
@@ -414,9 +414,19 @@ function setLang(l){
 //   무명 S1 · 헤르보르 S2 · 시걸 S3(일반공격 받피 −25% / 스킬 받피 −30%)도 버킷이 미확정이라 v:null 이다.
 //   조이너로서 레니·무명은 수치 대신 규칙 레이어(engine.js joinerRules)가 안내한다.
 // unsure:1 — Ton 표에서도 "?" 로 적힌 자리. 값은 그대로 배율에 들어가고 화면에 플래그만 단다.
-// off:1 — 값은 적혀 있지만 **실전 가치를 잴 자료가 없어 배율에 넣지 않는 몫** (지금은 아모세 Viper Formation 의 보병 몫 하나 ·
-//   2026-11-13 사용자 결정). 화면에는 숨기지 않고 "배율에서 뺀 몫" 으로 적는다. v:null 과 다르다 — 수치는 있다.
-//   ⚠️ 같은 스킬의 나머지 몫은 그대로 계산한다. 새로 달 때는 근거(왜 값을 못 믿는가)를 그 영웅 주석에 적을 것.
+// off:1 — 값은 적혀 있지만 **실전 가치를 잴 자료가 없어 배율에 넣지 않는 몫** (2026-11-13 사용자 결정 둘).
+//   화면에는 숨기지 않고 "배율에서 뺀 몫" 으로 적는다. v:null 과 다르다 — 수치는 있다. 지금 여섯 몫이고 규칙은 둘이다:
+//   ① **보병 전용 딜 몫 전부** (slot:"X" · k:"dmg" · tgt:"infantry") — 플린트 S1 · 아모세 S2 · 아모세 S3 · 헥터 S2 의 보병 몫 · 헤르보르 S3 의 피해량 몫.
+//      (헤르보르는 손으로 꼽을 때 빠뜨렸고 아래 검사가 잡았다 — 이 명단을 기억으로 적지 말 것.)
+//      사용자: "보병만 버프하는 스킬이라 효율이 좋을 수가 없다." 처음에는 보병 딜 가중(DW.infantry)만 0.3 → 0.1 로 낮췄는데,
+//      그러면 시트 편성(보병 ≤60%)에서는 빠져도 보병 72% 부터 플린트가 20% 계열을 다시 넘고 90% 에서는 Top 1 이 플린트 3장이었다.
+//      가중을 더 낮춰도 경계만 밀린다(0.05 → 84%). 시트는 보병 60% 를 넘는 병비를 한 줄도 안 적어 그 위로는 잴 자료가 없다 → 뺐다.
+//      규칙이 기계적이라 unit.mjs 가 "X·dmg·infantry 몫은 전부 off" 를 검사한다 — 새 영웅에 같은 꼴이 생기면 그 검사가 먼저 알려 준다.
+//      (bk:"A" 는 그대로 둔다 — 원문이 Damage Dealt 스탯이라는 분류는 여전히 참이고, off 는 "점수에 안 넣는다" 는 별개 표시다.)
+//   ② 아모세 Viper Formation 의 보병 몫(k:"sur") — 그 영웅 주석 참고.
+//   ⚠️ 같은 스킬의 나머지 몫은 그대로 계산한다(헥터 S2 의 궁병 몫 · 헤르보르 S3 의 받피 몫 · 아모세 S1 의 창·궁 몫).
+//   ⚠️ 보병 전용 **생존** 몫으로 넓히지 않았다 — 가토·기젤라(보병 방어 +30%)는 시트 등재 조이너라 0 이면 오히려 시트와 어긋난다.
+//   새로 달 때는 근거(왜 값을 못 믿는가)를 여기나 그 영웅 주석에 적을 것.
 // partial:1 — 그웬 S1. "일부 공격에만 걸린다"(Ton) → engine.js 의 GWEN_EFF(0.5) 로 감쇄. 0.5 는 근거 없는 값이다(사용자 결정).
 // 제시·제셀·제로니모(S1)·린(S1) 은 slot:"E"(파괴력) 다 — wosheroes 원문은 "damage dealt" 지만
 //   실험으로 나눈 집결원 스킬 분류표(2026-10-17 사용자 제공)가 넷을 블랑쉬·알론소와 같은 LETHALITY UP 에,
@@ -485,7 +495,8 @@ const HEROES = [
  w:{side:"defender",stat:"Attack",name:"Defend to Attack"}},
 // ── Gen 2 ──
 {id:"flint",kr:"플린트",en:"Flint",cls:"infantry",gen:2,rar:"leg",
- exp:[{n:"Pyromaniac",slot:"X",k:"dmg",v:1.0,tgt:"infantry",bk:"A",t:"보병 피해량 +100%",te:"infantry damage +100%"},
+ // Pyromaniac — 보병 전용 딜 몫이라 배율 제외(off:1 · 2026-11-13 사용자 결정 · 머리말 off 항목 ①). 조이너 플린트는 어떤 병비에서도 ×1.000 이다.
+ exp:[{n:"Pyromaniac",slot:"X",k:"dmg",v:1.0,tgt:"infantry",bk:"A",off:1,t:"보병 피해량 +100%",te:"infantry damage +100%"},
       {n:"Burning Resolve",slot:"B",v:.25,t:"전 부대 공격력 +25%",te:"all troops attack +25%"},
       {n:"Immolation",slot:"E",v:.25,t:"전 부대 파괴력 +25%",te:"all troops lethality +25%"}],
  w:{side:"defender",stat:"Attack",name:"Dragonbreath"}},
@@ -530,11 +541,14 @@ const HEROES = [
       // 아모세가 ×1.25~1.27 로 25% 조이너와 나란히 섰고, 「계산 추천 — 전체 영웅」에 13/60 행 올라왔다. 사용자: "보병만 버프하는 스킬이라
       // 효율이 좋을 수가 없다." 시트도 아모세를 조이너로 적은 적이 없다. 보병 전용 생존 버프의 실전 가치도, 같이 붙는 대가
       // (원문 "pauses the attack once every four times" — 2026-11-13 wosheroes 재확인)도 잴 자료가 없어 **값을 고쳐 넣지 않고 뺐다.**
-      // ⚠️ "대가를 못 실어서 뺐다" 가 근거의 전부가 아니다 — DW 0.1 로 그 대가를 어림하면 3% 남짓이라 그것만으로는 이 몫이 안 지워진다.
+      // ⚠️ "대가를 못 실어서 뺐다" 가 근거의 전부가 아니다. 그 대가를 어림하면 — 보병 공격 4회 중 1회 = 보병 딜의 25% → 총딜의 0.25 × 보병 딜 지분 —
+      // 시트의 보병 최대 병비 60/40 에서 3.3%(48/4/48 에서 2.1%)이고, 같은 병비에서 뺀 몫은 +21%(+16.8%)다. 대가만으로는 이 몫이 안 지워진다.
+      // (어림이다 — "공격을 쉰다" 가 딜을 정확히 1/4 깎는다는 실측은 없다. unit.mjs 「보병 전용 몫」 절이 이 산수를 다시 센다.)
       // 창·궁 −30% 몫(.15)은 그대로 계산한다 → 본체를 그쪽으로 두고 보병 몫을 also 로 돌렸다(조이너 판정 라벨도 창·궁 비중을 본다).
       {n:"Viper Formation",slot:"X",k:"sur",v:.15,tgt:"mar+lan",bk:"D",also:{slot:"X",k:"sur",v:.35,tgt:"infantry",bk:"D",off:1},t:"보병이 4회마다 공격을 쉬고, 2턴 보병 받피 −70% · 창·궁 −30%",te:"infantry pause their attack once every four times; for 2 turns infantry damage taken −70%, lancer/marksman −30%"},
-      {n:"Prayer of Flame",slot:"X",k:"dmg",v:1.0,tgt:"infantry",bk:"A",t:"보병 피해량 +100%",te:"infantry damage +100%"},
-      {n:"Blade of Light",slot:"X",k:"dmg",v:.60,tgt:"infantry",unsure:1,also:{slot:"G",v:null},t:"보병 공격당 피해 +60% & 대상 받피 +25%",te:"infantry, per attack: +60% damage & target takes +25% damage"}],
+      // S2 · S3 도 보병 전용 딜 몫이라 배율 제외(off:1 · 머리말 off 항목 ①) — 플린트 S1 과 같은 잣대다. S3 의 "대상 받피 +25%" 몫은 원래 v:null.
+      {n:"Prayer of Flame",slot:"X",k:"dmg",v:1.0,tgt:"infantry",bk:"A",off:1,t:"보병 피해량 +100%",te:"infantry damage +100%"},
+      {n:"Blade of Light",slot:"X",k:"dmg",v:.60,tgt:"infantry",unsure:1,off:1,also:{slot:"G",v:null},t:"보병 공격당 피해 +60% & 대상 받피 +25%",te:"infantry, per attack: +60% damage & target takes +25% damage"}],
  w:{side:"defender",stat:"Health",name:"Oath of Guardian"}},
 {id:"reina",s:1,kr:"레이나",en:"Reina",cls:"lancer",gen:4,rar:"leg",
  exp:[{n:"Assassin's Instinct",slot:"An",v:.30,t:"일반공격 피해 +30%",te:"normal-attack damage +30%"},
@@ -549,7 +563,8 @@ const HEROES = [
 // ── Gen 5 ──
 {id:"hector",kr:"헥터",en:"Hector",cls:"infantry",gen:5,rar:"leg",
  exp:[{n:"Survival Instincts",slot:"D",v:.20,p:"40%",pe:"40% chance",t:"40% 확률 받는 피해 −50%",te:"40% chance: damage taken −50%"},
-      {n:"Rampant",slot:"X",k:"dmg",v:1.07,tgt:"infantry",bk:"A",also:{slot:"X",k:"dmg",v:.535,tgt:"marksman",bk:"A"},t:"보병 피해량 +200% · 궁병 +100% (10회 동안 매 공격 85%로 감쇠 → 평균 0.535 환산)",te:"infantry damage +200%, marksmen +100% (decays over 10 procs)"},
+      // Rampant 의 보병 몫(본체)은 보병 전용 딜 몫이라 배율 제외(off:1 · 머리말 off 항목 ①). 궁병 몫(also)은 그대로 계산한다 — off 는 물려받지 않는다.
+      {n:"Rampant",slot:"X",k:"dmg",v:1.07,tgt:"infantry",bk:"A",off:1,also:{slot:"X",k:"dmg",v:.535,tgt:"marksman",bk:"A"},t:"보병 피해량 +200% · 궁병 +100% (10회 동안 매 공격 85%로 감쇠 → 평균 0.535 환산)",te:"infantry damage +200%, marksmen +100% (decays over 10 procs)"},
       {n:"Blitz",slot:"SKILL",v:.25,p:"25%",pe:"25% chance",t:"25% 확률 200% 피해",te:"25% chance: 200% damage"}],   // 필리 Dosage Boost 와 같은 문장·같은 정정(2026-09-14)
  w:{side:"defender",stat:"Attack",name:"Goliath"}},
 {id:"norah",s:1,stack:1,kr:"노라",en:"Norah",cls:"lancer",gen:5,rar:"leg",
@@ -667,7 +682,8 @@ const HEROES = [
 {id:"herbjorg",kr:"헤르보르",en:"Hervor",cls:"infantry",gen:12,rar:"leg",
  exp:[{n:"Call For Blood",slot:"E",v:.25,t:"전 부대 파괴력 +25%",te:"all troops lethality +25%"},
       {n:"Undying",slot:"D",v:null,unsure:1,tgt:"infantry",t:"보병 일반 받피 −25% / 스킬 받피 −30%",te:"infantry: normal-attack damage taken −25% / skill damage taken −30%"},
-      {n:"Battlethirsty",slot:"X",k:"sur",v:.15,tgt:"infantry",bk:"D",also:{slot:"X",k:"dmg",v:.10,tgt:"infantry",bk:"A"},t:"보병 받피 −15% / 피해량 +10%",te:"infantry damage taken −15% / damage +10%"}],
+      // Battlethirsty 의 피해량 몫(also)은 보병 전용 딜 몫이라 배율 제외(off:1 · 머리말 off 항목 ①). 받피 몫(본체)은 그대로 계산한다.
+      {n:"Battlethirsty",slot:"X",k:"sur",v:.15,tgt:"infantry",bk:"D",also:{slot:"X",k:"dmg",v:.10,tgt:"infantry",bk:"A",off:1},t:"보병 받피 −15% / 피해량 +10%",te:"infantry damage taken −15% / damage +10%"}],
  w:{side:"defender",stat:"Defense",name:"Fort of Rock"}},
 {id:"karol",kr:"가로얼",en:"Karol",cls:"lancer",gen:12,rar:"leg",
  exp:[{n:"In the Wings",slot:"D",v:.20,t:"전 부대 받는 피해 −20%",te:"all troops damage taken −20%"},
@@ -1513,7 +1529,8 @@ function calc(){
    [e].concat(e.also?[e.also]:[]).forEach(q=>{
     if(EXCL.indexOf(q.slot)>=0)leaderOnly.push({hero,skill:e.n,slot:q.slot});
     else if(q.v==null)unknown.push({hero,skill:e.n,slot:q.slot,reason:"v:null"});
-    else if(q.off)offs.push({hero,skill:e.n,tgt:q.tgt});
+    // rest — 같은 스킬에 점수에 드는 다른 몫이 있는가(헥터 S2 의 궁병 몫 · 아모세 S1 의 창·궁 몫). 화면이 "나머지 몫은 그대로 계산" 을 그때만 적는다.
+    else if(q.off)offs.push({hero,skill:e.n,tgt:q.tgt,rest:[e].concat(e.also?[e.also]:[]).some(x=>x!==q&&!x.off&&x.v!=null&&x.slot!=="ECO"&&EXCL.indexOf(x.slot)<0)});
     else if(q.unsure)unknown.push({hero,skill:e.n,slot:q.slot==="X"?(q.bk||"X"):q.slot,reason:"unsure"});
     // X 는 병종 전용 판정(cls)으로도 빠진다 — 한 스킬이 두 병종에 다르게 걸리면 also 로 둘 다 단다.
     // off 는 그 몫 자신의 표시다 — also 가 본체의 off 를 물려받지 않게 따로 적는다.
@@ -1545,7 +1562,9 @@ function calc(){
    const detail=[];let cond=null;
    // 리더로 쓴 영웅도 조이너로 들어올 수 있다 — 다른 연맹원이 자기 것을 데려오는 것이다.
    // 그 스킬은 이미 리더 쪽 원자로 들어가 있으므로 같은 버킷(또는 같은 자리)에 **한 장 더 얹는 값**으로 저절로 잰다.
-   if(e.slot==="X"){const[st,lbl,v]=tgtStat(e.tgt,r);cond=st+"|"+tgtName[e.tgt]+" "+v.toFixed(0)+"% ("+lbl+")";
+   // 본체가 배율에서 뺀 몫이면(플린트 S1) 라벨도 그렇게 적는다 — "보병 90% (정상)" 옆에 ×1.000 이면 왜 0 인지 읽을 수 없다.
+   // (지금은 화면에 안 보인다 — 순위표가 14행인데 플린트는 ×1.000 이라 언제나 그 밖이다. 표가 길어질 때를 위한 줄이다.)
+   if(e.slot==="X"){const[st,lbl,v]=tgtStat(e.tgt,r);cond=st+"|"+tgtName[e.tgt]+" "+v.toFixed(0)+"% ("+(e.off?L("배율 제외","not scored"):lbl)+")";
      // 2026-09-14: 조이너 쪽 사망 절벽은 없앴다 — 지분 환산(xShare)이 이미 연속으로 줄인다. 라벨(cond)만 안내로 남는다.
      [e].concat(e.also&&e.also.slot==="X"?[e.also]:[]).forEach(x=>{const sh=xShare(x,r);
        if(x.off){detail.push(L(tgtName[x.tgt]+" 몫은 배율 제외 — 실전 가치를 잴 자료 없음",tgtName[x.tgt]+" part not scored — no data to value it"));return;}
@@ -1943,10 +1962,11 @@ function render(d){
   '<p class="cap">'+L("같은 버킷은 더하고 다른 버킷은 곱합니다(버킷 값 = 1 + Σ%). 감소 계열도 1+Σ 로 나눗셈 쪽에 들어갑니다. <b>회색 칩</b>은 스킬 데미지·리더 전용 버킷(보호막·표식 대상·특정 병종 상대·추가 피해·스킬 데미지↑)이라 <b>수치 모델이 없어 배율에 넣지 않았습니다</b> — 근거: Ton 2026-11-10 영상의 원정스킬 버킷표.",
    "Same bucket adds, different buckets multiply (bucket = 1 + Σ%). Reductions also enter as 1+Σ, on the dividing side. <b>Grey chips</b> are skill damage and leader-only buckets (shield, marked target, vs a troop type, extra damage, skill damage up) — <b>there is no numeric model for them, so they are not scored</b>. Source: the expedition-skill bucket table in Ton's 2026-11-10 video.")+'</p>'+
   (unknown.length?'<p class="cap">❓ '+L("수치 미확인·미확정: ","Unconfirmed: ")+unknown.map(x=>esc(HN(x.hero))+" "+esc(x.skill)+" ("+x.slot+(x.reason==="unsure"?L(" — 표에서도 ?"," — ? in the table"):L(" — 수치 없음 · 배율 제외"," — no value · not scored"))+")").join(" · ")+'</p>':"")+
-  // off — 값은 적혀 있지만 배율에서 뺀 몫(아모세 Viper 의 보병 몫). 숨기지 않고 여기 적는다.
+  // off — 값은 적혀 있지만 배율에서 뺀 몫(보병 전용 딜 몫 · 아모세 Viper 의 보병 몫). 숨기지 않고 여기 적는다.
+  // "나머지 몫은 그대로 계산" 은 점수에 드는 다른 몫이 실제로 있는 스킬(헥터 Rampant 의 궁병 몫 · 아모세 Viper 의 창·궁 몫)에만 적는다 — 플린트 S1 에는 나머지가 없다.
   (offs&&offs.length?'<p class="cap" data-k="off">⏸ '+L("배율에서 뺀 몫: ","Left out of the score: ")+offs.map(x=>esc(HN(x.hero))+" "+esc(x.skill)+" ("+tgtName[x.tgt]+L(" 몫"," part")+")").join(" · ")+
-    L(" — 수치는 있지만 실전 가치를 잴 자료가 없어 점수에 넣지 않았습니다. 같은 스킬의 나머지 몫은 그대로 계산합니다.",
-      " — the number is known, but there is no data to value it in battle, so it is not scored. The rest of the same skill is scored as usual.")+'</p>':"")+
+    L(" — 수치는 있지만 실전 가치를 잴 자료가 없어 점수에 넣지 않았습니다."," — the number is known, but there is no data to value it in battle, so it is not scored.")+
+    (r=>r.length?L(" "+r.join(" · ")+" 의 나머지 몫은 그대로 계산합니다."," The rest of "+r.join(" · ")+" is scored as usual."):"")(offs.filter(x=>x.rest).map(x=>esc(x.skill)).filter((s,i,a)=>a.indexOf(s)===i))+'</p>':"")+
   '</div>';
  o+="</div>";
  part.buck=o;o="";
@@ -1976,19 +1996,27 @@ function render(d){
    '%</td><td><span class="tag t-'+(c.st==="dead"?"bad":c.st==="weak"?"warn":"ok")+'">'+c.lbl+"</span>"+
    (c.e.off?' <span class="tag t-warn">'+L("배율 제외","not scored")+"</span>":"")+"</td></tr>";});
   o+="</tbody></table></div>";
-  const dead=cls.filter(c=>c.st==="dead");
+  // 한 스킬의 두 몫이 같은 병종을 보면(헤르보르 Battlethirsty = 보병 받피 + 보병 피해량) 표에는 두 행이지만 죽은 스킬로는 하나다 —
+  // 그대로 세면 "죽은 스킬 2개" 아래 같은 줄이 두 번 찍힌다. 영웅·스킬·대상이 같으면 한 번만 적는다.
+  const dead=cls.filter(c=>c.st==="dead").filter((c,i,a)=>a.findIndex(x=>x.hero===c.hero&&x.e.n===c.e.n&&x.e.tgt===c.e.tgt)===i);
+  // 같은 스킬의 다른 몫이 살아 있는데 배율에서 뺀 몫(off)이면 그 사실을 같이 적는다 — 안 적으면 "죽은 스킬 · 교체하세요" 옆 행에
+  // "보병 100% 정상" 이 떠서 화면이 스스로와 어긋난다(리더 아모세 · 보병 100%). 그 스킬은 게임에서 죽은 게 아니라 점수에 드는 몫만 0 이다.
+  const offLive=c=>cls.filter(x=>x!==c&&x.hero===c.hero&&x.e.n===c.e.n&&x.e.off&&x.st!=="dead")[0];
   if(dead.length)o+='<div class="callout co-warn"><h3>'+L("⚠️ 죽은 스킬 ","⚠️ Dead skills: ")+dead.length+L("개","")+"</h3><p>"+
-    dead.map(c=>"<b>"+esc(HN(c.hero))+" "+esc(c.e.n)+"</b> — "+tgtName[c.e.tgt]+L(" 비중 "," share ")+c.v.toFixed(0)+"%").join("<br>")+
+    dead.map(c=>{const s=offLive(c);return "<b>"+esc(HN(c.hero))+" "+esc(c.e.n)+"</b> — "+tgtName[c.e.tgt]+L(" 비중 "," share ")+c.v.toFixed(0)+"%"+
+      (s?' <span class="note" data-k="offlive">· '+tgtName[s.e.tgt]+L(" 몫("," part (")+s.v.toFixed(0)+L("%)은 게임에서 발동하지만 배율에서 뺀 몫입니다 — 점수에 드는 몫만 0 입니다","%) is active in game but left out of the score — only the scored part is zero")+"</span>":"");}).join("<br>")+
     "</p><p>"+L("해당 병종을 늘리거나, 병종 전용 스킬이 없는 영웅으로 교체하세요.","Raise that troop type, or swap in a hero without class-locked skills.")+"</p></div>";
   o+='<div class="callout co-tip"><h3>'+L("📖 실제 병종 메커니즘 (병종 스탯 시스템 가이드)","📖 How troop counters actually work (troop stat guide)")+'</h3>'+
    L("<p><b>상성은 전용 타겟팅이 아니라 +10% 공격 보너스입니다.</b> 모든 병종이 모든 병종을 때립니다 — 궁병이 없어도 보병을 잡습니다.</p>","<p><b>The counter triangle is a +10% attack bonus, not exclusive targeting.</b> Every troop type hits every other type — you kill infantry without marksmen.</p>")+
-   '<table class="hgrid"><thead><tr><th>'+L("상성","Counter")+'</th><th>'+L("스킬","Skill")+'</th><th>'+L("효과","Effect")+'</th></tr></thead><tbody>'+
-   MECH.rps.map(r=>"<tr><td>"+r[0]+"</td><td>"+r[1]+"</td><td>"+r[2]+"</td></tr>").join("")+"</tbody></table>"+
-   '<table class="hgrid"><thead><tr><th>'+L("T7 스킬","T7 skill")+'</th><th>'+L("효과","Effect")+'</th></tr></thead><tbody>'+
-   MECH.t7.map(r=>"<tr><td>"+r[0]+"</td><td>"+r[1]+"</td></tr>").join("")+"</tbody></table>"+
+   // 이 안내의 표 셋도 .xscroll 로 감싼다 — 영어 화면 320px 에서 병종 스탯 표(자연폭 295px)가 본문을 25px 밀었다(2026-11-13).
+   // 병종 전용 스킬을 가진 리더를 골라야 이 안내가 떠서, 기본 리더만 보던 넘침 검사가 못 잡고 있었다.
+   '<div class="xscroll"><table class="hgrid"><thead><tr><th>'+L("상성","Counter")+'</th><th>'+L("스킬","Skill")+'</th><th>'+L("효과","Effect")+'</th></tr></thead><tbody>'+
+   MECH.rps.map(r=>"<tr><td>"+r[0]+"</td><td>"+r[1]+"</td><td>"+r[2]+"</td></tr>").join("")+"</tbody></table></div>"+
+   '<div class="xscroll"><table class="hgrid"><thead><tr><th>'+L("T7 스킬","T7 skill")+'</th><th>'+L("효과","Effect")+'</th></tr></thead><tbody>'+
+   MECH.t7.map(r=>"<tr><td>"+r[0]+"</td><td>"+r[1]+"</td></tr>").join("")+"</tbody></table></div>"+
    '<p class="cap">'+L('창병의 후열 침투는 <b>20% 확률</b>입니다(100% 아님). "창병이 궁병을 순삭한다"는 표현은 실제 수치보다 과장돼 있습니다.','The lancer back-line bypass is a <b>20% chance</b>, not 100%. Phrases like "their lancers delete your marksmen instantly" overstate what the numbers support.')+'</p>'+
-   '<table class="hgrid"><thead><tr><th>'+L("병종","Type")+'</th><th>'+L("배치","Row")+'</th><th>'+L("공격","Atk")+'</th><th>'+L("방어","Def")+'</th><th>'+L("체력","HP")+'</th><th>'+L("치명","Leth")+'</th></tr></thead><tbody>'+
-   MECH.stat.map(r=>"<tr><td>"+r[0]+"</td><td>"+r[1]+"</td><td>"+r[2]+"</td><td>"+r[3]+"</td><td>"+r[4]+"</td><td>"+r[5]+"</td></tr>").join("")+"</tbody></table>"+
+   '<div class="xscroll"><table class="hgrid"><thead><tr><th>'+L("병종","Type")+'</th><th>'+L("배치","Row")+'</th><th>'+L("공격","Atk")+'</th><th>'+L("방어","Def")+'</th><th>'+L("체력","HP")+'</th><th>'+L("치명","Leth")+'</th></tr></thead><tbody>'+
+   MECH.stat.map(r=>"<tr><td>"+r[0]+"</td><td>"+r[1]+"</td><td>"+r[2]+"</td><td>"+r[3]+"</td><td>"+r[4]+"</td><td>"+r[5]+"</td></tr>").join("")+"</tbody></table></div>"+
    '<p class="cap">'+L("T10 기준. 사수는 공격·치명 최고 / 방어·체력 최저, 보병은 반대. 창병은 균형형.","At T10. Marksmen top attack and lethality, bottom defense and health; infantry the reverse; lancers balanced.")+'</p>'+
    "</div>";
   o+="</div>";}

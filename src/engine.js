@@ -402,7 +402,8 @@ function calc(){
    [e].concat(e.also?[e.also]:[]).forEach(q=>{
     if(EXCL.indexOf(q.slot)>=0)leaderOnly.push({hero,skill:e.n,slot:q.slot});
     else if(q.v==null)unknown.push({hero,skill:e.n,slot:q.slot,reason:"v:null"});
-    else if(q.off)offs.push({hero,skill:e.n,tgt:q.tgt});
+    // rest — 같은 스킬에 점수에 드는 다른 몫이 있는가(헥터 S2 의 궁병 몫 · 아모세 S1 의 창·궁 몫). 화면이 "나머지 몫은 그대로 계산" 을 그때만 적는다.
+    else if(q.off)offs.push({hero,skill:e.n,tgt:q.tgt,rest:[e].concat(e.also?[e.also]:[]).some(x=>x!==q&&!x.off&&x.v!=null&&x.slot!=="ECO"&&EXCL.indexOf(x.slot)<0)});
     else if(q.unsure)unknown.push({hero,skill:e.n,slot:q.slot==="X"?(q.bk||"X"):q.slot,reason:"unsure"});
     // X 는 병종 전용 판정(cls)으로도 빠진다 — 한 스킬이 두 병종에 다르게 걸리면 also 로 둘 다 단다.
     // off 는 그 몫 자신의 표시다 — also 가 본체의 off 를 물려받지 않게 따로 적는다.
@@ -434,7 +435,9 @@ function calc(){
    const detail=[];let cond=null;
    // 리더로 쓴 영웅도 조이너로 들어올 수 있다 — 다른 연맹원이 자기 것을 데려오는 것이다.
    // 그 스킬은 이미 리더 쪽 원자로 들어가 있으므로 같은 버킷(또는 같은 자리)에 **한 장 더 얹는 값**으로 저절로 잰다.
-   if(e.slot==="X"){const[st,lbl,v]=tgtStat(e.tgt,r);cond=st+"|"+tgtName[e.tgt]+" "+v.toFixed(0)+"% ("+lbl+")";
+   // 본체가 배율에서 뺀 몫이면(플린트 S1) 라벨도 그렇게 적는다 — "보병 90% (정상)" 옆에 ×1.000 이면 왜 0 인지 읽을 수 없다.
+   // (지금은 화면에 안 보인다 — 순위표가 14행인데 플린트는 ×1.000 이라 언제나 그 밖이다. 표가 길어질 때를 위한 줄이다.)
+   if(e.slot==="X"){const[st,lbl,v]=tgtStat(e.tgt,r);cond=st+"|"+tgtName[e.tgt]+" "+v.toFixed(0)+"% ("+(e.off?L("배율 제외","not scored"):lbl)+")";
      // 2026-09-14: 조이너 쪽 사망 절벽은 없앴다 — 지분 환산(xShare)이 이미 연속으로 줄인다. 라벨(cond)만 안내로 남는다.
      [e].concat(e.also&&e.also.slot==="X"?[e.also]:[]).forEach(x=>{const sh=xShare(x,r);
        if(x.off){detail.push(L(tgtName[x.tgt]+" 몫은 배율 제외 — 실전 가치를 잴 자료 없음",tgtName[x.tgt]+" part not scored — no data to value it"));return;}

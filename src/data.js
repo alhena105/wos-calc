@@ -29,9 +29,19 @@
 //   무명 S1 · 헤르보르 S2 · 시걸 S3(일반공격 받피 −25% / 스킬 받피 −30%)도 버킷이 미확정이라 v:null 이다.
 //   조이너로서 레니·무명은 수치 대신 규칙 레이어(engine.js joinerRules)가 안내한다.
 // unsure:1 — Ton 표에서도 "?" 로 적힌 자리. 값은 그대로 배율에 들어가고 화면에 플래그만 단다.
-// off:1 — 값은 적혀 있지만 **실전 가치를 잴 자료가 없어 배율에 넣지 않는 몫** (지금은 아모세 Viper Formation 의 보병 몫 하나 ·
-//   2026-11-13 사용자 결정). 화면에는 숨기지 않고 "배율에서 뺀 몫" 으로 적는다. v:null 과 다르다 — 수치는 있다.
-//   ⚠️ 같은 스킬의 나머지 몫은 그대로 계산한다. 새로 달 때는 근거(왜 값을 못 믿는가)를 그 영웅 주석에 적을 것.
+// off:1 — 값은 적혀 있지만 **실전 가치를 잴 자료가 없어 배율에 넣지 않는 몫** (2026-11-13 사용자 결정 둘).
+//   화면에는 숨기지 않고 "배율에서 뺀 몫" 으로 적는다. v:null 과 다르다 — 수치는 있다. 지금 여섯 몫이고 규칙은 둘이다:
+//   ① **보병 전용 딜 몫 전부** (slot:"X" · k:"dmg" · tgt:"infantry") — 플린트 S1 · 아모세 S2 · 아모세 S3 · 헥터 S2 의 보병 몫 · 헤르보르 S3 의 피해량 몫.
+//      (헤르보르는 손으로 꼽을 때 빠뜨렸고 아래 검사가 잡았다 — 이 명단을 기억으로 적지 말 것.)
+//      사용자: "보병만 버프하는 스킬이라 효율이 좋을 수가 없다." 처음에는 보병 딜 가중(DW.infantry)만 0.3 → 0.1 로 낮췄는데,
+//      그러면 시트 편성(보병 ≤60%)에서는 빠져도 보병 72% 부터 플린트가 20% 계열을 다시 넘고 90% 에서는 Top 1 이 플린트 3장이었다.
+//      가중을 더 낮춰도 경계만 밀린다(0.05 → 84%). 시트는 보병 60% 를 넘는 병비를 한 줄도 안 적어 그 위로는 잴 자료가 없다 → 뺐다.
+//      규칙이 기계적이라 unit.mjs 가 "X·dmg·infantry 몫은 전부 off" 를 검사한다 — 새 영웅에 같은 꼴이 생기면 그 검사가 먼저 알려 준다.
+//      (bk:"A" 는 그대로 둔다 — 원문이 Damage Dealt 스탯이라는 분류는 여전히 참이고, off 는 "점수에 안 넣는다" 는 별개 표시다.)
+//   ② 아모세 Viper Formation 의 보병 몫(k:"sur") — 그 영웅 주석 참고.
+//   ⚠️ 같은 스킬의 나머지 몫은 그대로 계산한다(헥터 S2 의 궁병 몫 · 헤르보르 S3 의 받피 몫 · 아모세 S1 의 창·궁 몫).
+//   ⚠️ 보병 전용 **생존** 몫으로 넓히지 않았다 — 가토·기젤라(보병 방어 +30%)는 시트 등재 조이너라 0 이면 오히려 시트와 어긋난다.
+//   새로 달 때는 근거(왜 값을 못 믿는가)를 여기나 그 영웅 주석에 적을 것.
 // partial:1 — 그웬 S1. "일부 공격에만 걸린다"(Ton) → engine.js 의 GWEN_EFF(0.5) 로 감쇄. 0.5 는 근거 없는 값이다(사용자 결정).
 // 제시·제셀·제로니모(S1)·린(S1) 은 slot:"E"(파괴력) 다 — wosheroes 원문은 "damage dealt" 지만
 //   실험으로 나눈 집결원 스킬 분류표(2026-10-17 사용자 제공)가 넷을 블랑쉬·알론소와 같은 LETHALITY UP 에,
@@ -100,7 +110,8 @@ const HEROES = [
  w:{side:"defender",stat:"Attack",name:"Defend to Attack"}},
 // ── Gen 2 ──
 {id:"flint",kr:"플린트",en:"Flint",cls:"infantry",gen:2,rar:"leg",
- exp:[{n:"Pyromaniac",slot:"X",k:"dmg",v:1.0,tgt:"infantry",bk:"A",t:"보병 피해량 +100%",te:"infantry damage +100%"},
+ // Pyromaniac — 보병 전용 딜 몫이라 배율 제외(off:1 · 2026-11-13 사용자 결정 · 머리말 off 항목 ①). 조이너 플린트는 어떤 병비에서도 ×1.000 이다.
+ exp:[{n:"Pyromaniac",slot:"X",k:"dmg",v:1.0,tgt:"infantry",bk:"A",off:1,t:"보병 피해량 +100%",te:"infantry damage +100%"},
       {n:"Burning Resolve",slot:"B",v:.25,t:"전 부대 공격력 +25%",te:"all troops attack +25%"},
       {n:"Immolation",slot:"E",v:.25,t:"전 부대 파괴력 +25%",te:"all troops lethality +25%"}],
  w:{side:"defender",stat:"Attack",name:"Dragonbreath"}},
@@ -145,11 +156,14 @@ const HEROES = [
       // 아모세가 ×1.25~1.27 로 25% 조이너와 나란히 섰고, 「계산 추천 — 전체 영웅」에 13/60 행 올라왔다. 사용자: "보병만 버프하는 스킬이라
       // 효율이 좋을 수가 없다." 시트도 아모세를 조이너로 적은 적이 없다. 보병 전용 생존 버프의 실전 가치도, 같이 붙는 대가
       // (원문 "pauses the attack once every four times" — 2026-11-13 wosheroes 재확인)도 잴 자료가 없어 **값을 고쳐 넣지 않고 뺐다.**
-      // ⚠️ "대가를 못 실어서 뺐다" 가 근거의 전부가 아니다 — DW 0.1 로 그 대가를 어림하면 3% 남짓이라 그것만으로는 이 몫이 안 지워진다.
+      // ⚠️ "대가를 못 실어서 뺐다" 가 근거의 전부가 아니다. 그 대가를 어림하면 — 보병 공격 4회 중 1회 = 보병 딜의 25% → 총딜의 0.25 × 보병 딜 지분 —
+      // 시트의 보병 최대 병비 60/40 에서 3.3%(48/4/48 에서 2.1%)이고, 같은 병비에서 뺀 몫은 +21%(+16.8%)다. 대가만으로는 이 몫이 안 지워진다.
+      // (어림이다 — "공격을 쉰다" 가 딜을 정확히 1/4 깎는다는 실측은 없다. unit.mjs 「보병 전용 몫」 절이 이 산수를 다시 센다.)
       // 창·궁 −30% 몫(.15)은 그대로 계산한다 → 본체를 그쪽으로 두고 보병 몫을 also 로 돌렸다(조이너 판정 라벨도 창·궁 비중을 본다).
       {n:"Viper Formation",slot:"X",k:"sur",v:.15,tgt:"mar+lan",bk:"D",also:{slot:"X",k:"sur",v:.35,tgt:"infantry",bk:"D",off:1},t:"보병이 4회마다 공격을 쉬고, 2턴 보병 받피 −70% · 창·궁 −30%",te:"infantry pause their attack once every four times; for 2 turns infantry damage taken −70%, lancer/marksman −30%"},
-      {n:"Prayer of Flame",slot:"X",k:"dmg",v:1.0,tgt:"infantry",bk:"A",t:"보병 피해량 +100%",te:"infantry damage +100%"},
-      {n:"Blade of Light",slot:"X",k:"dmg",v:.60,tgt:"infantry",unsure:1,also:{slot:"G",v:null},t:"보병 공격당 피해 +60% & 대상 받피 +25%",te:"infantry, per attack: +60% damage & target takes +25% damage"}],
+      // S2 · S3 도 보병 전용 딜 몫이라 배율 제외(off:1 · 머리말 off 항목 ①) — 플린트 S1 과 같은 잣대다. S3 의 "대상 받피 +25%" 몫은 원래 v:null.
+      {n:"Prayer of Flame",slot:"X",k:"dmg",v:1.0,tgt:"infantry",bk:"A",off:1,t:"보병 피해량 +100%",te:"infantry damage +100%"},
+      {n:"Blade of Light",slot:"X",k:"dmg",v:.60,tgt:"infantry",unsure:1,off:1,also:{slot:"G",v:null},t:"보병 공격당 피해 +60% & 대상 받피 +25%",te:"infantry, per attack: +60% damage & target takes +25% damage"}],
  w:{side:"defender",stat:"Health",name:"Oath of Guardian"}},
 {id:"reina",s:1,kr:"레이나",en:"Reina",cls:"lancer",gen:4,rar:"leg",
  exp:[{n:"Assassin's Instinct",slot:"An",v:.30,t:"일반공격 피해 +30%",te:"normal-attack damage +30%"},
@@ -164,7 +178,8 @@ const HEROES = [
 // ── Gen 5 ──
 {id:"hector",kr:"헥터",en:"Hector",cls:"infantry",gen:5,rar:"leg",
  exp:[{n:"Survival Instincts",slot:"D",v:.20,p:"40%",pe:"40% chance",t:"40% 확률 받는 피해 −50%",te:"40% chance: damage taken −50%"},
-      {n:"Rampant",slot:"X",k:"dmg",v:1.07,tgt:"infantry",bk:"A",also:{slot:"X",k:"dmg",v:.535,tgt:"marksman",bk:"A"},t:"보병 피해량 +200% · 궁병 +100% (10회 동안 매 공격 85%로 감쇠 → 평균 0.535 환산)",te:"infantry damage +200%, marksmen +100% (decays over 10 procs)"},
+      // Rampant 의 보병 몫(본체)은 보병 전용 딜 몫이라 배율 제외(off:1 · 머리말 off 항목 ①). 궁병 몫(also)은 그대로 계산한다 — off 는 물려받지 않는다.
+      {n:"Rampant",slot:"X",k:"dmg",v:1.07,tgt:"infantry",bk:"A",off:1,also:{slot:"X",k:"dmg",v:.535,tgt:"marksman",bk:"A"},t:"보병 피해량 +200% · 궁병 +100% (10회 동안 매 공격 85%로 감쇠 → 평균 0.535 환산)",te:"infantry damage +200%, marksmen +100% (decays over 10 procs)"},
       {n:"Blitz",slot:"SKILL",v:.25,p:"25%",pe:"25% chance",t:"25% 확률 200% 피해",te:"25% chance: 200% damage"}],   // 필리 Dosage Boost 와 같은 문장·같은 정정(2026-09-14)
  w:{side:"defender",stat:"Attack",name:"Goliath"}},
 {id:"norah",s:1,stack:1,kr:"노라",en:"Norah",cls:"lancer",gen:5,rar:"leg",
@@ -282,7 +297,8 @@ const HEROES = [
 {id:"herbjorg",kr:"헤르보르",en:"Hervor",cls:"infantry",gen:12,rar:"leg",
  exp:[{n:"Call For Blood",slot:"E",v:.25,t:"전 부대 파괴력 +25%",te:"all troops lethality +25%"},
       {n:"Undying",slot:"D",v:null,unsure:1,tgt:"infantry",t:"보병 일반 받피 −25% / 스킬 받피 −30%",te:"infantry: normal-attack damage taken −25% / skill damage taken −30%"},
-      {n:"Battlethirsty",slot:"X",k:"sur",v:.15,tgt:"infantry",bk:"D",also:{slot:"X",k:"dmg",v:.10,tgt:"infantry",bk:"A"},t:"보병 받피 −15% / 피해량 +10%",te:"infantry damage taken −15% / damage +10%"}],
+      // Battlethirsty 의 피해량 몫(also)은 보병 전용 딜 몫이라 배율 제외(off:1 · 머리말 off 항목 ①). 받피 몫(본체)은 그대로 계산한다.
+      {n:"Battlethirsty",slot:"X",k:"sur",v:.15,tgt:"infantry",bk:"D",also:{slot:"X",k:"dmg",v:.10,tgt:"infantry",bk:"A",off:1},t:"보병 받피 −15% / 피해량 +10%",te:"infantry damage taken −15% / damage +10%"}],
  w:{side:"defender",stat:"Defense",name:"Fort of Rock"}},
 {id:"karol",kr:"가로얼",en:"Karol",cls:"lancer",gen:12,rar:"leg",
  exp:[{n:"In the Wings",slot:"D",v:.20,t:"전 부대 받는 피해 −20%",te:"all troops damage taken −20%"},

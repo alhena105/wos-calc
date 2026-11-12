@@ -77,10 +77,11 @@ function render(d){
   '<p class="cap">'+L("같은 버킷은 더하고 다른 버킷은 곱합니다(버킷 값 = 1 + Σ%). 감소 계열도 1+Σ 로 나눗셈 쪽에 들어갑니다. <b>회색 칩</b>은 스킬 데미지·리더 전용 버킷(보호막·표식 대상·특정 병종 상대·추가 피해·스킬 데미지↑)이라 <b>수치 모델이 없어 배율에 넣지 않았습니다</b> — 근거: Ton 2026-11-10 영상의 원정스킬 버킷표.",
    "Same bucket adds, different buckets multiply (bucket = 1 + Σ%). Reductions also enter as 1+Σ, on the dividing side. <b>Grey chips</b> are skill damage and leader-only buckets (shield, marked target, vs a troop type, extra damage, skill damage up) — <b>there is no numeric model for them, so they are not scored</b>. Source: the expedition-skill bucket table in Ton's 2026-11-10 video.")+'</p>'+
   (unknown.length?'<p class="cap">❓ '+L("수치 미확인·미확정: ","Unconfirmed: ")+unknown.map(x=>esc(HN(x.hero))+" "+esc(x.skill)+" ("+x.slot+(x.reason==="unsure"?L(" — 표에서도 ?"," — ? in the table"):L(" — 수치 없음 · 배율 제외"," — no value · not scored"))+")").join(" · ")+'</p>':"")+
-  // off — 값은 적혀 있지만 배율에서 뺀 몫(아모세 Viper 의 보병 몫). 숨기지 않고 여기 적는다.
+  // off — 값은 적혀 있지만 배율에서 뺀 몫(보병 전용 딜 몫 · 아모세 Viper 의 보병 몫). 숨기지 않고 여기 적는다.
+  // "나머지 몫은 그대로 계산" 은 점수에 드는 다른 몫이 실제로 있는 스킬(헥터 Rampant 의 궁병 몫 · 아모세 Viper 의 창·궁 몫)에만 적는다 — 플린트 S1 에는 나머지가 없다.
   (offs&&offs.length?'<p class="cap" data-k="off">⏸ '+L("배율에서 뺀 몫: ","Left out of the score: ")+offs.map(x=>esc(HN(x.hero))+" "+esc(x.skill)+" ("+tgtName[x.tgt]+L(" 몫"," part")+")").join(" · ")+
-    L(" — 수치는 있지만 실전 가치를 잴 자료가 없어 점수에 넣지 않았습니다. 같은 스킬의 나머지 몫은 그대로 계산합니다.",
-      " — the number is known, but there is no data to value it in battle, so it is not scored. The rest of the same skill is scored as usual.")+'</p>':"")+
+    L(" — 수치는 있지만 실전 가치를 잴 자료가 없어 점수에 넣지 않았습니다."," — the number is known, but there is no data to value it in battle, so it is not scored.")+
+    (r=>r.length?L(" "+r.join(" · ")+" 의 나머지 몫은 그대로 계산합니다."," The rest of "+r.join(" · ")+" is scored as usual."):"")(offs.filter(x=>x.rest).map(x=>esc(x.skill)).filter((s,i,a)=>a.indexOf(s)===i))+'</p>':"")+
   '</div>';
  o+="</div>";
  part.buck=o;o="";
@@ -110,19 +111,27 @@ function render(d){
    '%</td><td><span class="tag t-'+(c.st==="dead"?"bad":c.st==="weak"?"warn":"ok")+'">'+c.lbl+"</span>"+
    (c.e.off?' <span class="tag t-warn">'+L("배율 제외","not scored")+"</span>":"")+"</td></tr>";});
   o+="</tbody></table></div>";
-  const dead=cls.filter(c=>c.st==="dead");
+  // 한 스킬의 두 몫이 같은 병종을 보면(헤르보르 Battlethirsty = 보병 받피 + 보병 피해량) 표에는 두 행이지만 죽은 스킬로는 하나다 —
+  // 그대로 세면 "죽은 스킬 2개" 아래 같은 줄이 두 번 찍힌다. 영웅·스킬·대상이 같으면 한 번만 적는다.
+  const dead=cls.filter(c=>c.st==="dead").filter((c,i,a)=>a.findIndex(x=>x.hero===c.hero&&x.e.n===c.e.n&&x.e.tgt===c.e.tgt)===i);
+  // 같은 스킬의 다른 몫이 살아 있는데 배율에서 뺀 몫(off)이면 그 사실을 같이 적는다 — 안 적으면 "죽은 스킬 · 교체하세요" 옆 행에
+  // "보병 100% 정상" 이 떠서 화면이 스스로와 어긋난다(리더 아모세 · 보병 100%). 그 스킬은 게임에서 죽은 게 아니라 점수에 드는 몫만 0 이다.
+  const offLive=c=>cls.filter(x=>x!==c&&x.hero===c.hero&&x.e.n===c.e.n&&x.e.off&&x.st!=="dead")[0];
   if(dead.length)o+='<div class="callout co-warn"><h3>'+L("⚠️ 죽은 스킬 ","⚠️ Dead skills: ")+dead.length+L("개","")+"</h3><p>"+
-    dead.map(c=>"<b>"+esc(HN(c.hero))+" "+esc(c.e.n)+"</b> — "+tgtName[c.e.tgt]+L(" 비중 "," share ")+c.v.toFixed(0)+"%").join("<br>")+
+    dead.map(c=>{const s=offLive(c);return "<b>"+esc(HN(c.hero))+" "+esc(c.e.n)+"</b> — "+tgtName[c.e.tgt]+L(" 비중 "," share ")+c.v.toFixed(0)+"%"+
+      (s?' <span class="note" data-k="offlive">· '+tgtName[s.e.tgt]+L(" 몫("," part (")+s.v.toFixed(0)+L("%)은 게임에서 발동하지만 배율에서 뺀 몫입니다 — 점수에 드는 몫만 0 입니다","%) is active in game but left out of the score — only the scored part is zero")+"</span>":"");}).join("<br>")+
     "</p><p>"+L("해당 병종을 늘리거나, 병종 전용 스킬이 없는 영웅으로 교체하세요.","Raise that troop type, or swap in a hero without class-locked skills.")+"</p></div>";
   o+='<div class="callout co-tip"><h3>'+L("📖 실제 병종 메커니즘 (병종 스탯 시스템 가이드)","📖 How troop counters actually work (troop stat guide)")+'</h3>'+
    L("<p><b>상성은 전용 타겟팅이 아니라 +10% 공격 보너스입니다.</b> 모든 병종이 모든 병종을 때립니다 — 궁병이 없어도 보병을 잡습니다.</p>","<p><b>The counter triangle is a +10% attack bonus, not exclusive targeting.</b> Every troop type hits every other type — you kill infantry without marksmen.</p>")+
-   '<table class="hgrid"><thead><tr><th>'+L("상성","Counter")+'</th><th>'+L("스킬","Skill")+'</th><th>'+L("효과","Effect")+'</th></tr></thead><tbody>'+
-   MECH.rps.map(r=>"<tr><td>"+r[0]+"</td><td>"+r[1]+"</td><td>"+r[2]+"</td></tr>").join("")+"</tbody></table>"+
-   '<table class="hgrid"><thead><tr><th>'+L("T7 스킬","T7 skill")+'</th><th>'+L("효과","Effect")+'</th></tr></thead><tbody>'+
-   MECH.t7.map(r=>"<tr><td>"+r[0]+"</td><td>"+r[1]+"</td></tr>").join("")+"</tbody></table>"+
+   // 이 안내의 표 셋도 .xscroll 로 감싼다 — 영어 화면 320px 에서 병종 스탯 표(자연폭 295px)가 본문을 25px 밀었다(2026-11-13).
+   // 병종 전용 스킬을 가진 리더를 골라야 이 안내가 떠서, 기본 리더만 보던 넘침 검사가 못 잡고 있었다.
+   '<div class="xscroll"><table class="hgrid"><thead><tr><th>'+L("상성","Counter")+'</th><th>'+L("스킬","Skill")+'</th><th>'+L("효과","Effect")+'</th></tr></thead><tbody>'+
+   MECH.rps.map(r=>"<tr><td>"+r[0]+"</td><td>"+r[1]+"</td><td>"+r[2]+"</td></tr>").join("")+"</tbody></table></div>"+
+   '<div class="xscroll"><table class="hgrid"><thead><tr><th>'+L("T7 스킬","T7 skill")+'</th><th>'+L("효과","Effect")+'</th></tr></thead><tbody>'+
+   MECH.t7.map(r=>"<tr><td>"+r[0]+"</td><td>"+r[1]+"</td></tr>").join("")+"</tbody></table></div>"+
    '<p class="cap">'+L('창병의 후열 침투는 <b>20% 확률</b>입니다(100% 아님). "창병이 궁병을 순삭한다"는 표현은 실제 수치보다 과장돼 있습니다.','The lancer back-line bypass is a <b>20% chance</b>, not 100%. Phrases like "their lancers delete your marksmen instantly" overstate what the numbers support.')+'</p>'+
-   '<table class="hgrid"><thead><tr><th>'+L("병종","Type")+'</th><th>'+L("배치","Row")+'</th><th>'+L("공격","Atk")+'</th><th>'+L("방어","Def")+'</th><th>'+L("체력","HP")+'</th><th>'+L("치명","Leth")+'</th></tr></thead><tbody>'+
-   MECH.stat.map(r=>"<tr><td>"+r[0]+"</td><td>"+r[1]+"</td><td>"+r[2]+"</td><td>"+r[3]+"</td><td>"+r[4]+"</td><td>"+r[5]+"</td></tr>").join("")+"</tbody></table>"+
+   '<div class="xscroll"><table class="hgrid"><thead><tr><th>'+L("병종","Type")+'</th><th>'+L("배치","Row")+'</th><th>'+L("공격","Atk")+'</th><th>'+L("방어","Def")+'</th><th>'+L("체력","HP")+'</th><th>'+L("치명","Leth")+'</th></tr></thead><tbody>'+
+   MECH.stat.map(r=>"<tr><td>"+r[0]+"</td><td>"+r[1]+"</td><td>"+r[2]+"</td><td>"+r[3]+"</td><td>"+r[4]+"</td><td>"+r[5]+"</td></tr>").join("")+"</tbody></table></div>"+
    '<p class="cap">'+L("T10 기준. 사수는 공격·치명 최고 / 방어·체력 최저, 보병은 반대. 창병은 균형형.","At T10. Marksmen top attack and lethality, bottom defense and health; infantry the reverse; lancers balanced.")+'</p>'+
    "</div>";
   o+="</div>";}
